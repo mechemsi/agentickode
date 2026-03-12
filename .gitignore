@@ -1,0 +1,44 @@
+# IDE / tools
+.screenshots/
+.playwright-mcp/
+.serena/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.coverage
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+*.egg
+
+# Node
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.ssh/*
+!.ssh/.gitkeep
+
+# Test artifacts
+test-results/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log

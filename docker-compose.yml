@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8222:8000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ${WORKSPACE_ROOT:-/workspaces}:/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

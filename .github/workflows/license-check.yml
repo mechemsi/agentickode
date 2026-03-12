@@ -1,0 +1,187 @@
+name: License Header Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "backend/**/*.py"
+      - "frontend/src/**/*.ts"
+      - "frontend/src/**/*.tsx"
+      - "tests/**/*.py"
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * 1"  # Weekly Monday 8am UTC
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-license-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check license headers
+        id: check
+        run: |
+          MISSING=""
+          COUNT=0
+
+          # Check Python files
+          while IFS= read -r file; do
+            if ! head -3 "$file" | grep -q "Copyright (c) 2026 Mechemsi"; then
+              MISSING="${MISSING}- \`${file}\`\n"
+              COUNT=$((COUNT + 1))
+            fi
+          done < <(find backend tests -name "*.py" -not -path "*__pycache__*" | sort)
+
+          # Check TypeScript files
+          while IFS= read -r file; do
+            if ! head -3 "$file" | grep -q "Copyright (c) 2026 Mechemsi"; then
+              MISSING="${MISSING}- \`${file}\`\n"
+              COUNT=$((COUNT + 1))
+            fi
+          done < <(find frontend/src -name "*.ts" -o -name "*.tsx" | sort)
+
+          if [ "$COUNT" -gt 0 ]; then
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+            # Write to file to preserve newlines
+            printf '%b' "$MISSING" > /tmp/missing_files.txt
+          else
+            echo "status=passed" >> "$GITHUB_OUTPUT"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.check.outputs.status == 'failed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COUNT: ${{ steps.check.outputs.count }}
+          REPO: ${{ github.repository }}
+        run: |
+          MISSING=$(cat /tmp/missing_files.txt)
+          BODY=$(cat <<ENDOFBODY
+          ## :warning: License Header Check Failed
+
+          **${COUNT} file(s)** are missing the required license header:
+
+          ${MISSING}
+
+          ### Required header for Python files:
+          \`\`\`python
+          # Copyright (c) 2026 Mechemsi. All rights reserved.
+          # Licensed under AGPLv3. See LICENSE file.
+          # Commercial licensing: info@mechemsi.com
+          \`\`\`
+
+          ### Required header for TypeScript files:
+          \`\`\`typescript
+          // Copyright (c) 2026 Mechemsi. All rights reserved.
+          // Licensed under AGPLv3. See LICENSE file.
+          // Commercial licensing: info@mechemsi.com
+          \`\`\`
+          ENDOFBODY
+          )
+
+          # Find existing comment by this bot with this heading
+          EXISTING_COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("License Header Check")) | .id' \
+            | head -1)
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api "repos/${REPO}/issues/comments/${EXISTING_COMMENT_ID}" \
+              --method PATCH \
+              --field body="$BODY"
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
+
+      - name: Remove PR comment if passing
+        if: github.event_name == 'pull_request' && steps.check.outputs.status == 'passed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          EXISTING_COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("License Header Check")) | .id' \
+            | head -1)
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api "repos/${REPO}/issues/comments/${EXISTING_COMMENT_ID}" --method DELETE
+          fi
+
+      - name: Create or update issue on main
+        if: github.event_name == 'push' && steps.check.outputs.status == 'failed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COUNT: ${{ steps.check.outputs.count }}
+          SHA: ${{ github.sha }}
+        run: |
+          MISSING=$(cat /tmp/missing_files.txt)
+          SHORT_SHA="${SHA::7}"
+          TITLE="Missing license headers in source files"
+          BODY=$(cat <<ENDOFBODY
+          ## :warning: Missing License Headers
+
+          **${COUNT} file(s)** on \`main\` are missing the required license header.
+
+          ### Files missing headers:
+
+          ${MISSING}
+
+          ### Required header for Python files:
+          \`\`\`python
+          # Copyright (c) 2026 Mechemsi. All rights reserved.
+          # Licensed under AGPLv3. See LICENSE file.
+          # Commercial licensing: info@mechemsi.com
+          \`\`\`
+
+          ### Required header for TypeScript files:
+          \`\`\`typescript
+          // Copyright (c) 2026 Mechemsi. All rights reserved.
+          // Licensed under AGPLv3. See LICENSE file.
+          // Commercial licensing: info@mechemsi.com
+          \`\`\`
+
+          *Last checked: $(date -u '+%Y-%m-%d %H:%M UTC') on commit \`${SHORT_SHA}\`*
+          ENDOFBODY
+          )
+
+          # Find existing open issue with this title
+          EXISTING_ISSUE=$(gh issue list --state open --search "$TITLE" --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            gh issue edit "$EXISTING_ISSUE" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "license"
+          fi
+
+      - name: Close issue if passing on main
+        if: github.event_name == 'push' && steps.check.outputs.status == 'passed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Missing license headers in source files"
+          EXISTING_ISSUE=$(gh issue list --state open --search "$TITLE" --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            gh issue close "$EXISTING_ISSUE" --comment "All source files now have license headers."
+          fi
+
+      - name: Fail if missing headers
+        if: steps.check.outputs.status == 'failed'
+        env:
+          COUNT: ${{ steps.check.outputs.count }}
+        run: |
+          echo "::error::${COUNT} file(s) missing license headers. See job output or PR comment for details."
+          cat /tmp/missing_files.txt
+          exit 1

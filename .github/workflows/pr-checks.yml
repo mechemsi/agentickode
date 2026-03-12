@@ -1,0 +1,251 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'alembic/**'
+
+  pr-size:
+    name: PR Size Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR size
+        id: size
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | wc -l)
+          INSERTIONS=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" | awk '{ s += $1 } END { print s+0 }')
+          DELETIONS=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" | awk '{ s += $2 } END { print s+0 }')
+          TOTAL_LINES=$((INSERTIONS + DELETIONS))
+
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          echo "insertions=$INSERTIONS" >> "$GITHUB_OUTPUT"
+          echo "deletions=$DELETIONS" >> "$GITHUB_OUTPUT"
+          echo "lines=$TOTAL_LINES" >> "$GITHUB_OUTPUT"
+
+          STATUS="pass"
+          if [ "$FILES" -gt 20 ] || [ "$TOTAL_LINES" -gt 1500 ]; then
+            STATUS="fail"
+          fi
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        uses: actions/github-script@v7
+        env:
+          PR_FILES: ${{ steps.size.outputs.files }}
+          PR_INSERTIONS: ${{ steps.size.outputs.insertions }}
+          PR_DELETIONS: ${{ steps.size.outputs.deletions }}
+          PR_LINES: ${{ steps.size.outputs.lines }}
+          PR_STATUS: ${{ steps.size.outputs.status }}
+        with:
+          script: |
+            const files = parseInt(process.env.PR_FILES, 10);
+            const insertions = parseInt(process.env.PR_INSERTIONS, 10);
+            const deletions = parseInt(process.env.PR_DELETIONS, 10);
+            const lines = parseInt(process.env.PR_LINES, 10);
+            const status = process.env.PR_STATUS;
+            const marker = '<!-- pr-size-check -->';
+
+            // If under limits, remove existing comment if any
+            if (status === 'pass') {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+              });
+              const existing = comments.find(c => c.body.includes(marker));
+              if (existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                });
+              }
+              return;
+            }
+
+            const filesIcon = files > 20 ? ':x:' : ':white_check_mark:';
+            const linesIcon = lines > 1500 ? ':x:' : ':white_check_mark:';
+
+            const body = [
+              marker,
+              '### :warning: PR Size Check',
+              '',
+              '| Metric | Value | Limit | Status |',
+              '|--------|------:|------:|--------|',
+              `| Files changed | ${files} | 20 | ${filesIcon} |`,
+              `| Lines changed | +${insertions} -${deletions} = ${lines} | 1,500 | ${linesIcon} |`,
+              '',
+              '> Consider splitting this PR into smaller, focused changes.',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  alembic-check:
+    name: Alembic Migration Check
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if branch is behind main
+        id: behind
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "$BASE_REF"
+          BEHIND=$(git rev-list --count "HEAD..origin/$BASE_REF" -- alembic/)
+          echo "count=$BEHIND" >> "$GITHUB_OUTPUT"
+          if [ "$BEHIND" -gt 0 ]; then
+            echo "status=behind" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=ok" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for multiple migration heads
+        id: heads
+        run: |
+          set +e
+          OUTPUT=$(python scripts/check_alembic_heads.py 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+          echo "output<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        uses: actions/github-script@v7
+        env:
+          BEHIND_STATUS: ${{ steps.behind.outputs.status }}
+          BEHIND_COUNT: ${{ steps.behind.outputs.count }}
+          HEADS_EXIT: ${{ steps.heads.outputs.exit_code }}
+          HEADS_OUTPUT: ${{ steps.heads.outputs.output }}
+        with:
+          script: |
+            const marker = '<!-- alembic-check -->';
+            const behindStatus = process.env.BEHIND_STATUS;
+            const behindCount = process.env.BEHIND_COUNT;
+            const headsExit = parseInt(process.env.HEADS_EXIT, 10);
+            const headsOutput = process.env.HEADS_OUTPUT;
+            const hasIssues = behindStatus === 'behind' || headsExit !== 0;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            // All clear — remove comment if it exists
+            if (!hasIssues) {
+              if (existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                });
+              }
+              return;
+            }
+
+            const lines = [marker, '### :warning: Alembic Migration Check', ''];
+
+            if (behindStatus === 'behind') {
+              lines.push(
+                `**Branch is ${behindCount} commit(s) behind \`main\` in \`alembic/\`.**`,
+                'Rebase or merge main to avoid migration conflicts.',
+                ''
+              );
+            }
+
+            if (headsExit !== 0) {
+              lines.push(
+                '**Multiple migration heads detected:**',
+                '```',
+                headsOutput,
+                '```',
+                '',
+                'Fix: run `alembic merge heads -m merge_migrations` or rebase your migration.',
+              );
+            }
+
+            const body = lines.join('\n');
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail on multiple heads
+        if: steps.heads.outputs.exit_code != '0'
+        run: exit 1

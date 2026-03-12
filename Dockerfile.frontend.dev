@@ -1,0 +1,12 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+
+# Copy source so Vite can start immediately; dev volumes overlay at runtime
+COPY frontend/ .
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

@@ -1,0 +1,16 @@
+AutoDev
+Copyright (c) 2026 Mechemsi. All rights reserved.
+
+This product is licensed under the GNU Affero General Public License v3.0 (AGPLv3).
+A commercial license is also available. Contact info@mechemsi.com for details.
+
+This product includes software developed by third parties. See the respective
+license files in node_modules/ and Python package metadata for third-party notices.
+
+Third-party components:
+- FastAPI (MIT License) - https://github.com/tiangolo/fastapi
+- React (MIT License) - https://github.com/facebook/react
+- SQLAlchemy (MIT License) - https://github.com/sqlalchemy/sqlalchemy
+- Vite (MIT License) - https://github.com/vitejs/vite
+- Tailwind CSS (MIT License) - https://github.com/tailwindlabs/tailwindcss
+- xterm.js (MIT License) - https://github.com/xtermjs/xterm.js
