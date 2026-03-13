@@ -1,0 +1,15 @@
+# Normalize line endings to LF on checkout
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.gif binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Lock files - exact match
+package-lock.json -diff
