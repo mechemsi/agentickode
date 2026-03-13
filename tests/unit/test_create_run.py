@@ -45,7 +45,7 @@ class TestCreateRun:
         assert data["title"] == "Fix the login bug"
         assert data["project_id"] == "test-proj"
         assert data["id"] > 0
-        assert "autodev/test-proj/" in data["branch_name"]
+        assert "agentickode/test-proj/" in data["branch_name"]
 
     async def test_create_run_missing_project_returns_404(self, client: AsyncClient):
         resp = await client.post(
@@ -124,9 +124,9 @@ class TestCreateRun:
         )
         assert resp.status_code == 201
         branch = resp.json()["branch_name"]
-        # Format: autodev/{slug}/{timestamp}
+        # Format: agentickode/{slug}/{timestamp}
         parts = branch.split("/")
-        assert parts[0] == "autodev"
+        assert parts[0] == "agentickode"
         assert parts[1] == "test-proj"
         assert parts[2].isdigit()
 

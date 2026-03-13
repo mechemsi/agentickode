@@ -26,7 +26,7 @@ from backend.services.workspace.project_discovery import ProjectDiscoveryService
 from backend.services.workspace.ssh_service import SSHService
 from backend.services.workspace.worker_user_service import WorkerUserService
 
-logger = logging.getLogger("autodev.server_setup")
+logger = logging.getLogger("agentickode.server_setup")
 
 SETUP_STEPS = [
     "ssh_test",

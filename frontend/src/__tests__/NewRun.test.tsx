@@ -136,7 +136,7 @@ describe("NewRun", () => {
       status: "pending",
       title: "Fix bug",
       project_id: "proj-1",
-      branch_name: "autodev/my-project/123456",
+      branch_name: "agentickode/my-project/123456",
     });
 
     renderNewRun();
@@ -174,7 +174,7 @@ describe("NewRun", () => {
       status: "pending",
       title: "My run",
       project_id: "proj-1",
-      branch_name: "autodev/my-project/999",
+      branch_name: "agentickode/my-project/999",
     });
 
     renderNewRun();
@@ -281,7 +281,7 @@ describe("NewRun", () => {
       status: "pending",
       title: "Urgent fix",
       project_id: "proj-1",
-      branch_name: "autodev/my-project/555",
+      branch_name: "agentickode/my-project/555",
     });
 
     renderNewRun();

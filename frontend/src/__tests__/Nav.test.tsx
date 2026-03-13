@@ -17,9 +17,9 @@ describe("Nav", () => {
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("renders AutoDev brand name", () => {
+  it("renders AgenticKode brand name", () => {
     render(<MemoryRouter><Nav /></MemoryRouter>);
-    expect(screen.getByText("AutoDev")).toBeInTheDocument();
+    expect(screen.getByText("AgenticKode")).toBeInTheDocument();
   });
 
   it("highlights active link", () => {

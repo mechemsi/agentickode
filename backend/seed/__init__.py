@@ -23,7 +23,7 @@ from backend.seed.prompt_overrides import AGENT_PROMPT_OVERRIDES, seed_prompt_ov
 from backend.seed.role_configs import DEFAULT_ROLE_CONFIGS, seed_role_configs
 from backend.seed.workflow_templates import DEFAULT_WORKFLOW_TEMPLATES, seed_workflow_templates
 
-logger = logging.getLogger("autodev.seed")
+logger = logging.getLogger("agentickode.seed")
 
 # Re-export everything that external code imports from `backend.seed`.
 # Keep private helpers accessible for tests that import them directly.

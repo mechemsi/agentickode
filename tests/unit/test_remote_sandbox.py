@@ -20,7 +20,7 @@ def mock_ssh():
 
 @pytest.fixture()
 def remote_sandbox(mock_ssh):
-    return RemoteSandbox(mock_ssh, templates_path="/opt/autodev/docker/sandboxes")
+    return RemoteSandbox(mock_ssh, templates_path="/opt/agentickode/docker/sandboxes")
 
 
 class TestStartSandbox:

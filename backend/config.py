@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "postgresql+asyncpg://autodev:autodev@postgres:5432/autodev"
+    database_url: str = "postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode"
 
     # Ollama
     ollama_url: str = "http://localhost:11434"
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Workspace
     workspace_root: str = "/workspaces"
     default_ssh_key_path: str = "/app/.ssh/id_ed25519"
-    sandbox_templates_path: str = "/opt/autodev/docker/sandboxes"
+    sandbox_templates_path: str = "/opt/agentickode/docker/sandboxes"
 
     # Encryption
     encryption_key: str = ""

@@ -17,7 +17,7 @@ from backend.services.workspace.ssh_service import SSHCommandError
 if TYPE_CHECKING:
     from backend.services.workspace.ssh_service import SSHService
 
-logger = logging.getLogger("autodev.remote_git_ops")
+logger = logging.getLogger("agentickode.remote_git_ops")
 
 
 class RemoteGitError(RuntimeError):

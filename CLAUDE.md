@@ -340,7 +340,7 @@ When asked to create a plan, write it to a file immediately and do NOT attempt t
 
 ## CI/CD
 
-GitHub Actions workflow files must be placed at the REPOSITORY ROOT under `.github/workflows/`, not inside subdirectories like `autodev-app/.github/workflows/`.
+GitHub Actions workflow files must be placed at the REPOSITORY ROOT under `.github/workflows/`, not inside subdirectories like `agentickode-app/.github/workflows/`.
 
 ## Docker & Infrastructure
 

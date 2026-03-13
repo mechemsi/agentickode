@@ -28,7 +28,7 @@ from backend.worker.phases._helpers import (
     get_ssh_for_run,
 )
 
-logger = logging.getLogger("autodev.phases.finalization")
+logger = logging.getLogger("agentickode.phases.finalization")
 
 PHASE_META = {
     "description": "Confirm PR and clean up resources",

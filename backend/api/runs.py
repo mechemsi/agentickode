@@ -31,7 +31,7 @@ from backend.schemas import (
     TerminalActionRequest,
 )
 
-logger = logging.getLogger("autodev.runs")
+logger = logging.getLogger("agentickode.runs")
 router = APIRouter(tags=["runs"])
 
 
@@ -70,7 +70,7 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
 
     ts = int(time.time())
     slug = project.project_slug or project.repo_name
-    branch_name = f"autodev/{slug}/{ts}"
+    branch_name = f"agentickode/{slug}/{ts}"
 
     ws_server_id = req.workspace_server_id or project.workspace_server_id
     workspace_path = project.workspace_path or project.repo_name

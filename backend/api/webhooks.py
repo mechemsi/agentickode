@@ -17,7 +17,7 @@ from backend.database import get_db
 from backend.models import ProjectConfig, TaskRun
 from backend.repositories.project_config_repo import ProjectConfigRepository
 
-logger = logging.getLogger("autodev.webhooks")
+logger = logging.getLogger("agentickode.webhooks")
 router = APIRouter(tags=["webhooks"])
 
 

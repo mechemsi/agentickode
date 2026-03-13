@@ -17,7 +17,7 @@ from backend.repositories.workflow_template_repo import WorkflowTemplateReposito
 from backend.services.container import ServiceContainer
 from backend.worker.broadcaster import broadcaster
 
-logger = logging.getLogger("autodev.phases.task_creation")
+logger = logging.getLogger("agentickode.phases.task_creation")
 
 PHASE_META = {
     "description": "Create child task runs from subtasks",

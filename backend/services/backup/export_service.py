@@ -49,7 +49,7 @@ class ExportService:
             ]
 
         envelope: dict = {
-            "autodev_export": {
+            "agentickode_export": {
                 "schema_version": CURRENT_SCHEMA_VERSION,
                 "exported_at": datetime.now(UTC).isoformat(),
                 "secret_mode": secret_mode.value,
@@ -57,7 +57,7 @@ class ExportService:
             }
         }
         if handler.salt_b64:
-            envelope["autodev_export"]["encryption_salt"] = handler.salt_b64
+            envelope["agentickode_export"]["encryption_salt"] = handler.salt_b64
         return envelope
 
     async def export_project(
@@ -94,7 +94,7 @@ class ExportService:
                 entities["workspace_servers"] = [serialize_entity(ws, ws_cfg, handler, id_to_name)]
 
         envelope: dict = {
-            "autodev_export": {
+            "agentickode_export": {
                 "schema_version": CURRENT_SCHEMA_VERSION,
                 "exported_at": datetime.now(UTC).isoformat(),
                 "secret_mode": secret_mode.value,
@@ -102,7 +102,7 @@ class ExportService:
             }
         }
         if handler.salt_b64:
-            envelope["autodev_export"]["encryption_salt"] = handler.salt_b64
+            envelope["agentickode_export"]["encryption_salt"] = handler.salt_b64
         return envelope
 
     # --- helpers ---

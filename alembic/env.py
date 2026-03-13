@@ -18,7 +18,7 @@ target_metadata = Base.metadata
 # Override sqlalchemy.url from env
 config.set_main_option(
     "sqlalchemy.url",
-    os.environ.get("DATABASE_URL", "postgresql+asyncpg://autodev:autodev@postgres:5432/autodev"),
+    os.environ.get("DATABASE_URL", "postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode"),
 )
 
 

@@ -74,7 +74,7 @@ class GitAccessService:
             return existing
 
         force_flag = "-y" if force else ""
-        comment = f"autodev@{server_name}"
+        comment = f"agentickode@{server_name}"
         cmd = f'ssh-keygen -t ed25519 -C "{comment}" -f ~/.ssh/id_ed25519 -N "" ' f"{force_flag} -q"
         _, stderr, rc = await self._ssh.run_command(cmd, timeout=15)
         if rc != 0:

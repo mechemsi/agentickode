@@ -17,7 +17,7 @@ from backend.config import settings
 if TYPE_CHECKING:
     from backend.services.workspace.ssh_service import SSHService
 
-logger = logging.getLogger("autodev.worker_user")
+logger = logging.getLogger("agentickode.worker_user")
 
 # Agents that need non-root to run (used by CLIAdapter)
 _CLI_AGENTS = ["claude", "codex", "aider", "opencode", "gemini", "kimi", "copilot"]
@@ -82,10 +82,10 @@ class WorkerUserService:
             f"chmod 600 {home}/.ssh/config 2>/dev/null || true",
             # Set up basic git config for the worker user
             (
-                f'runuser -u {safe_user} -- git config --global user.name "autodev" 2>/dev/null || true'
+                f'runuser -u {safe_user} -- git config --global user.name "agentickode" 2>/dev/null || true'
             ),
             (
-                f'runuser -u {safe_user} -- git config --global user.email "autodev@localhost" 2>/dev/null || true'
+                f'runuser -u {safe_user} -- git config --global user.email "agentickode@localhost" 2>/dev/null || true'
             ),
             # Persist PATH in .bashrc for interactive shells
             (
@@ -100,11 +100,11 @@ class WorkerUserService:
             env_content = "\\n".join(env_lines)
             setup_cmds.extend(
                 [
-                    f'printf "{env_content}\\n" > {home}/.autodev_env',
-                    f"chmod 600 {home}/.autodev_env",
+                    f'printf "{env_content}\\n" > {home}/.agentickode_env',
+                    f"chmod 600 {home}/.agentickode_env",
                     (
-                        f"grep -q 'autodev_env' {home}/.bashrc 2>/dev/null || "
-                        f"echo '[ -f ~/.autodev_env ] && . ~/.autodev_env' >> {home}/.bashrc"
+                        f"grep -q 'agentickode_env' {home}/.bashrc 2>/dev/null || "
+                        f"echo '[ -f ~/.agentickode_env ] && . ~/.agentickode_env' >> {home}/.bashrc"
                     ),
                 ]
             )
@@ -168,7 +168,7 @@ class WorkerUserService:
     def _build_env_vars() -> list[str]:
         """Build environment variable exports for the worker user.
 
-        These are written to ~/.autodev_env and sourced from .bashrc so that
+        These are written to ~/.agentickode_env and sourced from .bashrc so that
         agent plugins (github MCP, etc.) and CLI tools have access to tokens.
         """
         lines: list[str] = []

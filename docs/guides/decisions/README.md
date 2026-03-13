@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Key design decisions for the AutoDev project. Each record explains the context, options considered, and rationale.
+Key design decisions for the AgenticKode project. Each record explains the context, options considered, and rationale.
 
 ## Index
 

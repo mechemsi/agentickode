@@ -11,7 +11,7 @@ import httpx
 
 from backend.config import settings
 
-logger = logging.getLogger("autodev.task_source_updater")
+logger = logging.getLogger("agentickode.task_source_updater")
 
 
 class TaskSourceUpdater:
@@ -61,7 +61,7 @@ class TaskSourceUpdater:
             logger.debug("No comments_url in task_source_meta, skipping GitHub notify")
             return
 
-        body = f"**AutoDev Run #{run_id}** — Phase `{phase_name}` {status}"
+        body = f"**AgenticKode Run #{run_id}** — Phase `{phase_name}` {status}"
         if pr_url:
             body += f"\nPR: {pr_url}"
 
@@ -94,7 +94,7 @@ class TaskSourceUpdater:
             logger.debug("Incomplete Plane metadata, skipping Plane notify")
             return
 
-        comment = f"**AutoDev Run #{run_id}** — Phase `{phase_name}` {status}"
+        comment = f"**AgenticKode Run #{run_id}** — Phase `{phase_name}` {status}"
         if pr_url:
             comment += f"\nPR: {pr_url}"
 
@@ -127,7 +127,7 @@ class TaskSourceUpdater:
             logger.debug("Incomplete Gitea metadata, skipping Gitea notify")
             return
 
-        body = f"**AutoDev Run #{run_id}** — Phase `{phase_name}` {status}"
+        body = f"**AgenticKode Run #{run_id}** — Phase `{phase_name}` {status}"
         if pr_url:
             body += f"\nPR: {pr_url}"
 
@@ -155,7 +155,7 @@ class TaskSourceUpdater:
             logger.debug("Incomplete GitLab metadata, skipping GitLab notify")
             return
 
-        body = f"**AutoDev Run #{run_id}** — Phase `{phase_name}` {status}"
+        body = f"**AgenticKode Run #{run_id}** — Phase `{phase_name}` {status}"
         if pr_url:
             body += f"\nPR: {pr_url}"
 

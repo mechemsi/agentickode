@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from backend.models import AgentSettings
 from backend.seed._helpers import commands_for
 
-logger = logging.getLogger("autodev.seed")
+logger = logging.getLogger("agentickode.seed")
 
 # ---------------------------------------------------------------------------
 # Claude CLI install: binary + marketplaces + plugins

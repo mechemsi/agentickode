@@ -22,7 +22,7 @@ const mockGetHealth = vi.fn().mockResolvedValue({
 const mockGetSSHKeys = vi.fn().mockResolvedValue([
   {
     name: "id_ed25519",
-    public_key: "ssh-ed25519 AAAA autodev@host",
+    public_key: "ssh-ed25519 AAAA agentickode@host",
     created_at: "2025-01-01T00:00:00Z",
     is_default: true,
   },
@@ -86,7 +86,7 @@ describe("Settings", () => {
     mockGetSSHKeys.mockResolvedValue([
       {
         name: "id_ed25519",
-        public_key: "ssh-ed25519 AAAA autodev@host",
+        public_key: "ssh-ed25519 AAAA agentickode@host",
         created_at: "2025-01-01T00:00:00Z",
         is_default: true,
       },
@@ -123,7 +123,7 @@ describe("Settings", () => {
   it("lists existing SSH keys", async () => {
     renderSettings();
     expect(await screen.findByText("id_ed25519")).toBeInTheDocument();
-    expect(await screen.findByText("ssh-ed25519 AAAA autodev@host")).toBeInTheDocument();
+    expect(await screen.findByText("ssh-ed25519 AAAA agentickode@host")).toBeInTheDocument();
     expect(await screen.findByText("default")).toBeInTheDocument();
   });
 

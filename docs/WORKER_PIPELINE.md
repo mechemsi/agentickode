@@ -1,4 +1,4 @@
-# AutoDev Worker Pipeline — Complete Technical Reference
+# AgenticKode Worker Pipeline — Complete Technical Reference
 
 This document covers every detail of the worker pipeline: engine polling, phase sequencing, prompt templates, SSH commands, timeouts, retry logic, and data flow.
 
@@ -351,7 +351,7 @@ async def run(task_run, session, services, phase_config=None) -> None
 2. Command: git init
 3. Command: git checkout -b {default_branch}
 4. If scaffold_template specified:
-   Command: bash /opt/autodev/docker/sandboxes/{template}/scaffold.sh
+   Command: bash /opt/agentickode/docker/sandboxes/{template}/scaffold.sh
    Timeout: 300 seconds
 5. Command: git add -A
 6. Command: git commit -m "Initial project scaffold" --allow-empty

@@ -99,7 +99,7 @@ async def test_export_full_redacted(db_session: AsyncSession):
     svc = ExportService(db_session)
     envelope = await svc.export_config(secret_mode=SecretMode.redacted)
 
-    inner = envelope["autodev_export"]
+    inner = envelope["agentickode_export"]
     assert inner["schema_version"] == CURRENT_SCHEMA_VERSION
     assert inner["secret_mode"] == "redacted"
     assert "encryption_salt" not in inner
@@ -140,7 +140,7 @@ async def test_export_encrypted(db_session: AsyncSession):
     await _seed(db_session)
     svc = ExportService(db_session)
     envelope = await svc.export_config(secret_mode=SecretMode.encrypted, password="test")
-    inner = envelope["autodev_export"]
+    inner = envelope["agentickode_export"]
     assert inner["secret_mode"] == "encrypted"
     assert "encryption_salt" in inner
 
@@ -154,7 +154,7 @@ async def test_export_selected_types(db_session: AsyncSession):
     await _seed(db_session)
     svc = ExportService(db_session)
     envelope = await svc.export_config(entity_types=["app_settings", "workspace_servers"])
-    entities = envelope["autodev_export"]["entities"]
+    entities = envelope["agentickode_export"]["entities"]
     assert "app_settings" in entities
     assert "workspace_servers" in entities
     assert "project_configs" not in entities
@@ -165,7 +165,7 @@ async def test_export_single_project(db_session: AsyncSession):
     await _seed(db_session)
     svc = ExportService(db_session)
     envelope = await svc.export_project("proj-1")
-    entities = envelope["autodev_export"]["entities"]
+    entities = envelope["agentickode_export"]["entities"]
     assert len(entities["project_configs"]) == 1
     assert "workspace_servers" in entities
 

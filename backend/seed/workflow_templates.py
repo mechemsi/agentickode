@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import WorkflowTemplate
 
-logger = logging.getLogger("autodev.seed")
+logger = logging.getLogger("agentickode.seed")
 
 _PHASE_AUTO = {
     "role": None,

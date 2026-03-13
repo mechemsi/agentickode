@@ -71,7 +71,7 @@ describe("GitAccessPanel", () => {
     });
     mockGenerateGitKey.mockResolvedValue({
       has_key: true,
-      public_key: "ssh-ed25519 NEWKEY autodev@srv",
+      public_key: "ssh-ed25519 NEWKEY agentickode@srv",
       key_type: "ed25519",
       providers: [],
     });

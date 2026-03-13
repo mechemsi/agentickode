@@ -411,7 +411,7 @@ export default function Settings() {
                   type="text"
                   value={keyComment}
                   onChange={(e) => setKeyComment(e.target.value)}
-                  placeholder="e.g. autodev@production"
+                  placeholder="e.g. agentickode@production"
                   className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 />
               </div>

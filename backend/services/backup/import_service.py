@@ -31,7 +31,7 @@ class ImportService:
         password: str | None = None,
     ) -> dict:
         """Dry-run: return what *would* happen for each entity."""
-        inner = data["autodev_export"]
+        inner = data["agentickode_export"]
         validate_schema_version(inner["schema_version"])
 
         secret_mode = inner.get("secret_mode", "plaintext")
@@ -69,7 +69,7 @@ class ImportService:
         password: str | None = None,
     ) -> dict:
         """Actually import entities, respecting dependency order."""
-        inner = data["autodev_export"]
+        inner = data["agentickode_export"]
         validate_schema_version(inner["schema_version"])
 
         secret_mode = inner.get("secret_mode", "plaintext")

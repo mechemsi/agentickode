@@ -9,7 +9,7 @@ DEFAULT_KEY="$SSH_DIR/id_ed25519"
 if [ ! -f "$DEFAULT_KEY" ]; then
   echo "Generating default SSH key at $DEFAULT_KEY..."
   mkdir -p "$SSH_DIR"
-  ssh-keygen -t ed25519 -f "$DEFAULT_KEY" -N "" -C "autodev@$(hostname)"
+  ssh-keygen -t ed25519 -f "$DEFAULT_KEY" -N "" -C "agentickode@$(hostname)"
   chmod 600 "$DEFAULT_KEY"
   chmod 644 "$DEFAULT_KEY.pub"
   echo "SSH key generated."

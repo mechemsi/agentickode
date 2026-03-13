@@ -25,7 +25,7 @@ from backend.services.schedule import is_within_schedule
 from backend.worker.broadcaster import broadcaster
 from backend.worker.pipeline import execute_pipeline
 
-logger = logging.getLogger("autodev.worker")
+logger = logging.getLogger("agentickode.worker")
 
 
 class WorkerEngine:

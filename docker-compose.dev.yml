@@ -2,13 +2,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: autodev
-      POSTGRES_PASSWORD: autodev
-      POSTGRES_DB: autodev
+      POSTGRES_USER: agentickode
+      POSTGRES_PASSWORD: agentickode
+      POSTGRES_DB: agentickode
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U autodev"]
+      test: ["CMD-SHELL", "pg_isready -U agentickode"]
       interval: 2s
       timeout: 5s
       retries: 10
@@ -33,7 +33,7 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql+asyncpg://autodev:autodev@postgres:5432/autodev
+      DATABASE_URL: postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +69,6 @@ services:
 
 volumes:
   pgdata:
-    name: autodev-app_pgdata
+    name: agentickode-app_pgdata
   redisdata:
-    name: autodev-app_redisdata
+    name: agentickode-app_redisdata

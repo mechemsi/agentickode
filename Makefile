@@ -83,7 +83,7 @@ migrate-new:
 	$(DC) exec backend alembic revision --autogenerate -m "$(MSG)"
 
 db-shell:
-	$(DC) exec postgres psql -U autodev -d autodev
+	$(DC) exec postgres psql -U agentickode -d agentickode
 
 # ── CI (mirrors GitHub Actions) ──────────────────────────────
 .PHONY: ci ci-backend ci-frontend ci-push

@@ -47,7 +47,7 @@ from backend.services.http_client import close_http_client
 from backend.services.notifications.dispatcher import NotificationDispatcher
 from backend.worker.engine import WorkerEngine
 
-logger = logging.getLogger("autodev")
+logger = logging.getLogger("agentickode")
 
 worker_engine = WorkerEngine()
 notification_dispatcher = NotificationDispatcher()
@@ -165,7 +165,7 @@ async def lifespan(app: FastAPI):
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
     )
-    logger.info("Starting autodev backend")
+    logger.info("Starting agentickode backend")
     await _run_migrations()
     from backend.database import async_session
 
@@ -183,7 +183,7 @@ async def lifespan(app: FastAPI):
     await close_http_client()
 
 
-app = FastAPI(title="AutoDev", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="AgenticKode", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in AutoDev, please report it responsibly.
+If you discover a security vulnerability in AgenticKode, please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
@@ -23,8 +23,8 @@ Include:
 ## Scope
 
 The following are in scope:
-- AutoDev backend API
-- AutoDev frontend application
+- AgenticKode backend API
+- AgenticKode frontend application
 - Worker pipeline and phase execution
 - SSH/workspace server interactions
 - Authentication and authorization
@@ -44,7 +44,7 @@ The following are out of scope:
 
 ## Security Best Practices for Self-Hosting
 
-- Never expose the AutoDev API directly to the internet without authentication
+- Never expose the AgenticKode API directly to the internet without authentication
 - Use strong, unique values for all secrets in `.env`
 - Run workspace servers with non-root worker users (built-in support)
 - Keep Docker images and dependencies up to date

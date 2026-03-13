@@ -16,7 +16,7 @@ import pkgutil
 from dataclasses import dataclass
 from types import ModuleType
 
-logger = logging.getLogger("autodev.phases.registry")
+logger = logging.getLogger("agentickode.phases.registry")
 
 # Modules whose file name starts with ``_`` are internal helpers, not phases.
 # The registry itself is also excluded.

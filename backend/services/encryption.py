@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet
 
 from backend.config import settings
 
-logger = logging.getLogger("autodev.encryption")
+logger = logging.getLogger("agentickode.encryption")
 
 _fernet: Fernet | None = None
 

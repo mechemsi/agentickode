@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import WebhookCallback
 
-logger = logging.getLogger("autodev.webhook_callbacks")
+logger = logging.getLogger("agentickode.webhook_callbacks")
 
 
 class WebhookCallbackService:

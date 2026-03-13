@@ -18,7 +18,7 @@ from backend.database import get_db
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
 
-logger = logging.getLogger("autodev.webhooks")
+logger = logging.getLogger("agentickode.webhooks")
 router = APIRouter(tags=["webhooks"])
 
 

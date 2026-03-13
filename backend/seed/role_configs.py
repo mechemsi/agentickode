@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import RoleConfig
 
-logger = logging.getLogger("autodev.seed")
+logger = logging.getLogger("agentickode.seed")
 
 DEFAULT_ROLE_CONFIGS: list[dict] = [
     {

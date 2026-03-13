@@ -25,7 +25,7 @@ class WebhookProvider:
 
     async def test(self, config: dict, client: httpx.AsyncClient) -> tuple[bool, str | None]:
         try:
-            await self.send("AutoDev test notification", config, client)
+            await self.send("AgenticKode test notification", config, client)
             return True, None
         except Exception as e:
             return False, str(e)

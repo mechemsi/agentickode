@@ -25,7 +25,7 @@ from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import close_run_session
 from backend.worker.phases.registry import discover_phases
 
-logger = logging.getLogger("autodev.pipeline")
+logger = logging.getLogger("agentickode.pipeline")
 
 PHASE_NAMES = [
     "workspace_setup",

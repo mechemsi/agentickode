@@ -32,7 +32,7 @@ from backend.worker.phases._helpers import (
 )
 from backend.worker.phases._prompt_resolver import resolve_prompts
 
-logger = logging.getLogger("autodev.phases.planning")
+logger = logging.getLogger("agentickode.phases.planning")
 
 PHASE_META = {
     "description": "Decompose task into subtasks via AI agent",

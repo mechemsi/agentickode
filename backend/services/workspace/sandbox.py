@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.services.workspace.ssh_service import SSHService
 
-logger = logging.getLogger("autodev.remote_sandbox")
+logger = logging.getLogger("agentickode.remote_sandbox")
 
 
 class RemoteSandboxError(RuntimeError):
@@ -26,7 +26,7 @@ class RemoteSandbox:
     def __init__(
         self,
         ssh: SSHService,
-        templates_path: str = "/opt/autodev/docker/sandboxes",
+        templates_path: str = "/opt/agentickode/docker/sandboxes",
     ) -> None:
         self._ssh = ssh
         self._templates_path = templates_path

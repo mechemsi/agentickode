@@ -26,7 +26,7 @@ from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_workspace_server
 
-logger = logging.getLogger("autodev.phases.workspace_setup")
+logger = logging.getLogger("agentickode.phases.workspace_setup")
 
 PHASE_META = {
     "description": "Set up workspace on remote server",
@@ -188,7 +188,7 @@ async def _scaffold_new(
     scaffold_template = ws_cfg.get("scaffold_template")
     if scaffold_template:
         await _log(f"Running scaffold template: {scaffold_template}")
-        script = f"/opt/autodev/docker/sandboxes/{scaffold_template}/scaffold.sh"
+        script = f"/opt/agentickode/docker/sandboxes/{scaffold_template}/scaffold.sh"
         cmd = f"test -f {shlex.quote(script)} && bash {shlex.quote(script)}"
         await ssh.run_command(f"cd {shlex.quote(workspace)} && {cmd}", timeout=300)
 

@@ -63,7 +63,7 @@ async def create_ssh_key(body: SSHKeyCreate) -> SSHKeyOut:
     if priv.exists():
         raise HTTPException(400, f"Key '{body.name}' already exists")
 
-    comment = body.comment or f"autodev-{body.name}"
+    comment = body.comment or f"agentickode-{body.name}"
     try:
         subprocess.run(
             [

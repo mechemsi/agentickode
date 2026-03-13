@@ -27,7 +27,7 @@ from backend.services.workspace.agent_install_service import AgentInstallService
 from backend.services.workspace.ssh_service import SSHService
 from backend.services.workspace.worker_user_service import WorkerUserService
 
-logger = logging.getLogger("autodev.agent_management")
+logger = logging.getLogger("agentickode.agent_management")
 
 router = APIRouter(tags=["agent-management"])
 

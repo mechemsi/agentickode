@@ -10,7 +10,7 @@ import logging
 from datetime import UTC, datetime, time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-logger = logging.getLogger("autodev.schedule")
+logger = logging.getLogger("agentickode.schedule")
 
 
 def _parse_time(value: str) -> time:

@@ -35,7 +35,7 @@ def mock_ssh_for_git():
             ga_mock_cls.for_server = lambda server: ga_instance
             # Default: has key, github connected
             ga_instance.run_command = AsyncMock(
-                return_value=("ssh-ed25519 AAAA... autodev@test", "", 0)
+                return_value=("ssh-ed25519 AAAA... agentickode@test", "", 0)
             )
 
             yield ga_instance
@@ -53,7 +53,7 @@ class TestCheckGitAccess:
         # Mock the git access service calls
         mock_ssh_for_git.run_command = AsyncMock(
             side_effect=[
-                ("ssh-ed25519 AAAA... autodev@test", "", 0),  # get_public_key ed25519
+                ("ssh-ed25519 AAAA... agentickode@test", "", 0),  # get_public_key ed25519
                 (
                     "Hi octocat! You've successfully authenticated, but GitHub does not provide shell access.",
                     "",
@@ -115,7 +115,7 @@ class TestGenerateGitKey:
                 ("", "", 0),  # ssh-keygen
                 ("", "", 0),  # ssh-keyscan known_hosts
                 ("", "", 0),  # _copy_key_to_user (mkdir+cp+chown)
-                ("ssh-ed25519 NEWKEY autodev@keygen-srv", "", 0),  # get_public_key: ed25519
+                ("ssh-ed25519 NEWKEY agentickode@keygen-srv", "", 0),  # get_public_key: ed25519
             ]
         )
 

@@ -7,19 +7,19 @@ import { getHostAlias, generateSSHConfig, generateVSCodeURI, generateJetBrainsGa
 
 describe("getHostAlias", () => {
   it("produces a slug-safe alias", () => {
-    expect(getHostAlias("My Server")).toBe("autodev-my-server");
+    expect(getHostAlias("My Server")).toBe("agentickode-my-server");
   });
 
   it("replaces special characters with hyphens", () => {
-    expect(getHostAlias("dev@box_1")).toBe("autodev-dev-box-1");
+    expect(getHostAlias("dev@box_1")).toBe("agentickode-dev-box-1");
   });
 
   it("lowercases the name", () => {
-    expect(getHostAlias("PROD")).toBe("autodev-prod");
+    expect(getHostAlias("PROD")).toBe("agentickode-prod");
   });
 
   it("handles already-clean names", () => {
-    expect(getHostAlias("staging-01")).toBe("autodev-staging-01");
+    expect(getHostAlias("staging-01")).toBe("agentickode-staging-01");
   });
 });
 
@@ -34,7 +34,7 @@ describe("generateSSHConfig", () => {
 
   it("includes correct Host alias", () => {
     const config = generateSSHConfig(server);
-    expect(config).toContain("Host autodev-dev-box");
+    expect(config).toContain("Host agentickode-dev-box");
   });
 
   it("includes HostName, Port, and User", () => {

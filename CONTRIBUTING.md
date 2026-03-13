@@ -1,6 +1,6 @@
-# Contributing to AutoDev
+# Contributing to AgenticKode
 
-Thank you for your interest in contributing to AutoDev! This guide will help you get started.
+Thank you for your interest in contributing to AgenticKode! This guide will help you get started.
 
 ## Contributor License Agreement
 
@@ -17,8 +17,8 @@ All contributors must agree to our [CLA](CLA.md) before contributions can be mer
 
 ```bash
 # Clone the repository
-git clone https://github.com/mechemsi/autodev.git
-cd autodev
+git clone https://github.com/mechemsi/agentickode.git
+cd agentickode
 
 # Copy environment config
 cp .env.example .env
@@ -92,7 +92,7 @@ Write clear commit messages that describe the *why*, not just the *what*:
 Add GitLab webhook support for merge request events
 
 Previously only issue events triggered runs. This adds support for
-merge request events so AutoDev can respond to PR-related webhooks.
+merge request events so AgenticKode can respond to PR-related webhooks.
 ```
 
 ## Pull Request Process

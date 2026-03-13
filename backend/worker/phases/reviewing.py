@@ -39,7 +39,7 @@ from backend.worker.phases._review_helpers import (
     should_retry,
 )
 
-logger = logging.getLogger("autodev.phases.reviewing")
+logger = logging.getLogger("agentickode.phases.reviewing")
 
 PHASE_META = {
     "description": "AI code review with auto-fix retry loop",

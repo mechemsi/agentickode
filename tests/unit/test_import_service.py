@@ -88,7 +88,7 @@ async def test_import_overwrite(db_session: AsyncSession):
     envelope = await export_svc.export_config(secret_mode=SecretMode.plaintext)
 
     # Modify an existing value
-    ws_data = envelope["autodev_export"]["entities"]["workspace_servers"][0]
+    ws_data = envelope["agentickode_export"]["entities"]["workspace_servers"][0]
     ws_data["hostname"] = "10.0.0.99"
 
     import_svc = ImportService(db_session)
@@ -135,7 +135,7 @@ async def test_roundtrip_encrypted(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_import_invalid_version(db_session: AsyncSession):
     bad_data = {
-        "autodev_export": {
+        "agentickode_export": {
             "schema_version": "99.0.0",
             "secret_mode": "plaintext",
             "entities": {},

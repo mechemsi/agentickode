@@ -9,7 +9,7 @@ from typing import Protocol
 
 import httpx
 
-logger = logging.getLogger("autodev.git_provider")
+logger = logging.getLogger("agentickode.git_provider")
 
 
 class GitProvider(Protocol):

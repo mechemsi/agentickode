@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import RoleConfig
 from backend.models.agents import RolePromptOverride
 
-logger = logging.getLogger("autodev.seed")
+logger = logging.getLogger("agentickode.seed")
 
 _AUTONOMOUS_DIRECTIVE = (
     "IMPORTANT: You are running autonomously. Do NOT ask clarifying questions. "

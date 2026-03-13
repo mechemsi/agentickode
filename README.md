@@ -1,16 +1,16 @@
 <div align="center">
 
-# AutoDev
+# AgenticKode
 
 ### Turn issues into pull requests with AI agents
 
-**Create an issue. AutoDev clones your repo, plans the work, writes the code, runs tests, opens a PR, and waits for your approval. Fully automated. Fully self-hosted. You stay in control.**
+**Create an issue. AgenticKode clones your repo, plans the work, writes the code, runs tests, opens a PR, and waits for your approval. Fully automated. Fully self-hosted. You stay in control.**
 
 <br>
 
-[![CI](https://github.com/mechemsi/autodev/actions/workflows/ci.yml/badge.svg)](https://github.com/mechemsi/autodev/actions/workflows/ci.yml)
-[![Dependency Audit](https://github.com/mechemsi/autodev/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/mechemsi/autodev/actions/workflows/dependency-audit.yml)
-[![License Check](https://github.com/mechemsi/autodev/actions/workflows/license-check.yml/badge.svg)](https://github.com/mechemsi/autodev/actions/workflows/license-check.yml)
+[![CI](https://github.com/mechemsi/agentickode/actions/workflows/ci.yml/badge.svg)](https://github.com/mechemsi/agentickode/actions/workflows/ci.yml)
+[![Dependency Audit](https://github.com/mechemsi/agentickode/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/mechemsi/agentickode/actions/workflows/dependency-audit.yml)
+[![License Check](https://github.com/mechemsi/agentickode/actions/workflows/license-check.yml/badge.svg)](https://github.com/mechemsi/agentickode/actions/workflows/license-check.yml)
 [![License: AGPLv3](https://img.shields.io/badge/license-AGPLv3-blue.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 ![Node 22](https://img.shields.io/badge/node-22-green.svg)
@@ -27,17 +27,17 @@
 
 <div align="center">
 
-<img src="docs/screenshots/demo.gif" alt="AutoDev Demo" width="100%">
+<img src="docs/screenshots/demo.gif" alt="AgenticKode Demo" width="100%">
 
 *Full UI walkthrough — Dashboard, Run Detail, Projects, Servers, Agents, Workflows, Settings*
 
 </div>
 
-## Why AutoDev?
+## Why AgenticKode?
 
-Most AI coding tools are chat-based — you type prompts, copy-paste code, manually test, and commit. **AutoDev eliminates all of that.** It connects directly to your issue tracker and git provider, runs AI agents on remote workspace servers, and delivers ready-to-review pull requests.
+Most AI coding tools are chat-based — you type prompts, copy-paste code, manually test, and commit. **AgenticKode eliminates all of that.** It connects directly to your issue tracker and git provider, runs AI agents on remote workspace servers, and delivers ready-to-review pull requests.
 
-**What makes AutoDev different:**
+**What makes AgenticKode different:**
 
 - **Issue-to-PR pipeline** — Not a chatbot. A full automation pipeline that takes an issue and delivers a PR with code, tests, and review.
 - **Self-hosted & private** — Your code never leaves your infrastructure. Run it on your own servers with your own models.
@@ -50,7 +50,7 @@ Most AI coding tools are chat-based — you type prompts, copy-paste code, manua
 
 ```
 ┌─────────────┐     ┌──────────────────────────────────────────────────────────────────┐     ┌──────────────┐
-│             │     │                     AutoDev Pipeline                              │     │              │
+│             │     │                     AgenticKode Pipeline                              │     │              │
 │  Issue      │────>│  Setup → Init → Plan → Code → Test → Review → Approve → Done    │────>│  Pull        │
 │  Created    │     │   ↑                                                      ↑       │     │  Request     │
 │             │     │   └── live logs, phase controls, cost tracking ──────────┘       │     │              │
@@ -84,13 +84,13 @@ Each phase can be configured independently: auto-advance, wait for manual trigge
 
 ### Supported AI Agents
 
-AutoDev doesn't lock you into one AI provider. The **RoleAdapter Protocol** lets you plug in any AI agent — and AutoDev can **auto-install** them on your workspace servers.
+AgenticKode doesn't lock you into one AI provider. The **RoleAdapter Protocol** lets you plug in any AI agent — and AgenticKode can **auto-install** them on your workspace servers.
 
 <img src="docs/screenshots/agents.png" alt="Agent Settings" width="100%">
 
 #### CLI Agents
 
-These run directly on your workspace servers via SSH. AutoDev discovers, installs, and manages them automatically.
+These run directly on your workspace servers via SSH. AgenticKode discovers, installs, and manages them automatically.
 
 | Agent | Provider | Session Support | Auto-Install | Best For |
 |-------|----------|:--------------:|:------------:|----------|
@@ -116,13 +116,13 @@ These are used for text generation roles (planner, reviewer) rather than direct 
 
 | Provider | Models | GPU Dashboard | Best For |
 |----------|--------|:------------:|----------|
-| **[Ollama](https://ollama.ai)** | Any GGUF model (Qwen, DeepSeek, Llama, Mistral, etc.) | Yes | Self-hosted LLM inference. Zero API costs. Full privacy. Manage models and monitor GPU usage from the AutoDev dashboard. |
+| **[Ollama](https://ollama.ai)** | Any GGUF model (Qwen, DeepSeek, Llama, Mistral, etc.) | Yes | Self-hosted LLM inference. Zero API costs. Full privacy. Manage models and monitor GPU usage from the AgenticKode dashboard. |
 
 #### Bring Your Own Agent
 
-AutoDev's plugin architecture makes it easy to add new agents:
+AgenticKode's plugin architecture makes it easy to add new agents:
 
-- **CLI agents**: Add a command template to `AGENT_COMMANDS` dict — define `generate`, `task`, and `check` commands. AutoDev handles SSH execution, output capture, and error handling.
+- **CLI agents**: Add a command template to `AGENT_COMMANDS` dict — define `generate`, `task`, and `check` commands. AgenticKode handles SSH execution, output capture, and error handling.
 - **API agents**: Implement the `RoleAdapter` Protocol (4 methods: `provider_name`, `generate`, `run_task`, `is_available`) and register in the `AdapterFactory`.
 - **Per-agent config**: Each agent has configurable timeouts, retry limits, environment variables, and CLI flags — all manageable from the UI.
 
@@ -149,14 +149,14 @@ Reviewing →  Ollama (qwen2.5-coder:14b)      # Cost-effective review
 | Gitea | Yes | Yes | Yes |
 | Bitbucket | Yes | — | — |
 
-**Webhook sources**: Plane, GitHub, Gitea, and GitLab issue events can automatically trigger AutoDev runs.
+**Webhook sources**: Plane, GitHub, Gitea, and GitLab issue events can automatically trigger AgenticKode runs.
 
 ### Workspace Management
 
-AutoDev runs AI agents on **remote workspace servers** — dedicated machines accessed via SSH:
+AgenticKode runs AI agents on **remote workspace servers** — dedicated machines accessed via SSH:
 
 - **Worker user isolation**: Code execution runs under a non-root user for security
-- **Agent discovery & sync**: AutoDev finds and manages installed agents on your servers
+- **Agent discovery & sync**: AgenticKode finds and manages installed agents on your servers
 - **SSH terminal bridge**: Jump into any workspace server directly from the UI via xterm.js
 - **Multi-server support**: Distribute work across multiple machines
 
@@ -164,7 +164,7 @@ AutoDev runs AI agents on **remote workspace servers** — dedicated machines ac
 
 ### IDE Integration
 
-Open any project on your workspace servers directly in your IDE — one click from the AutoDev UI.
+Open any project on your workspace servers directly in your IDE — one click from the AgenticKode UI.
 
 #### VS Code Remote SSH
 
@@ -174,7 +174,7 @@ Click **"VS Code"** next to any project to open it in VS Code via the [Remote - 
 vscode://vscode-remote/ssh-remote+coder@your-server/home/coder/projects/your-repo
 ```
 
-AutoDev generates the correct `vscode://` URI with:
+AgenticKode generates the correct `vscode://` URI with:
 - Automatic worker user detection (uses `coder` if configured, falls back to `root`)
 - SSH config snippet generation for non-standard ports
 - Direct deep-link to the project directory on the remote server
@@ -194,15 +194,15 @@ Click **"JetBrains"** to open a picker with all supported IDEs via [JetBrains Ga
 | Rider | Yes |
 | CLion | Yes |
 
-AutoDev generates `jetbrains-gateway://` URIs with SSH connection details, so Gateway connects directly to the right server, user, and project path.
+AgenticKode generates `jetbrains-gateway://` URIs with SSH connection details, so Gateway connects directly to the right server, user, and project path.
 
 #### SSH Terminal (xterm.js)
 
-For quick access without leaving the browser, use the built-in **SSH terminal** — a full xterm.js terminal embedded in the AutoDev UI that connects to your workspace server via WebSocket. Available from both the server management page and individual run detail pages.
+For quick access without leaving the browser, use the built-in **SSH terminal** — a full xterm.js terminal embedded in the AgenticKode UI that connects to your workspace server via WebSocket. Available from both the server management page and individual run detail pages.
 
 ### Ollama Server Management & GPU Dashboard
 
-AutoDev includes a dedicated dashboard for managing your Ollama LLM servers:
+AgenticKode includes a dedicated dashboard for managing your Ollama LLM servers:
 
 #### Multi-Server Management
 - **Register multiple Ollama servers** — connect to Ollama instances across your infrastructure
@@ -302,14 +302,14 @@ This lets you optimize GPU utilization across multiple servers — preload your 
 
 ```bash
 # Clone the repository
-git clone https://github.com/mechemsi/autodev.git
-cd autodev
+git clone https://github.com/mechemsi/agentickode.git
+cd agentickode
 
 # Copy and configure environment
 cp .env.example .env
 # Edit .env with your git provider tokens and agent URLs
 
-# Start AutoDev
+# Start AgenticKode
 docker compose -f docker-compose.dev.yml up -d
 ```
 
@@ -338,7 +338,7 @@ docker compose -f docker-compose.dev.yml up -d
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://autodev:autodev@postgres:5432/autodev` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode` |
 | `OLLAMA_URL` | Ollama server URL | `http://localhost:11434` |
 | `OPENHANDS_URL` | OpenHands server URL | `http://localhost:3000` |
 | `GITHUB_TOKEN` | GitHub personal access token | — |
@@ -352,7 +352,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ### Webhook Setup
 
-AutoDev can automatically start runs when issues are created in your tracker:
+AgenticKode can automatically start runs when issues are created in your tracker:
 
 - **GitHub** — Repository webhook → `POST /api/webhooks/github`
 - **GitLab** — Project webhook → `POST /api/webhooks/gitlab`
@@ -376,7 +376,7 @@ See the [Webhook Setup Guide](docs/guides/09-webhook-setup.md) for detailed inst
 ## Project Structure
 
 ```
-autodev/
+agentickode/
 ├── backend/              # FastAPI backend
 │   ├── api/              # REST routes, WebSocket, SSE, webhooks
 │   │   └── servers/      # Workspace server management endpoints
@@ -439,7 +439,7 @@ To report a security vulnerability, please see [SECURITY.md](SECURITY.md). Do no
 
 ## License
 
-AutoDev is dual-licensed:
+AgenticKode is dual-licensed:
 
 - **AGPLv3** — Free for self-hosting, personal, and internal use. If you offer it as a SaaS, you must open-source your modifications. See [LICENSE](LICENSE).
 - **Commercial License** — For proprietary use, SaaS offerings, or embedding without copyleft obligations. Contact info@mechemsi.com for details.
@@ -450,6 +450,6 @@ See [LICENSING.md](LICENSING.md) for full details.
 
 <div align="center">
 
-**If AutoDev saves you time, give it a star!**
+**If AgenticKode saves you time, give it a star!**
 
 </div>

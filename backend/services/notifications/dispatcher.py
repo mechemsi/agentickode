@@ -14,7 +14,7 @@ from backend.services.notifications.formatter import format_notification
 from backend.services.notifications.service import NotificationService
 from backend.worker.broadcaster import broadcaster
 
-logger = logging.getLogger("autodev.notifications.dispatcher")
+logger = logging.getLogger("agentickode.notifications.dispatcher")
 
 # Map broadcaster event types to notification event names
 _EVENT_MAP: dict[str, str] = {

@@ -41,7 +41,7 @@ function IDEPicker({
   }, [onClose]);
 
   const openIDE = (ide: JetBrainsIDE) => {
-    window.localStorage.setItem("autodev-jetbrains-ide", ide);
+    window.localStorage.setItem("agentickode-jetbrains-ide", ide);
     window.location.href = generateJetBrainsGatewayURI(server, remotePath, ide);
     onClose();
   };

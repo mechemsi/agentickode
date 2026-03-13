@@ -101,13 +101,13 @@ class TestGenerateKey:
                 ("", "", 1),  # no rsa
                 ("", "", 0),  # ssh-keygen success
                 ("", "", 0),  # ssh-keyscan known_hosts
-                ("ssh-ed25519 NEW... autodev@srv", "", 0),  # read new key
+                ("ssh-ed25519 NEW... agentickode@srv", "", 0),  # read new key
             ]
         )
         svc = GitAccessService(ssh)
         result = await svc.generate_key("srv")
         assert result.has_key is True
-        assert result.public_key == "ssh-ed25519 NEW... autodev@srv"
+        assert result.public_key == "ssh-ed25519 NEW... agentickode@srv"
 
 
 class TestCheckAll:

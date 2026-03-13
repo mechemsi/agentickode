@@ -4,7 +4,7 @@
 
 /** Generate a slug-safe SSH config Host alias from a server name. */
 export function getHostAlias(serverName: string): string {
-  return `autodev-${serverName.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
+  return `agentickode-${serverName.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
 }
 
 /** Generate ~/.ssh/config snippet for a workspace server. */

@@ -41,7 +41,7 @@ class TestChromaDBService:
     async def test_query_logs_warning_on_exception(self, caplog):
         svc, client = self._make()
         client.post.side_effect = RuntimeError("boom")
-        with caplog.at_level(logging.WARNING, logger="autodev.chromadb"):
+        with caplog.at_level(logging.WARNING, logger="agentickode.chromadb"):
             await svc.query_project_context("proj-1", ["query"])
         assert "ChromaDB query failed for project proj-1" in caplog.text
 
@@ -49,6 +49,6 @@ class TestChromaDBService:
         svc, client = self._make()
         resp = MagicMock(status_code=500)
         client.post.return_value = resp
-        with caplog.at_level(logging.WARNING, logger="autodev.chromadb"):
+        with caplog.at_level(logging.WARNING, logger="agentickode.chromadb"):
             await svc.query_project_context("proj-1", ["query"])
         assert "ChromaDB returned 500 for project proj-1" in caplog.text

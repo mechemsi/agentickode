@@ -10,7 +10,7 @@ import httpx
 
 from backend.config import settings
 
-logger = logging.getLogger("autodev.chromadb")
+logger = logging.getLogger("agentickode.chromadb")
 
 
 class ChromaDBService:

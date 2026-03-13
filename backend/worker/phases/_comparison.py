@@ -26,7 +26,7 @@ from backend.worker.phases.coding import (
     _build_coding_prompt,
 )
 
-logger = logging.getLogger("autodev.phases.comparison")
+logger = logging.getLogger("agentickode.phases.comparison")
 
 
 async def run_comparison(

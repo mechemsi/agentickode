@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import RoleConfig, RolePromptOverride
 
-logger = logging.getLogger("autodev.prompt_resolver")
+logger = logging.getLogger("agentickode.prompt_resolver")
 
 
 async def build_project_instructions_section(

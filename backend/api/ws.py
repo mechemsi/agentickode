@@ -17,7 +17,7 @@ from backend.models import ProjectConfig, TaskRun, WorkspaceServer
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
 
-logger = logging.getLogger("autodev.ws")
+logger = logging.getLogger("agentickode.ws")
 router = APIRouter()
 
 

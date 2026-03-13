@@ -1,5 +1,5 @@
 [project]
-name = "autodev-backend"
+name = "agentickode-backend"
 version = "1.0.0"
 requires-python = ">=3.11"
 

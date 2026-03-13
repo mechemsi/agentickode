@@ -1,18 +1,18 @@
 # Chapter 9: Webhook Setup
 
-This guide explains how to manually configure webhooks so that issues (and optionally pull requests) from your git provider trigger AutoDev task runs.
+This guide explains how to manually configure webhooks so that issues (and optionally pull requests) from your git provider trigger AgenticKode task runs.
 
 ## Prerequisites
 
-1. A running AutoDev instance reachable from the internet (or your git provider's network)
-2. A project already created in AutoDev with the correct `git_provider` and `repo_owner`/`repo_name`
+1. A running AgenticKode instance reachable from the internet (or your git provider's network)
+2. A project already created in AgenticKode with the correct `git_provider` and `repo_owner`/`repo_name`
 3. Admin access to the repository in your git provider
 
 ## How It Works
 
-When an issue is created or labeled with **`ai-task`**, the git provider sends a webhook payload to AutoDev. AutoDev matches the repo to a project config, creates a `task_run`, and the worker pipeline picks it up.
+When an issue is created or labeled with **`ai-task`**, the git provider sends a webhook payload to AgenticKode. AgenticKode matches the repo to a project config, creates a `task_run`, and the worker pipeline picks it up.
 
-Adding the **`use-claude`** label alongside `ai-task` tells AutoDev to use the Claude API instead of the default coding agent.
+Adding the **`use-claude`** label alongside `ai-task` tells AgenticKode to use the Claude API instead of the default coding agent.
 
 ## Endpoint Reference
 
@@ -41,7 +41,7 @@ Adding the **`use-claude`** label alongside `ai-task` tells AutoDev to use the C
 
 1. Go to **Settings** > **Webhooks** > **Add webhook**
 2. Configure:
-   - **Payload URL**: `https://<your-autodev-host>/api/webhooks/github`
+   - **Payload URL**: `https://<your-agentickode-host>/api/webhooks/github`
    - **Content type**: `application/json`
    - **Secret**: leave blank (or configure if you add signature verification later)
    - **Which events?**: Select **Let me select individual events**, then check **Issues**
@@ -52,7 +52,7 @@ Adding the **`use-claude`** label alongside `ai-task` tells AutoDev to use the C
 To enable automatic PR reviews:
 
 1. Add another webhook with:
-   - **Payload URL**: `https://<your-autodev-host>/api/webhooks/github-pr`
+   - **Payload URL**: `https://<your-agentickode-host>/api/webhooks/github-pr`
    - **Content type**: `application/json`
    - **Events**: Select **Pull requests**
    - Click **Add webhook**
@@ -61,7 +61,7 @@ To enable automatic PR reviews:
 
 1. Create an issue in your repository
 2. Add the `ai-task` label to the issue
-3. AutoDev will pick it up and start the worker pipeline
+3. AgenticKode will pick it up and start the worker pipeline
 
 ---
 
@@ -80,7 +80,7 @@ To enable automatic PR reviews:
 1. Go to **Settings** > **Webhooks**
 2. Click **Add new webhook**
 3. Configure:
-   - **URL**: `https://<your-autodev-host>/api/webhooks/gitlab`
+   - **URL**: `https://<your-agentickode-host>/api/webhooks/gitlab`
    - **Secret token**: leave blank
    - **Trigger**: Check **Issues events**
    - Click **Add webhook**
@@ -89,9 +89,9 @@ To enable automatic PR reviews:
 
 1. Create an issue in your GitLab project
 2. Add the `ai-task` label
-3. AutoDev receives the webhook when the issue is opened or updated with the label
+3. AgenticKode receives the webhook when the issue is opened or updated with the label
 
-> **Note**: GitLab uses `object_kind: "issue"` and `labels[].title` (not `name`). AutoDev handles this automatically.
+> **Note**: GitLab uses `object_kind: "issue"` and `labels[].title` (not `name`). AgenticKode handles this automatically.
 
 ---
 
@@ -109,7 +109,7 @@ To enable automatic PR reviews:
 
 1. Go to **Settings** > **Webhooks** > **Add Webhook** > **Gitea**
 2. Configure:
-   - **Target URL**: `https://<your-autodev-host>/api/webhooks/gitea`
+   - **Target URL**: `https://<your-agentickode-host>/api/webhooks/gitea`
    - **HTTP Method**: POST
    - **Content type**: `application/json`
    - **Secret**: leave blank
@@ -119,7 +119,7 @@ To enable automatic PR reviews:
 ### Step 3 (Optional): Add the PR review webhook
 
 1. Add another webhook with:
-   - **Target URL**: `https://<your-autodev-host>/api/webhooks/gitea-pr`
+   - **Target URL**: `https://<your-agentickode-host>/api/webhooks/gitea-pr`
    - **Trigger On**: Custom Events > **Pull Request**
    - Click **Add Webhook**
 
@@ -127,7 +127,7 @@ To enable automatic PR reviews:
 
 1. Create an issue in your Gitea repository
 2. Add the `ai-task` label
-3. AutoDev picks it up automatically
+3. AgenticKode picks it up automatically
 
 ---
 
@@ -145,7 +145,7 @@ To enable automatic PR reviews:
 1. Go to **Settings** > **Webhooks**
 2. Click **Create webhook**
 3. Configure:
-   - **URL**: `https://<your-autodev-host>/api/webhooks/plane`
+   - **URL**: `https://<your-agentickode-host>/api/webhooks/plane`
    - **Events**: Select issue events
 4. Save the webhook
 
@@ -153,15 +153,15 @@ To enable automatic PR reviews:
 
 1. Create an issue in Plane
 2. Add the `ai-task` label
-3. AutoDev matches the issue's `project` ID to the `project_id` in your AutoDev project config
+3. AgenticKode matches the issue's `project` ID to the `project_id` in your AgenticKode project config
 
-> **Important**: For Plane, the `project_id` in your AutoDev project config must match the Plane project UUID.
+> **Important**: For Plane, the `project_id` in your AgenticKode project config must match the Plane project UUID.
 
 ---
 
 ## Plain (API-Only) Task Source
 
-Projects configured with `task_source: "plain"` do not use webhooks. Tasks are created directly via the AutoDev API:
+Projects configured with `task_source: "plain"` do not use webhooks. Tasks are created directly via the AgenticKode API:
 
 ```bash
 POST /api/runs
@@ -186,7 +186,7 @@ POST /api/runs
 
 ### Issue ignored with `unknown_project`
 
-- AutoDev matches by `git_provider` + `repo_owner` + `repo_name`
+- AgenticKode matches by `git_provider` + `repo_owner` + `repo_name`
 - Verify your project config has the correct values (check via `GET /api/projects`)
 - For Plane, the `project_id` must match the Plane project UUID exactly
 

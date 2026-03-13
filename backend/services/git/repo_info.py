@@ -17,7 +17,7 @@ from backend.config import settings
 if TYPE_CHECKING:
     from backend.services.workspace.ssh_service import SSHService
 
-logger = logging.getLogger("autodev.repo_info")
+logger = logging.getLogger("agentickode.repo_info")
 
 
 async def get_default_branch(

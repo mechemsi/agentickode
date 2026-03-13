@@ -24,7 +24,7 @@ from backend.services.workspace.ssh_service import SSHService
 
 from .projects import _get_repo
 
-logger = logging.getLogger("autodev.project_issues")
+logger = logging.getLogger("agentickode.project_issues")
 router = APIRouter(tags=["projects"])
 
 

@@ -19,7 +19,7 @@ from backend.services.http_client import get_http_client
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_project_token
 
-logger = logging.getLogger("autodev.phases.pr_fetch")
+logger = logging.getLogger("agentickode.phases.pr_fetch")
 
 PHASE_META = {
     "description": "Fetch PR diff and comments from git provider",

@@ -18,7 +18,7 @@ import asyncssh
 
 from backend.config import settings
 
-logger = logging.getLogger("autodev.ssh")
+logger = logging.getLogger("agentickode.ssh")
 
 if TYPE_CHECKING:
     from backend.models import WorkspaceServer

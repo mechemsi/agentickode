@@ -35,7 +35,7 @@ from backend.worker.phases._helpers import (
 )
 from backend.worker.phases._prompt_resolver import resolve_prompts
 
-logger = logging.getLogger("autodev.phases.coding")
+logger = logging.getLogger("agentickode.phases.coding")
 
 PHASE_META = {
     "description": "Execute subtasks via AI coding agent",

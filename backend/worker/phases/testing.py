@@ -18,7 +18,7 @@ from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_ssh_for_run
 
-logger = logging.getLogger("autodev.phases.testing")
+logger = logging.getLogger("agentickode.phases.testing")
 
 PHASE_META = {
     "description": "Run tests on remote workspace",

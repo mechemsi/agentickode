@@ -79,7 +79,7 @@ async def _run_import(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AutoDev backup CLI")
+    parser = argparse.ArgumentParser(description="AgenticKode backup CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
     # Export

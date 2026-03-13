@@ -1,14 +1,14 @@
-# AutoDev Contributor License Agreement
+# AgenticKode Contributor License Agreement
 
-Thank you for your interest in contributing to AutoDev. This Contributor License Agreement ("Agreement") documents the rights granted by contributors to the project maintainers.
+Thank you for your interest in contributing to AgenticKode. This Contributor License Agreement ("Agreement") documents the rights granted by contributors to the project maintainers.
 
-By submitting a contribution (via pull request, patch, or any other mechanism) to the AutoDev project, you agree to the following terms:
+By submitting a contribution (via pull request, patch, or any other mechanism) to the AgenticKode project, you agree to the following terms:
 
 ## 1. Definitions
 
 - **"You"** (or **"Contributor"**) means the individual or legal entity submitting the contribution.
 - **"Contribution"** means any original work of authorship, including modifications or additions to existing work, submitted to the project.
-- **"Project"** means the AutoDev software project and all associated repositories.
+- **"Project"** means the AgenticKode software project and all associated repositories.
 
 ## 2. Grant of Copyright License
 

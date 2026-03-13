@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We are committed to providing a welcoming and inclusive environment for everyone who contributes to or interacts with AutoDev.
+We are committed to providing a welcoming and inclusive environment for everyone who contributes to or interacts with AgenticKode.
 
 ## Our Standards
 

@@ -10,7 +10,7 @@ import httpx
 
 from backend.config import settings
 
-logger = logging.getLogger("autodev.git_provider")
+logger = logging.getLogger("agentickode.git_provider")
 
 
 class GiteaProvider:

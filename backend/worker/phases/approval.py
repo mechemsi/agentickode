@@ -21,7 +21,7 @@ from backend.services.http_client import get_http_client
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_ssh_for_run
 
-logger = logging.getLogger("autodev.phases.approval")
+logger = logging.getLogger("agentickode.phases.approval")
 
 PHASE_META = {
     "description": "Push branch and create pull request",

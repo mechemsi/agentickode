@@ -26,7 +26,7 @@ from backend.services.workspace.agent_install_service import AgentInstallService
 from backend.services.workspace.ssh_service import SSHService
 from backend.services.workspace.worker_user_service import WorkerUserService
 
-logger = logging.getLogger("autodev.phases.helpers")
+logger = logging.getLogger("agentickode.phases.helpers")
 
 _default_roles: dict[str, str] | None = None
 _default_modes: dict[str, str] | None = None

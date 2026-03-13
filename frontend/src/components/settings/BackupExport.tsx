@@ -51,7 +51,7 @@ export default function BackupExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `autodev-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `agentickode-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Configuration exported");

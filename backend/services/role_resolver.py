@@ -23,7 +23,7 @@ from backend.services.ollama_service import OllamaService
 if TYPE_CHECKING:
     from backend.services.adapters.factory import AdapterFactory
 
-logger = logging.getLogger("autodev.role_resolver")
+logger = logging.getLogger("agentickode.role_resolver")
 
 
 @dataclass

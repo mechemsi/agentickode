@@ -18,7 +18,7 @@ from backend.services.git import RemoteGitOps
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_ssh_for_run
 
-logger = logging.getLogger("autodev.phases.init")
+logger = logging.getLogger("agentickode.phases.init")
 
 PHASE_META = {
     "name": "init",

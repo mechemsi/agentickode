@@ -27,7 +27,7 @@ from backend.services.adapters.cli_wrappers import (
 if TYPE_CHECKING:
     from backend.services.workspace.ssh_service import SSHService
 
-logger = logging.getLogger("autodev.adapters.cli")
+logger = logging.getLogger("agentickode.adapters.cli")
 
 # Type alias for the optional log callback
 LogFn = Callable[[str], Awaitable[None]]

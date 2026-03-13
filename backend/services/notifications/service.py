@@ -14,7 +14,7 @@ from backend.services.notifications.slack import SlackProvider
 from backend.services.notifications.telegram import TelegramProvider
 from backend.services.notifications.webhook import WebhookProvider
 
-logger = logging.getLogger("autodev.notifications")
+logger = logging.getLogger("agentickode.notifications")
 
 _PROVIDERS: dict[str, TelegramProvider | SlackProvider | DiscordProvider | WebhookProvider] = {
     "telegram": TelegramProvider(),

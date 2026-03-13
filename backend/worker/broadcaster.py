@@ -16,7 +16,7 @@ from typing import Any
 from backend.database import async_session
 from backend.models import TaskLog
 
-logger = logging.getLogger("autodev.broadcaster")
+logger = logging.getLogger("agentickode.broadcaster")
 
 # Truncation limits for metadata fields
 _MAX_PROMPT_CHARS = 10_000
