@@ -42,3 +42,5 @@ Thumbs.db
 
 # Docker
 *.log
+docs/screenshots/frames/
+docs/screenshots/node_modules/
