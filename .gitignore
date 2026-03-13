@@ -40,6 +40,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Website (separate repo)
+www/
+
 # Docker
 *.log
 docs/screenshots/frames/
