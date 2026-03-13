@@ -26,7 +26,7 @@ jobs:
         with:
           path-to-signatures: "signatures/cla.json"
           path-to-document: "CLA.md"
-          branch: "main"
+          branch: "cla-signatures"
           allowlist: "mechemsi,dependabot[bot],github-actions[bot]"
           custom-notsigned-prcomment: |
             Thank you for your contribution! Before we can merge this PR, you need to agree to our [Contributor License Agreement](CLA.md).
