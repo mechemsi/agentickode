@@ -204,6 +204,30 @@ async def run_consolidated(
     ]
 
     task_run.coding_results = make_results(coding_results, session_id)
+
+    # Populate planning_result so the UI can display what was done
+    task_run.planning_result = {
+        "subtasks": [
+            {
+                "id": 1,
+                "title": task_run.title or "Task",
+                "description": description,
+                "files_likely_affected": files_changed,
+            }
+        ],
+        "estimated_complexity": "consolidated",
+        "consolidated": True,
+    }
+
+    # Populate review_result so the UI shows self-review status
+    task_run.review_result = {
+        "approved": exit_code == 0,
+        "issues": [],
+        "suggestions": [],
+        "strictness": "self-review",
+        "consolidated": True,
+    }
+
     await session.commit()
 
     if exit_code != 0:
