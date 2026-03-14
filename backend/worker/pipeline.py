@@ -109,6 +109,48 @@ async def _ensure_phase_executions(run: TaskRun, session: AsyncSession) -> list[
     return await repo.create_for_run(run.id, workflow_phases)
 
 
+async def _skip_phases_for_consolidated(
+    run: TaskRun, session: AsyncSession, pe_repo: PhaseExecutionRepository
+) -> None:
+    """When coding phase uses consolidated mode, skip planning and reviewing.
+
+    Consolidated mode means the agent handles plan + code + review in a single
+    invocation, so separate planning and reviewing phases are redundant.
+    """
+    phases = await pe_repo.get_by_run(run.id)
+    coding_pe = next((p for p in phases if p.phase_name == "coding"), None)
+    if not coding_pe:
+        return
+
+    # Resolve consolidated flag from coding phase config
+    params = (coding_pe.phase_config or {}).get("params", {})
+    consolidated_explicit = params.get("consolidated")
+
+    if consolidated_explicit is None:
+        # Not set in phase config — check agent default via task_source_meta
+        # (agent_settings lookup happens later in the phase, so we check the
+        # run-level phase_overrides as well)
+        meta_overrides = (run.task_source_meta or {}).get("phase_overrides", {})
+        coding_override = meta_overrides.get("coding", {})
+        consolidated_explicit = coding_override.get("params", {}).get("consolidated")
+
+    if not consolidated_explicit:
+        # Not explicitly set to True — let the coding phase decide at runtime
+        # based on agent_settings.consolidated_default
+        return
+
+    skip_phases = {"planning", "reviewing"}
+    for pe in phases:
+        if pe.phase_name in skip_phases and pe.status == "pending":
+            await pe_repo.update_status(pe, "skipped")
+            await broadcaster.log(
+                run.id,
+                f"Skipped {pe.phase_name} — consolidated mode handles it in coding phase",
+                phase=pe.phase_name,
+            )
+    await session.commit()
+
+
 async def execute_pipeline(run: TaskRun, session: AsyncSession, services: ServiceContainer) -> None:
     """Execute the pipeline phase-by-phase using PhaseExecution rows."""
     run.status = "running"
@@ -122,6 +164,9 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
 
     await _ensure_phase_executions(run, session)
     pe_repo = PhaseExecutionRepository(session)
+
+    # Auto-skip planning + reviewing when coding is in consolidated mode
+    await _skip_phases_for_consolidated(run, session, pe_repo)
 
     while True:
         phase_exec = await pe_repo.get_next_pending(run.id)

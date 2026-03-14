@@ -205,6 +205,9 @@ async def run(
     else:
         consolidated = True
     if consolidated:
+        # Skip reviewing phase — consolidated mode self-reviews
+        await _skip_reviewing_phase(task_run, session)
+
         await run_consolidated(
             task_run,
             session,
@@ -258,3 +261,20 @@ async def run(
         phase_exec_row,
         ws_id,
     )
+
+
+async def _skip_reviewing_phase(task_run: TaskRun, session: AsyncSession) -> None:
+    """Mark the reviewing phase as skipped when consolidated mode is active."""
+    from backend.repositories.phase_execution_repo import PhaseExecutionRepository
+
+    pe_repo = PhaseExecutionRepository(session)
+    phases = await pe_repo.get_by_run(task_run.id)
+    for pe in phases:
+        if pe.phase_name == "reviewing" and pe.status == "pending":
+            await pe_repo.update_status(pe, "skipped")
+            await broadcaster.log(
+                task_run.id,
+                "Skipped reviewing — consolidated mode self-reviews in coding phase",
+                phase="reviewing",
+            )
+    await session.flush()

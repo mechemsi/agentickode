@@ -8,6 +8,8 @@ interface SubtaskResult {
   subtask_title?: string;
   files_changed?: string[];
   exit_code?: number | string;
+  consolidated?: boolean;
+  batch_mode?: boolean;
 }
 
 interface TestResult {
@@ -33,6 +35,16 @@ export default function CodingResultsPanel({ data }: { data: CodingResults }) {
         <span className="text-gray-500 font-normal">
           ({results.length} subtask{results.length !== 1 ? "s" : ""})
         </span>
+        {results.some((r) => r.consolidated) && (
+          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-900/50 text-purple-300 border border-purple-700/50">
+            Consolidated
+          </span>
+        )}
+        {results.some((r) => r.batch_mode) && !results.some((r) => r.consolidated) && (
+          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-900/50 text-blue-300 border border-blue-700/50">
+            Batch
+          </span>
+        )}
       </h3>
 
       {results.length === 0 ? (
