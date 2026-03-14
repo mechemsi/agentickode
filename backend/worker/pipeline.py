@@ -110,33 +110,54 @@ async def _ensure_phase_executions(run: TaskRun, session: AsyncSession) -> list[
 
 
 async def _skip_phases_for_consolidated(
-    run: TaskRun, session: AsyncSession, pe_repo: PhaseExecutionRepository
+    run: TaskRun,
+    session: AsyncSession,
+    pe_repo: PhaseExecutionRepository,
+    services: ServiceContainer,
 ) -> None:
     """When coding phase uses consolidated mode, skip planning and reviewing.
 
     Consolidated mode means the agent handles plan + code + review in a single
     invocation, so separate planning and reviewing phases are redundant.
+
+    Resolution priority:
+    1. Explicit in coding phase_config params
+    2. Run-level phase_overrides in task_source_meta
+    3. Agent's consolidated_default from DB
     """
     phases = await pe_repo.get_by_run(run.id)
     coding_pe = next((p for p in phases if p.phase_name == "coding"), None)
     if not coding_pe:
         return
 
-    # Resolve consolidated flag from coding phase config
+    # 1. Check coding phase_config params
     params = (coding_pe.phase_config or {}).get("params", {})
-    consolidated_explicit = params.get("consolidated")
+    consolidated = params.get("consolidated")
 
-    if consolidated_explicit is None:
-        # Not set in phase config — check agent default via task_source_meta
-        # (agent_settings lookup happens later in the phase, so we check the
-        # run-level phase_overrides as well)
+    # 2. Check run-level phase_overrides
+    if consolidated is None:
         meta_overrides = (run.task_source_meta or {}).get("phase_overrides", {})
         coding_override = meta_overrides.get("coding", {})
-        consolidated_explicit = coding_override.get("params", {}).get("consolidated")
+        consolidated = coding_override.get("params", {}).get("consolidated")
 
-    if not consolidated_explicit:
-        # Not explicitly set to True — let the coding phase decide at runtime
-        # based on agent_settings.consolidated_default
+    # 3. Check agent's consolidated_default
+    if consolidated is None:
+        try:
+            from backend.worker.phases._helpers import get_phase_role, get_workspace_server_id
+
+            ws_id = await get_workspace_server_id(run, session)
+            role = get_phase_role("coding", coding_pe.phase_config, coding_pe)
+            resolved = await services.role_resolver.resolve(
+                role, session, ws_id, phase_name="coding"
+            )
+            if resolved.agent_settings:
+                val = getattr(resolved.agent_settings, "consolidated_default", None)
+                if isinstance(val, bool):
+                    consolidated = val
+        except Exception:
+            logger.debug("Could not resolve agent for consolidated check", exc_info=True)
+
+    if not consolidated:
         return
 
     skip_phases = {"planning", "reviewing"}
@@ -166,7 +187,7 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
     pe_repo = PhaseExecutionRepository(session)
 
     # Auto-skip planning + reviewing when coding is in consolidated mode
-    await _skip_phases_for_consolidated(run, session, pe_repo)
+    await _skip_phases_for_consolidated(run, session, pe_repo, services)
 
     while True:
         phase_exec = await pe_repo.get_next_pending(run.id)
