@@ -13,10 +13,15 @@ from backend.worker.phases import reviewing
 
 def _patch_reviewing():
     """Common patches for reviewing tests."""
+    mock_broadcaster = MagicMock(log=AsyncMock(), event=AsyncMock())
     return (
         patch(
             "backend.worker.phases.reviewing.broadcaster",
-            new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            new=mock_broadcaster,
+        ),
+        patch(
+            "backend.worker.phases._reviewing_loop.broadcaster",
+            new=mock_broadcaster,
         ),
         patch(
             "backend.worker.phases.reviewing.get_workspace_server_id",
@@ -47,8 +52,8 @@ class TestReviewing:
         )
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
 
-        p1, p2, p3, p4 = _patch_reviewing()
-        with p1, p2, p3, p4 as mock_git_cls:
+        p1, p2, p3, p4, p5 = _patch_reviewing()
+        with p1, p2, p3, p4, p5 as mock_git_cls:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.run_git = AsyncMock(
                 return_value=GitResult(stdout="+added line", stderr="")
@@ -84,8 +89,8 @@ class TestReviewing:
             ResolvedRole(adapter=coder_adapter),
         ]
 
-        p1, p2, p3, p4 = _patch_reviewing()
-        with p1, p2, p3, p4 as mock_git_cls:
+        p1, p2, p3, p4, p5 = _patch_reviewing()
+        with p1, p2, p3, p4, p5 as mock_git_cls:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.run_git = AsyncMock(return_value=GitResult(stdout="+line", stderr=""))
             await reviewing.run(run, db_session, mock_services)
@@ -105,8 +110,8 @@ class TestReviewing:
         reviewer_adapter.generate.return_value = "garbage not json"
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
 
-        p1, p2, p3, p4 = _patch_reviewing()
-        with p1, p2, p3, p4 as mock_git_cls:
+        p1, p2, p3, p4, p5 = _patch_reviewing()
+        with p1, p2, p3, p4, p5 as mock_git_cls:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.run_git = AsyncMock(return_value=GitResult(stdout="+line", stderr=""))
             await reviewing.run(run, db_session, mock_services)
@@ -128,8 +133,8 @@ class TestReviewing:
         reviewer_adapter.generate.return_value = '{"approved": true, "issues": [{"severity": "critical", "description": "security hole"}], "suggestions": []}'
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
 
-        p1, p2, p3, p4 = _patch_reviewing()
-        with p1, p2, p3, p4 as mock_git_cls:
+        p1, p2, p3, p4, p5 = _patch_reviewing()
+        with p1, p2, p3, p4, p5 as mock_git_cls:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.run_git = AsyncMock(return_value=GitResult(stdout="+line", stderr=""))
             await reviewing.run(run, db_session, mock_services)

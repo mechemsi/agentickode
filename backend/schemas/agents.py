@@ -87,6 +87,7 @@ class AgentSettingsIn(BaseModel):
     prereq_check: str | None = None
     prereq_name: str | None = None
     needs_non_root: bool | None = None
+    consolidated_default: bool | None = None
 
 
 class AgentSettingsOut(BaseModel):
@@ -108,6 +109,7 @@ class AgentSettingsOut(BaseModel):
     prereq_check: str | None = None
     prereq_name: str | None = None
     needs_non_root: bool = False
+    consolidated_default: bool = True
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

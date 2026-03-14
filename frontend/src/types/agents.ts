@@ -90,6 +90,7 @@ export interface AgentSettings {
   prereq_check: string | null;
   prereq_name: string | null;
   needs_non_root: boolean;
+  consolidated_default: boolean;
   created_at: string | null;
   updated_at: string | null;
 }

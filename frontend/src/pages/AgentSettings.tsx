@@ -78,6 +78,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
   const [prereqCheck, setPrereqCheck] = useState(agent.prereq_check ?? "");
   const [prereqName, setPrereqName] = useState(agent.prereq_name ?? "");
   const [needsNonRoot, setNeedsNonRoot] = useState(agent.needs_non_root ?? false);
+  const [consolidatedDefault, setConsolidatedDefault] = useState(agent.consolidated_default ?? true);
 
   // Sync when agent prop changes
   useEffect(() => {
@@ -97,6 +98,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
     setPrereqCheck(agent.prereq_check ?? "");
     setPrereqName(agent.prereq_name ?? "");
     setNeedsNonRoot(agent.needs_non_root ?? false);
+    setConsolidatedDefault(agent.consolidated_default ?? true);
   }, [agent]);
 
   const loadAvailability = async () => {
@@ -148,6 +150,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
         prereq_check: prereqCheck || null,
         prereq_name: prereqName || null,
         needs_non_root: needsNonRoot,
+        consolidated_default: consolidatedDefault,
       });
       toast.success(`Saved ${agent.display_name}`);
       onSaved();
@@ -372,6 +375,19 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   checked={needsNonRoot}
                   onChange={setNeedsNonRoot}
                   ariaLabel="Toggle needs non-root"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs text-gray-500">Consolidated Mode</label>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Plan + code + review in a single invocation
+                  </p>
+                </div>
+                <Toggle
+                  checked={consolidatedDefault}
+                  onChange={setConsolidatedDefault}
+                  ariaLabel="Toggle consolidated mode"
                 />
               </div>
             </div>

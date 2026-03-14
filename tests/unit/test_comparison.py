@@ -74,11 +74,20 @@ class TestComparisonDetection:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
         # Normal flow was executed
         mock_services.role_resolver.resolve.assert_called_once()

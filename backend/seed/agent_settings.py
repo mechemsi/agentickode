@@ -111,6 +111,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "install_cmd": _CLAUDE_INSTALL_CMD,
         "post_install_cmd": _CLAUDE_POST_INSTALL_CMD,
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "codex",
@@ -137,6 +138,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
             "rm -f /tmp/codex.tar.gz"
         ),
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "gemini",
@@ -155,6 +157,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
             'npm install -g @google/gemini-cli --prefix "$HOME/.local"'
         ),
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "kimi",
@@ -170,6 +173,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_name": "curl",
         "install_cmd": "curl -L code.kimi.com/install.sh | bash",
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "aider",
@@ -185,6 +189,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_name": "curl",
         "install_cmd": "curl -fsSL https://aider.chat/install.sh | sh",
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "opencode",
@@ -200,6 +205,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_name": "curl",
         "install_cmd": "curl -fsSL https://opencode.ai/install | bash",
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "copilot",
@@ -215,6 +221,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_name": "curl",
         "install_cmd": "curl -fsSL https://gh.io/copilot-install | bash",
         "needs_non_root": True,
+        "consolidated_default": True,
     },
     {
         "agent_name": "openhands",
@@ -230,6 +237,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_name": "docker",
         "install_cmd": "docker pull ghcr.io/all-hands-ai/openhands:latest",
         "needs_non_root": False,
+        "consolidated_default": False,
     },
 ]
 

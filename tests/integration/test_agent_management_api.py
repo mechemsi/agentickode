@@ -27,7 +27,7 @@ async def _seed_agent_settings(db_engine):
 @pytest.fixture
 def mock_ssh_for_agents():
     """Mock SSH for agent management tests."""
-    with patch("backend.api.servers.workspace_servers.SSHService") as ws_mock_cls:
+    with patch("backend.api.servers.workspace_servers_discovery.SSHService") as ws_mock_cls:
         ws_instance = AsyncMock()
         ws_mock_cls.return_value = ws_instance
         ws_mock_cls.for_server = lambda server: ws_instance
@@ -36,8 +36,12 @@ def mock_ssh_for_agents():
         )
 
         with (
-            patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-            patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+            ) as mock_agent_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+            ) as mock_proj_cls,
             patch("backend.api.servers.agent_management.SSHService") as am_mock_cls,
             patch("backend.api.servers.agent_management.WorkerUserService") as am_user_mock_cls,
         ):

@@ -26,6 +26,8 @@ from backend.api import (
     projects,
     role_configs,
     runs,
+    runs_actions,
+    runs_phases,
     sse,
     webhook_callbacks,
     webhooks,
@@ -40,6 +42,8 @@ from backend.api.servers import (
     ssh_keys_router,
     worker_user_router,
     workspace_servers_router,
+    ws_discovery_router,
+    ws_ops_router,
 )
 from backend.database import engine as db_engine
 from backend.seed import seed_all
@@ -198,12 +202,16 @@ app.include_router(webhooks.router, prefix="/api")
 app.include_router(webhooks_pr.router, prefix="/api")
 app.include_router(sse.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
+app.include_router(runs_actions.router, prefix="/api")
+app.include_router(runs_phases.router, prefix="/api")
 app.include_router(project_instructions.router, prefix="/api")
 app.include_router(project_issues.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(health.router, prefix="/api")
 app.include_router(workspace_servers_router, prefix="/api")
+app.include_router(ws_discovery_router, prefix="/api")
+app.include_router(ws_ops_router, prefix="/api")
 app.include_router(git_access_router, prefix="/api")
 app.include_router(agent_management_router, prefix="/api")
 app.include_router(server_projects_router, prefix="/api")

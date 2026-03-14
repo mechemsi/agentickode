@@ -8,10 +8,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.services.role_resolver import ResolvedRole
 from backend.worker.phases import coding
-from backend.worker.phases.coding import (
-    _build_continuation_prompt,
-    _get_previous_session_id,
+from backend.worker.phases._coding_utils import (
+    FALLBACK_USER_TEMPLATE,
+    build_coding_prompt,
+    build_continuation_prompt,
+    get_previous_session_id,
 )
+
+_mock_broadcaster = MagicMock(log=AsyncMock(), event=AsyncMock())
+
+
+def _broadcaster_patches():
+    """Return context managers to patch broadcaster in all coding submodules."""
+    return (
+        patch(
+            "backend.worker.phases.coding.broadcaster",
+            new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+        ),
+        patch(
+            "backend.worker.phases._coding_consolidated.broadcaster",
+            new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+        ),
+        patch(
+            "backend.worker.phases._coding_batch.broadcaster",
+            new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+        ),
+        patch(
+            "backend.worker.phases._coding_separate.broadcaster",
+            new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+        ),
+    )
 
 
 class TestBuildContinuationPrompt:
@@ -21,7 +47,7 @@ class TestBuildContinuationPrompt:
             "description": "Wrap the API call in try/except",
             "files_likely_affected": ["api.py", "utils.py"],
         }
-        prompt = _build_continuation_prompt(subtask)
+        prompt = build_continuation_prompt(subtask)
         assert "Add error handling" in prompt
         assert "Wrap the API call in try/except" in prompt
         assert "api.py" in prompt
@@ -33,39 +59,39 @@ class TestBuildContinuationPrompt:
             "description": "Fix the auth bug",
             "files_likely_affected": ["auth.py"],
         }
-        continuation = _build_continuation_prompt(subtask)
-        full = coding._build_coding_prompt(subtask, ["a.py", "b.py"], coding.FALLBACK_USER_TEMPLATE)
+        continuation = build_continuation_prompt(subtask)
+        full = build_coding_prompt(subtask, ["a.py", "b.py"], FALLBACK_USER_TEMPLATE)
         # Continuation prompt should be meaningfully shorter
         assert len(continuation) < len(full)
 
     def test_works_with_empty_files_list(self):
         subtask = {"title": "T", "description": "D", "files_likely_affected": []}
-        prompt = _build_continuation_prompt(subtask)
+        prompt = build_continuation_prompt(subtask)
         assert "T" in prompt
         assert "D" in prompt
 
     def test_works_with_missing_keys(self):
         # Should not raise even when keys are missing
-        prompt = _build_continuation_prompt({})
+        prompt = build_continuation_prompt({})
         assert isinstance(prompt, str)
 
 
 class TestGetPreviousSessionId:
     def test_returns_none_when_no_planning_result(self, make_task_run):
         run = make_task_run(planning_result=None)
-        assert _get_previous_session_id(run) is None
+        assert get_previous_session_id(run) is None
 
     def test_returns_none_when_no_session_id_in_planning(self, make_task_run):
         run = make_task_run(planning_result={"subtasks": []})
-        assert _get_previous_session_id(run) is None
+        assert get_previous_session_id(run) is None
 
     def test_returns_session_id_from_planning_result(self, make_task_run):
         run = make_task_run(planning_result={"subtasks": [], "session_id": "abc-123"})
-        assert _get_previous_session_id(run) == "abc-123"
+        assert get_previous_session_id(run) == "abc-123"
 
     def test_ignores_non_string_session_id(self, make_task_run):
         run = make_task_run(planning_result={"session_id": 12345})
-        assert _get_previous_session_id(run) is None
+        assert get_previous_session_id(run) is None
 
 
 class TestCodingSessionGeneration:
@@ -95,11 +121,12 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
@@ -134,11 +161,12 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
@@ -176,11 +204,12 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
@@ -217,11 +246,12 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
@@ -259,17 +289,18 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
             patch(
-                "backend.worker.phases.coding._auto_commit_changes",
+                "backend.worker.phases._coding_separate.auto_commit_changes",
                 new=AsyncMock(return_value=False),
             ),
         ):
@@ -277,7 +308,7 @@ class TestCodingSessionGeneration:
                 run,
                 db_session,
                 mock_services,
-                phase_config={"params": {"subtask_mode": "separate"}},
+                phase_config={"params": {"subtask_mode": "separate", "consolidated": False}},
             )
 
         assert mock_adapter.run_task.call_count == 2
@@ -319,11 +350,12 @@ class TestCodingSessionGeneration:
         }
         mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
 
+        bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
-            patch(
-                "backend.worker.phases.coding.broadcaster",
-                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
-            ),
+            bp1,
+            bp2,
+            bp3,
+            bp4,
             patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
