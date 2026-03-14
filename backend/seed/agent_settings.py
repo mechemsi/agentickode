@@ -249,7 +249,6 @@ _INSTALL_FIELDS = (
     "prereq_check",
     "prereq_name",
     "needs_non_root",
-    "consolidated_default",
 )
 
 

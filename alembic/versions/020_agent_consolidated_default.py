@@ -8,8 +8,9 @@ Revision ID: 020
 Revises: 019
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "020"
 down_revision = "019"
@@ -19,6 +20,10 @@ def upgrade() -> None:
     op.add_column(
         "agent_settings",
         sa.Column("consolidated_default", sa.Boolean(), nullable=False, server_default="true"),
+    )
+    # API-based agents need external orchestration — set to False
+    op.execute(
+        "UPDATE agent_settings SET consolidated_default = false " "WHERE agent_type = 'api_service'"
     )
 
 
