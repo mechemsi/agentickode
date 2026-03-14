@@ -83,7 +83,9 @@ class TestComparisonDetection:
             ),
         ):
             await coding.run(
-                run, db_session, mock_services,
+                run,
+                db_session,
+                mock_services,
                 phase_config={"params": {"consolidated": False}},
             )
 
