@@ -266,7 +266,7 @@ async def run(
             )
 
     # Consolidated mode: single invocation handles plan + code + review
-    consolidated = (phase_config or {}).get("params", {}).get("consolidated", False)
+    consolidated = (phase_config or {}).get("params", {}).get("consolidated", True)
     if consolidated:
         await _run_consolidated(
             task_run,

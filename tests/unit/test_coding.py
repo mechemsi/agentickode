@@ -55,7 +55,7 @@ class TestCoding:
                 run,
                 db_session,
                 mock_services,
-                phase_config={"params": {"subtask_mode": "separate"}},
+                phase_config={"params": {"subtask_mode": "separate", "consolidated": False}},
             )
 
         assert mock_adapter.run_task.call_count == 2
@@ -107,7 +107,12 @@ class TestCoding:
                 new=AsyncMock(return_value=5),
             ),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
         mock_services.role_resolver.resolve.assert_called_once_with(
             "coder", db_session, 5, phase_name="coding"
@@ -146,7 +151,12 @@ class TestCoding:
             ),
             pytest.raises(RuntimeError, match="All 1 subtask"),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
     async def test_fails_when_no_files_changed(self, db_session, make_task_run, mock_services):
         run = make_task_run(
@@ -181,7 +191,12 @@ class TestCoding:
             ),
             pytest.raises(RuntimeError, match="no file changes"),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
     async def test_auto_commits_uncommitted_changes(self, db_session, make_task_run, mock_services):
         """After each subtask, uncommitted changes are auto-committed."""
@@ -238,7 +253,12 @@ class TestCoding:
                 return_value=mock_remote_git,
             ),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
         # Verify git add + commit were called
         git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
@@ -294,7 +314,12 @@ class TestCoding:
                 return_value=mock_remote_git,
             ),
         ):
-            await coding.run(run, db_session, mock_services)
+            await coding.run(
+                run,
+                db_session,
+                mock_services,
+                phase_config={"params": {"consolidated": False}},
+            )
 
         # Only status check should be called, not add/commit
         git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
