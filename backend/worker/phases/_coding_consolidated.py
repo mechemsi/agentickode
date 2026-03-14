@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import AgentInvocation, PhaseExecution, TaskRun
 from backend.services.git import RemoteGitOps
 from backend.services.html_to_text import html_to_text
+from backend.services.json_extract import extract_json
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._coding_utils import (
     CONSOLIDATED_TEMPLATE,
@@ -194,6 +195,11 @@ async def run_consolidated(
     if auto_committed:
         await broadcaster.log(task_run.id, "  Auto-committed uncommitted changes", phase="coding")
 
+    # Parse structured summary from agent output
+    summary = _parse_consolidated_summary(agent_output)
+    plan_data = summary.get("plan", {})
+    review_data = summary.get("review", {})
+
     coding_results = [
         {
             "subtask_title": f"Consolidated: {task_run.title}",
@@ -205,25 +211,36 @@ async def run_consolidated(
 
     task_run.coding_results = make_results(coding_results, session_id)
 
-    # Populate planning_result so the UI can display what was done
-    task_run.planning_result = {
-        "subtasks": [
+    # Populate planning_result from agent's reported plan
+    subtasks = plan_data.get("subtasks", [])
+    if not subtasks:
+        # Fallback: single subtask from the task itself
+        subtasks = [
             {
                 "id": 1,
                 "title": task_run.title or "Task",
                 "description": description,
                 "files_likely_affected": files_changed,
             }
-        ],
-        "estimated_complexity": "consolidated",
+        ]
+    else:
+        # Normalize field names from agent output
+        for i, st in enumerate(subtasks):
+            st.setdefault("id", i + 1)
+            if "files_affected" in st and "files_likely_affected" not in st:
+                st["files_likely_affected"] = st.pop("files_affected")
+
+    task_run.planning_result = {
+        "subtasks": subtasks,
+        "estimated_complexity": plan_data.get("complexity", "consolidated"),
         "consolidated": True,
     }
 
-    # Populate review_result so the UI shows self-review status
+    # Populate review_result from agent's self-review
     task_run.review_result = {
-        "approved": exit_code == 0,
-        "issues": [],
-        "suggestions": [],
+        "approved": review_data.get("approved", exit_code == 0),
+        "issues": review_data.get("issues", []),
+        "suggestions": review_data.get("suggestions", []),
         "strictness": "self-review",
         "consolidated": True,
     }
@@ -239,3 +256,34 @@ async def run_consolidated(
         f"Coding complete (consolidated): 1 invocation in {elapsed_str}",
         phase="coding",
     )
+
+
+def _parse_consolidated_summary(agent_output: str) -> dict:
+    """Extract the structured JSON summary from consolidated agent output.
+
+    The agent is asked to output a JSON block with "plan" and "review" keys.
+    Falls back to empty dict if no valid JSON is found.
+    """
+    try:
+        data = extract_json(agent_output)
+        if isinstance(data, dict) and ("plan" in data or "review" in data):
+            return data
+    except Exception:
+        pass
+
+    # Try to find the last JSON block in the output (agent may have
+    # outputted other text/JSON before the summary)
+    import re
+
+    json_blocks = re.findall(r"```json\s*\n(.*?)\n\s*```", agent_output, re.DOTALL)
+    for block in reversed(json_blocks):
+        try:
+            import json
+
+            parsed = json.loads(block)
+            if isinstance(parsed, dict) and ("plan" in parsed or "review" in parsed):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    return {}

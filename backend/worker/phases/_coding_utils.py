@@ -90,7 +90,33 @@ You are responsible for the FULL lifecycle of this task in a single pass:
 6. **Commit** your changes with descriptive commit message(s)
 
 Do NOT ask clarifying questions — use your best judgment and proceed autonomously.
-Do NOT leave TODOs or placeholders — complete everything to a working state."""
+Do NOT leave TODOs or placeholders — complete everything to a working state.
+
+## Required Output
+After completing ALL work, output a JSON summary block wrapped in ```json fences:
+
+```json
+{{
+  "plan": {{
+    "subtasks": [
+      {{"title": "...", "description": "...", "files_affected": ["..."]}}
+    ],
+    "complexity": "simple|medium|complex"
+  }},
+  "review": {{
+    "approved": true,
+    "issues": [
+      {{"severity": "critical|major|minor", "file": "...", "description": "..."}}
+    ],
+    "suggestions": ["..."]
+  }}
+}}
+```
+
+The "plan" section should describe what you actually did (subtasks completed).
+The "review" section should describe your self-review findings.
+If you found and fixed issues during self-review, list them with severity.
+If everything looks clean, set approved=true with empty issues."""
 
 
 # ---------------------------------------------------------------------------
