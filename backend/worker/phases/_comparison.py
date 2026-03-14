@@ -14,17 +14,17 @@ from backend.models import AgentInvocation, PhaseExecution, TaskRun
 from backend.services.container import ServiceContainer
 from backend.services.git import RemoteGitOps
 from backend.worker.broadcaster import broadcaster
+from backend.worker.phases._coding_utils import (
+    FALLBACK_SYSTEM_PROMPT,
+    FALLBACK_USER_TEMPLATE,
+    build_coding_prompt,
+)
 from backend.worker.phases._helpers import (
     ensure_agent_ready,
     get_ssh_for_run,
     get_token_usage,
 )
 from backend.worker.phases._prompt_resolver import resolve_prompts
-from backend.worker.phases.coding import (
-    FALLBACK_SYSTEM_PROMPT,
-    FALLBACK_USER_TEMPLATE,
-    _build_coding_prompt,
-)
 
 logger = logging.getLogger("agentickode.phases.comparison")
 
@@ -103,7 +103,7 @@ async def run_comparison(
 
         for i, subtask in enumerate(subtasks):
             title = subtask.get("title", f"Subtask {i + 1}")
-            coding_prompt = _build_coding_prompt(subtask, previous_changes, user_template)
+            coding_prompt = build_coding_prompt(subtask, previous_changes, user_template)
 
             await broadcaster.log(
                 run_id,

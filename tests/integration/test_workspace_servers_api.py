@@ -17,16 +17,21 @@ from backend.services.workspace.ssh_service import SSHTestResult as SSHTestResul
 @pytest.fixture(autouse=True)
 def mock_setup_service():
     """Prevent ServerSetupService from running background tasks during tests."""
-    with patch("backend.api.servers.workspace_servers.ServerSetupService") as mock_cls:
+    with (
+        patch("backend.api.servers.workspace_servers.ServerSetupService") as mock_cls,
+        patch("backend.api.servers.workspace_servers_ops.ServerSetupService") as mock_ops_cls,
+    ):
         mock_cls.return_value.kick_off_setup = MagicMock()  # sync method
         mock_cls.return_value.retry_setup = AsyncMock()
-        yield mock_cls
+        mock_ops_cls.return_value.kick_off_setup = MagicMock()
+        mock_ops_cls.return_value.retry_setup = AsyncMock()
+        yield {"crud": mock_cls, "ops": mock_ops_cls}
 
 
 @pytest.fixture
 def mock_ssh_service():
     """Mock SSH that succeeds for connection test."""
-    with patch("backend.api.servers.workspace_servers.SSHService") as mock_cls:
+    with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
         instance = AsyncMock()
         mock_cls.return_value = instance
         mock_cls.for_server = lambda server: instance
@@ -40,9 +45,13 @@ def mock_ssh_service():
 def mock_ssh_with_discovery():
     """Mock SSH + AgentDiscovery + ProjectDiscovery for scan endpoints."""
     with (
-        patch("backend.api.servers.workspace_servers.SSHService") as mock_cls,
-        patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-        patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+        patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+        patch(
+            "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+        ) as mock_agent_cls,
+        patch(
+            "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+        ) as mock_proj_cls,
     ):
         instance = AsyncMock()
         mock_cls.return_value = instance
@@ -150,7 +159,7 @@ class TestCreateWorkspaceServer:
             json={"name": "setup-srv", "hostname": "10.0.0.1"},
         )
         assert resp.status_code == 201
-        mock_setup_service.return_value.kick_off_setup.assert_called_once()
+        mock_setup_service["crud"].return_value.kick_off_setup.assert_called_once()
 
 
 class TestListWorkspaceServers:
@@ -372,7 +381,7 @@ class TestSSHTest:
         server_id = create_resp.json()["id"]
 
         # Make SSH fail for the test call
-        with patch("backend.api.servers.workspace_servers.SSHService") as mock_cls:
+        with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
             fail_instance = AsyncMock()
             mock_cls.for_server = lambda server: fail_instance
             fail_instance.test_connection = AsyncMock(
@@ -407,7 +416,7 @@ class TestSSHTest:
         assert create_resp.json()["status"] == "setting_up"
 
         # SSH test succeeds
-        with patch("backend.api.servers.workspace_servers.SSHService") as mock_cls:
+        with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
             ok_instance = AsyncMock()
             mock_cls.for_server = lambda server: ok_instance
             ok_instance.test_connection = AsyncMock(
@@ -471,9 +480,13 @@ class TestScan:
             ),
         ]
         with (
-            patch("backend.api.servers.workspace_servers.SSHService") as mock_cls,
-            patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-            patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+            ) as mock_agent_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+            ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
             mock_cls.for_server = lambda server: scan_ssh
@@ -509,9 +522,13 @@ class TestScan:
 
         # First scan: imports projects
         with (
-            patch("backend.api.servers.workspace_servers.SSHService") as mock_cls,
-            patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-            patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+            ) as mock_agent_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+            ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
             mock_cls.for_server = lambda server: scan_ssh
@@ -552,9 +569,13 @@ class TestScan:
             ),
         ]
         with (
-            patch("backend.api.servers.workspace_servers.SSHService") as mock_cls,
-            patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-            patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+            ) as mock_agent_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+            ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
             mock_cls.for_server = lambda server: scan_ssh
@@ -599,8 +620,9 @@ class TestRetrySetup:
         resp = await client.post(f"/api/workspace-servers/{server_id}/retry-setup")
         assert resp.status_code == 200
         assert resp.json()["status"] == "setup_retrying"
-        # kick_off_setup called twice: once during create, once during retry
-        assert mock_setup_service.return_value.kick_off_setup.call_count == 2
+        # kick_off_setup called once in create (crud mock) and once in retry (ops mock)
+        mock_setup_service["crud"].return_value.kick_off_setup.assert_called_once()
+        mock_setup_service["ops"].return_value.kick_off_setup.assert_called_once()
 
     async def test_retry_setup_not_found(self, client: AsyncClient):
         resp = await client.post("/api/workspace-servers/999/retry-setup")

@@ -43,11 +43,15 @@ class TestCoding:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
             patch(
-                "backend.worker.phases.coding._auto_commit_changes",
+                "backend.worker.phases._coding_separate.auto_commit_changes",
                 new=AsyncMock(return_value=False),
             ),
         ):
@@ -103,6 +107,10 @@ class TestCoding:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=5),
             ),
@@ -146,6 +154,10 @@ class TestCoding:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
@@ -183,6 +195,10 @@ class TestCoding:
         with (
             patch(
                 "backend.worker.phases.coding.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases._coding_separate.broadcaster",
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
@@ -241,15 +257,19 @@ class TestCoding:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
             patch(
-                "backend.worker.phases.coding.get_ssh_for_run",
+                "backend.worker.phases._coding_utils.get_ssh_for_run",
                 new=AsyncMock(return_value=mock_ssh),
             ),
             patch(
-                "backend.worker.phases.coding.RemoteGitOps",
+                "backend.worker.phases._coding_utils.RemoteGitOps",
                 return_value=mock_remote_git,
             ),
         ):
@@ -302,15 +322,19 @@ class TestCoding:
                 new=MagicMock(log=AsyncMock(), event=AsyncMock()),
             ),
             patch(
+                "backend.worker.phases._coding_separate.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
                 "backend.worker.phases.coding.get_workspace_server_id",
                 new=AsyncMock(return_value=None),
             ),
             patch(
-                "backend.worker.phases.coding.get_ssh_for_run",
+                "backend.worker.phases._coding_utils.get_ssh_for_run",
                 new=AsyncMock(return_value=mock_ssh),
             ),
             patch(
-                "backend.worker.phases.coding.RemoteGitOps",
+                "backend.worker.phases._coding_utils.RemoteGitOps",
                 return_value=mock_remote_git,
             ),
         ):

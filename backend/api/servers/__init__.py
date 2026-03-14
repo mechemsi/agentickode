@@ -10,6 +10,8 @@ from backend.api.servers.projects import router as server_projects_router
 from backend.api.servers.ssh_keys import router as ssh_keys_router
 from backend.api.servers.worker_user import router as worker_user_router
 from backend.api.servers.workspace_servers import router as workspace_servers_router
+from backend.api.servers.workspace_servers_discovery import router as ws_discovery_router
+from backend.api.servers.workspace_servers_ops import router as ws_ops_router
 
 __all__ = [
     "agent_management_router",
@@ -18,4 +20,6 @@ __all__ = [
     "ssh_keys_router",
     "worker_user_router",
     "workspace_servers_router",
+    "ws_discovery_router",
+    "ws_ops_router",
 ]

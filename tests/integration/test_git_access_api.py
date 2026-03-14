@@ -15,7 +15,7 @@ from backend.services.workspace.ssh_service import SSHTestResult as SSHTestResul
 @pytest.fixture
 def mock_ssh_for_git():
     """Mock SSH for git access tests — server creation + git access calls."""
-    with patch("backend.api.servers.workspace_servers.SSHService") as ws_mock_cls:
+    with patch("backend.api.servers.workspace_servers_discovery.SSHService") as ws_mock_cls:
         ws_instance = AsyncMock()
         ws_mock_cls.return_value = ws_instance
         ws_mock_cls.for_server = lambda server: ws_instance
@@ -24,8 +24,12 @@ def mock_ssh_for_git():
         )
 
         with (
-            patch("backend.api.servers.workspace_servers.AgentDiscoveryService") as mock_agent_cls,
-            patch("backend.api.servers.workspace_servers.ProjectDiscoveryService") as mock_proj_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
+            ) as mock_agent_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
+            ) as mock_proj_cls,
             patch("backend.api.servers.git_access.SSHService") as ga_mock_cls,
         ):
             mock_agent_cls.return_value.discover_all = AsyncMock(return_value=[])
