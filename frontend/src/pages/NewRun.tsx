@@ -44,7 +44,7 @@ export default function NewRun() {
   const [agentOverride, setAgentOverride] = useState("");
   const [workspaceServerId, setWorkspaceServerId] = useState<number | "">("");
   const [phaseOverrides, setPhaseOverrides] = useState<Record<string, string>>({});
-  const [subtaskMode, setSubtaskMode] = useState<"separate" | "batch">("batch");
+  const [executionMode, setExecutionMode] = useState<"consolidated" | "batch" | "separate">("consolidated");
 
   const [issues, setIssues] = useState<GitIssue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(false);
@@ -121,10 +121,15 @@ export default function NewRun() {
           phaseOverridesPayload[phase] = { agent_override: agent };
         }
       }
-      if (subtaskMode === "batch") {
+      if (executionMode === "consolidated") {
         phaseOverridesPayload["coding"] = {
           ...phaseOverridesPayload["coding"],
-          params: { subtask_mode: "batch" },
+          params: { consolidated: true },
+        };
+      } else {
+        phaseOverridesPayload["coding"] = {
+          ...phaseOverridesPayload["coding"],
+          params: { consolidated: false, subtask_mode: executionMode },
         };
       }
 
@@ -368,21 +373,26 @@ export default function NewRun() {
                 </select>
               </div>
 
-              {/* Subtask mode */}
+              {/* Execution mode */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Subtask Execution Mode
+                  Execution Mode
                 </label>
                 <select
-                  value={subtaskMode}
-                  onChange={(e) => setSubtaskMode(e.target.value as "separate" | "batch")}
+                  value={executionMode}
+                  onChange={(e) => setExecutionMode(e.target.value as "consolidated" | "batch" | "separate")}
                   className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                 >
-                  <option value="batch">Batch — all subtasks in one prompt (saves tokens)</option>
+                  <option value="consolidated">Consolidated — plan + code + review in one call (recommended)</option>
+                  <option value="batch">Batch — all subtasks in one prompt</option>
                   <option value="separate">Separate — one agent call per subtask</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Batch mode sends all subtasks in a single prompt, reducing token usage but giving less granular control.
+                  {executionMode === "consolidated"
+                    ? "Agent handles planning, implementation, and self-review internally. Best for autonomous agents like Claude Code."
+                    : executionMode === "batch"
+                      ? "Sends all subtasks in a single prompt after planning phase. Saves tokens but less granular control."
+                      : "Runs each subtask as a separate agent invocation. Most granular but highest token usage."}
                 </p>
               </div>
 

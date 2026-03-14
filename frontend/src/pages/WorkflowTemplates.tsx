@@ -160,6 +160,14 @@ function PhaseAdvancedConfig({
   const [cmdTemplates, setCmdTemplates] = useState<KVEntry[]>(
     parseKV(phase.command_templates as Record<string, string>),
   );
+  const isCodingPhase = phase.phase_name === "coding";
+  const [executionMode, setExecutionMode] = useState<"agent_default" | "consolidated" | "batch" | "separate">(
+    phase.params?.consolidated === true
+      ? "consolidated"
+      : phase.params?.consolidated === false
+        ? (phase.params?.subtask_mode === "separate" ? "separate" : "batch")
+        : "agent_default",
+  );
 
   const handleSave = () => {
     const updates: Partial<PhaseConfig> = {};
@@ -174,6 +182,21 @@ function PhaseAdvancedConfig({
 
     const cmd = kvToObject(cmdTemplates);
     updates.command_templates = Object.keys(cmd).length ? cmd : null;
+
+    if (isCodingPhase) {
+      const existingParams = { ...(phase.params || {}) };
+      if (executionMode === "agent_default") {
+        delete existingParams.consolidated;
+        delete existingParams.subtask_mode;
+      } else if (executionMode === "consolidated") {
+        existingParams.consolidated = true;
+        delete existingParams.subtask_mode;
+      } else {
+        existingParams.consolidated = false;
+        existingParams.subtask_mode = executionMode;
+      }
+      updates.params = existingParams;
+    }
 
     onSave(updates);
   };
@@ -211,6 +234,23 @@ function PhaseAdvancedConfig({
             className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
           />
         </div>
+        {isCodingPhase && (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">
+              Execution Mode
+            </label>
+            <select
+              value={executionMode}
+              onChange={(e) => setExecutionMode(e.target.value as typeof executionMode)}
+              className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+            >
+              <option value="agent_default">Agent default{agentDefaults?.consolidated_default != null ? ` (${agentDefaults.consolidated_default ? "consolidated" : "multi-step"})` : ""}</option>
+              <option value="consolidated">Consolidated — single invocation</option>
+              <option value="batch">Batch — all subtasks in one prompt</option>
+              <option value="separate">Separate — one call per subtask</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div>
