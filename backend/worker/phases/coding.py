@@ -196,7 +196,14 @@ async def run(
             )
 
     # Consolidated mode: single invocation handles plan + code + review
-    consolidated = (phase_config or {}).get("params", {}).get("consolidated", True)
+    # Priority: run/workflow phase_config > agent default > global fallback (True)
+    params = (phase_config or {}).get("params", {})
+    if "consolidated" in params:
+        consolidated = params["consolidated"]
+    elif resolved.agent_settings and resolved.agent_settings.consolidated_default is not None:
+        consolidated = resolved.agent_settings.consolidated_default
+    else:
+        consolidated = True
     if consolidated:
         await run_consolidated(
             task_run,

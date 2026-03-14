@@ -102,6 +102,9 @@ class AgentSettings(Base):
     needs_non_root = Column(
         Boolean, nullable=False, default=False
     )  # whether agent refuses root execution
+    consolidated_default = Column(
+        Boolean, nullable=False, default=True
+    )  # whether agent prefers consolidated mode (plan+code+review in one invocation)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
