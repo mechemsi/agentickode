@@ -249,6 +249,9 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
     """Install system-level deps as root, then user-level deps if user exists."""
     failed: list[str] = []
 
+    # Clean up any malformed apt sources from previous failed gh installs
+    await ssh.run_command("rm -f /etc/apt/sources.list.d/github-cli.list", timeout=10)
+
     apt_cmd = (
         "apt-get update -qq && "
         "apt-get install -y -qq git ca-certificates curl pipx unzip "
@@ -263,9 +266,7 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
         failed.append(f"apt packages: {stderr.strip()[:500]}")
 
     # Install GitHub CLI (gh) for PR creation from workspace servers
-    # Clean up any malformed sources list from previous attempts
     gh_cmd = (
-        "rm -f /etc/apt/sources.list.d/github-cli.list 2>/dev/null; "
         "if ! command -v gh >/dev/null 2>&1; then "
         "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg "
         "-o /usr/share/keyrings/githubcli-archive-keyring.gpg && "
