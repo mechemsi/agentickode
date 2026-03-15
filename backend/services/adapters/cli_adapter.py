@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shlex
 import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
@@ -249,5 +250,13 @@ class CLIAdapter:
         await close_cli_session(self, session_id, workspace)
 
     async def is_available(self) -> bool:
-        _, _, rc = await self._ssh.run_command(str(self._commands["check"]), timeout=10)
-        return rc == 0
+        check_cmd = str(self._commands["check"])
+        _, _, rc = await self._ssh.run_command(check_cmd, timeout=10)
+        if rc == 0:
+            return True
+        # Agent may be installed for worker user only (e.g. /home/coder/.local/bin)
+        if self._worker_user:
+            wrapped = f"runuser -l {self._worker_user} -c {shlex.quote(check_cmd)}"
+            _, _, rc = await self._ssh.run_command(wrapped, timeout=10)
+            return rc == 0
+        return False
