@@ -1,31 +1,74 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: agentickode
+      POSTGRES_PASSWORD: agentickode
+      POSTGRES_DB: agentickode
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentickode"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile.backend.dev
     ports:
       - "8222:8000"
     env_file:
       - path: .env
         required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
-      - ${WORKSPACE_ROOT:-/workspaces}:/workspaces
-      - /var/run/docker.sock:/var/run/docker.sock
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      - ./backend:/app/backend
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./alembic.ini:/app/alembic.ini
+      - ./alembic:/app/alembic
+      - ./.ssh:/app/.ssh
     restart: unless-stopped
 
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile.frontend.dev
     ports:
-      - "3080:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/eslint.config.js:/app/eslint.config.js
     restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: agentickode-app_pgdata
+  redisdata:
+    name: agentickode-app_redisdata
