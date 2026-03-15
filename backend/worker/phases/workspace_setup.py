@@ -10,6 +10,7 @@ All operations execute on the remote workspace server via SSH.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import shlex
 from collections.abc import Awaitable, Callable
@@ -74,9 +75,19 @@ async def run(
         workspace = f"{workspace_root}/{raw_path}".rstrip("/")
     task_run.workspace_path = workspace
 
+    worker_user = server.worker_user
     repos_cloned: list[str] = []
 
     await _log(f"Workspace type={ws_type}, path={workspace}")
+
+    # Mark directory safe for both root and worker user to avoid
+    # "dubious ownership" errors when repo is cloned as root but
+    # operated by worker user (or vice versa)
+    await remote_git._mark_safe_directory(workspace)
+    if worker_user and ssh.username == "root":
+        safe_cmd = f"runuser -l {shlex.quote(worker_user)} -c 'git config --global --add safe.directory {shlex.quote(workspace)}'"
+        with contextlib.suppress(Exception):
+            await ssh.run_command(safe_cmd, timeout=10)
 
     if ws_type == "existing":
         branch = str(task_run.default_branch)
@@ -150,7 +161,6 @@ async def run(
         raise ValueError(f"Unknown workspace_type: {ws_type}")
 
     # Ensure worker user can access the workspace (clone runs as root)
-    worker_user = server.worker_user
     if worker_user and ssh.username == "root":
         ws_quoted = shlex.quote(workspace)
         await _log(f"Setting workspace ownership to {worker_user}")
