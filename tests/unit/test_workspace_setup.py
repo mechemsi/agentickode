@@ -15,12 +15,25 @@ def _mock_server():
     """Return a mock WorkspaceServer with workspace_root."""
     server = MagicMock()
     server.workspace_root = "/home/workspace"
+    server.worker_user = "coder"
+    server.username = "root"
     return server
+
+
+def _mock_ssh():
+    """Return a mock SSHService with async run_command."""
+    ssh = MagicMock()
+    ssh.run_command = AsyncMock(return_value=("", "", 0))
+    ssh.hostname = "test-host"
+    ssh.port = 22
+    ssh.username = "root"
+    return ssh
 
 
 def _ws_patches():
     """Common patches for workspace_setup tests."""
     mock_server = _mock_server()
+    mock_ssh_instance = _mock_ssh()
     return (
         patch(
             "backend.worker.phases.workspace_setup.get_workspace_server",
@@ -28,6 +41,7 @@ def _ws_patches():
         ),
         patch(
             "backend.worker.phases.workspace_setup.SSHService",
+            **{"for_server.return_value": mock_ssh_instance},
         ),
         patch(
             "backend.worker.phases.workspace_setup.RemoteGitOps",
@@ -42,6 +56,10 @@ def _ws_patches():
         patch(
             "backend.worker.phases.workspace_setup.get_auth_url",
             new=AsyncMock(return_value=("https://authed@url", "https")),
+        ),
+        patch(
+            "backend.worker.phases.workspace_setup.get_project_token",
+            new=AsyncMock(return_value=None),
         ),
     )
 
@@ -58,17 +76,17 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.has_repo = AsyncMock(return_value=True)
             mock_remote_git.run_git = AsyncMock()
             mock_remote_git.clone = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             await workspace_setup.run(run, db_session, mock_services)
 
-            # Should checkout -f, clean, and pull via run_git — not clone
             git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
             assert ["checkout", "-f", "main"] in git_calls
             assert ["clean", "-fd"] in git_calls
@@ -85,13 +103,14 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.has_repo = AsyncMock(return_value=False)
             mock_remote_git.pull = AsyncMock()
             mock_remote_git.clone = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             await workspace_setup.run(run, db_session, mock_services)
 
@@ -110,16 +129,16 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.has_repo = AsyncMock(return_value=True)
             mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             await workspace_setup.run(run, db_session, mock_services)
 
-            # Path should be resolved to /home/workspace/myproject
             assert run.workspace_path == "/home/workspace/myproject"
             git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
             assert ["checkout", "-f", "main"] in git_calls
@@ -135,11 +154,12 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.clone_or_pull = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             await workspace_setup.run(run, db_session, mock_services)
 
@@ -153,10 +173,11 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             with pytest.raises(ValueError, match="at least one repo"):
                 await workspace_setup.run(run, db_session, mock_services)
@@ -169,10 +190,11 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             with pytest.raises(ValueError, match="Unknown workspace_type"):
                 await workspace_setup.run(run, db_session, mock_services)
@@ -189,11 +211,12 @@ class TestWorkspaceSetup:
         db_session.add(run)
         await db_session.commit()
 
-        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox as mock_sb_cls, p_bc, p_auth:
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
+        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox as mock_sb_cls, p_bc, p_auth, p_token:
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.clone_or_pull = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
 
             mock_remote_sb = mock_sb_cls.return_value
             mock_remote_sb.start_sandbox = AsyncMock(return_value=(True, "http://host:9090"))
