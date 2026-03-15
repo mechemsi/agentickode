@@ -96,7 +96,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const add = useCallback(
     (variant: Variant) => (message: string, duration = 4000) => {
-      dispatch({ type: "ADD", toast: { id: crypto.randomUUID(), message, variant, duration } });
+      const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      dispatch({ type: "ADD", toast: { id, message, variant, duration } });
     },
     [],
   );
