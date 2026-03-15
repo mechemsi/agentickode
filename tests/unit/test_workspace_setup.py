@@ -212,7 +212,15 @@ class TestWorkspaceSetup:
         await db_session.commit()
 
         p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox as mock_sb_cls, p_bc, p_auth, p_token:
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox as mock_sb_cls,
+            p_bc,
+            p_auth,
+            p_token,
+        ):
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.clone_or_pull = AsyncMock()
