@@ -94,11 +94,12 @@ class RoleResolver:
             if agent_sett is not None:
                 non_root = getattr(agent_sett, "needs_non_root", None)
 
-            adapter = self._build_adapter(
+            adapter, build_err = self._build_adapter(
                 assignment, command_templates=cmd_templates, needs_non_root=non_root
             )
             if adapter is None:
-                tried.append(f"{assignment.provider_type}:{assignment.agent_name or assignment.model_name}(build-failed)")
+                label = assignment.agent_name or assignment.model_name or assignment.provider_type
+                tried.append(f"{label}({build_err or 'build-failed'})")
                 continue
 
             try:
@@ -233,28 +234,30 @@ class RoleResolver:
         assignment: RoleAssignment,
         command_templates: dict | None = None,
         needs_non_root: bool | None = None,
-    ) -> RoleAdapter | None:
-        """Build an adapter from a RoleAssignment row."""
+    ) -> tuple[RoleAdapter | None, str | None]:
+        """Build an adapter from a RoleAssignment row. Returns (adapter, error_reason)."""
         try:
             if assignment.provider_type == "ollama":
                 if assignment.ollama_server and assignment.model_name:
                     return self._factory.create_ollama_adapter(
                         assignment.ollama_server, assignment.model_name
-                    )
+                    ), None
+                return None, "no ollama server or model configured"
             elif assignment.provider_type == "agent" and assignment.agent_name:
                 return self._factory.create_agent_adapter(
                     assignment.agent_name,
                     workspace_server=assignment.workspace_server,
                     command_templates=command_templates,
                     needs_non_root=needs_non_root,
-                )
-        except Exception:
+                ), None
+        except Exception as exc:
             logger.warning(
                 "Failed to build adapter for assignment %d",
                 assignment.id,
                 exc_info=True,
             )
-        return None
+            return None, str(exc)
+        return None, "unknown provider type"
 
     def _settings_default(self, role: str) -> RoleAdapter:
         """Ultimate fallback: create OllamaAdapter from settings."""
