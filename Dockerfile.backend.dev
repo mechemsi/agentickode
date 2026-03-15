@@ -12,7 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Source code mounted as volume in docker-compose.dev.yml
+# Copy source as fallback; docker-compose.dev.yml overrides with volume mounts
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
+COPY backend/ ./backend/
 EXPOSE 8000
 
 CMD ["/docker-entrypoint.sh"]
