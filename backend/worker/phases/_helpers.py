@@ -129,7 +129,35 @@ async def get_ssh_for_run(task_run: TaskRun, session: AsyncSession) -> SSHServic
 
 
 async def get_project_token(task_run: TaskRun, session: AsyncSession) -> str | None:
-    """Decrypt and return the per-project git provider token, if set."""
+    """Return the best git provider token for this run.
+
+    Resolution order:
+    1. git_connections scoped to project
+    2. git_connections scoped to workspace server
+    3. git_connections global default
+    4. Legacy ProjectConfig.git_provider_token_enc
+    5. None (caller falls back to .env via GitProvider)
+    """
+    from backend.repositories.git_connection_repo import GitConnectionRepository
+
+    provider = task_run.git_provider or "github"
+    conn_repo = GitConnectionRepository(session)
+
+    # Try git_connections table (project → server → global)
+    ws_id = getattr(task_run, "workspace_server_id", None)
+    if ws_id is None:
+        project = await session.get(ProjectConfig, task_run.project_id)
+        ws_id = project.workspace_server_id if project else None
+
+    token = await conn_repo.resolve_token(
+        provider=provider,
+        project_id=task_run.project_id,
+        workspace_server_id=ws_id,
+    )
+    if token:
+        return token
+
+    # Legacy: per-project encrypted token
     stmt = select(ProjectConfig.git_provider_token_enc).where(
         ProjectConfig.project_id == task_run.project_id
     )
