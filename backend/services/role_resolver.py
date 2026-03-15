@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from backend.config import settings
-from backend.models import AgentSettings, RoleAssignment, RoleConfig
+from backend.models import AgentSettings, RoleAssignment, RoleConfig, WorkspaceServer
 from backend.services.adapters.ollama_adapter import OllamaAdapter
 from backend.services.adapters.protocol import RoleAdapter
 from backend.services.ollama_service import OllamaService
@@ -72,6 +72,11 @@ class RoleResolver:
         role_config = await self._load_role_config(role, session, phase_name)
         tried: list[str] = []
 
+        # Load fallback server for global assignments that don't have one
+        fallback_server: WorkspaceServer | None = None
+        if workspace_server_id is not None:
+            fallback_server = await session.get(WorkspaceServer, workspace_server_id)
+
         for assignment in candidates:
             # Pre-load AgentSettings for CLI agents to check enabled + pass templates
             agent_sett: AgentSettings | None = None
@@ -95,7 +100,10 @@ class RoleResolver:
                 non_root = getattr(agent_sett, "needs_non_root", None)
 
             adapter, build_err = self._build_adapter(
-                assignment, command_templates=cmd_templates, needs_non_root=non_root
+                assignment,
+                command_templates=cmd_templates,
+                needs_non_root=non_root,
+                fallback_server=fallback_server,
             )
             if adapter is None:
                 label = assignment.agent_name or assignment.model_name or assignment.provider_type
@@ -234,6 +242,7 @@ class RoleResolver:
         assignment: RoleAssignment,
         command_templates: dict | None = None,
         needs_non_root: bool | None = None,
+        fallback_server: WorkspaceServer | None = None,
     ) -> tuple[RoleAdapter | None, str | None]:
         """Build an adapter from a RoleAssignment row. Returns (adapter, error_reason)."""
         try:
@@ -244,9 +253,10 @@ class RoleResolver:
                     ), None
                 return None, "no ollama server or model configured"
             elif assignment.provider_type == "agent" and assignment.agent_name:
+                server = assignment.workspace_server or fallback_server
                 return self._factory.create_agent_adapter(
                     assignment.agent_name,
-                    workspace_server=assignment.workspace_server,
+                    workspace_server=server,
                     command_templates=command_templates,
                     needs_non_root=needs_non_root,
                 ), None
