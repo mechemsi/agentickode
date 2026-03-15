@@ -263,14 +263,16 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
         failed.append(f"apt packages: {stderr.strip()[:500]}")
 
     # Install GitHub CLI (gh) for PR creation from workspace servers
+    # Clean up any malformed sources list from previous attempts
     gh_cmd = (
+        "rm -f /etc/apt/sources.list.d/github-cli.list 2>/dev/null; "
         "if ! command -v gh >/dev/null 2>&1; then "
         "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg "
-        "| dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && "
-        "echo 'deb [arch=$(dpkg --print-architecture) "
-        "signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] "
-        "https://cli.github.com/packages stable main' "
-        "> /etc/apt/sources.list.d/github-cli.list && "
+        "-o /usr/share/keyrings/githubcli-archive-keyring.gpg && "
+        "chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && "
+        'printf "deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg]'
+        ' https://cli.github.com/packages stable main\\n" '
+        '"$(dpkg --print-architecture)" > /etc/apt/sources.list.d/github-cli.list && '
         "apt-get update -qq && apt-get install -y -qq gh 2>/dev/null; "
         "fi"
     )
