@@ -58,7 +58,12 @@ class OllamaAdapter:
         return result.text
 
     async def run_task(self, workspace: str, instruction: str, **kwargs: object) -> dict:
-        raise NotImplementedError("Ollama cannot execute coding tasks directly")
+        raise NotImplementedError(
+            "Ollama cannot execute coding tasks directly. "
+            "This usually means the configured CLI agent (e.g. Claude) was not available "
+            "on the workspace server and the system fell back to Ollama. "
+            "Check that the agent is installed and accessible on the server."
+        )
 
     async def is_available(self) -> bool:
         return await self._service.is_healthy()

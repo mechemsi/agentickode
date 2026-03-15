@@ -68,6 +68,7 @@ class RoleResolver:
     ) -> ResolvedRole:
         candidates = await self._load_candidates(role, session, workspace_server_id)
         role_config = await self._load_role_config(role, session, phase_name)
+        tried: list[str] = []
 
         for assignment in candidates:
             # Pre-load AgentSettings for CLI agents to check enabled + pass templates
@@ -76,6 +77,7 @@ class RoleResolver:
             if assignment.provider_type == "agent" and assignment.agent_name:
                 agent_sett = await self._load_agent_settings(assignment.agent_name, session)
                 if agent_sett and not agent_sett.enabled:
+                    tried.append(f"{assignment.agent_name}(disabled)")
                     logger.info(
                         "Agent '%s' is disabled, skipping for role '%s'",
                         assignment.agent_name,
@@ -94,6 +96,7 @@ class RoleResolver:
                 assignment, command_templates=cmd_templates, needs_non_root=non_root
             )
             if adapter is None:
+                tried.append(f"{assignment.provider_type}:{assignment.agent_name or assignment.model_name}(build-failed)")
                 continue
 
             try:
@@ -104,19 +107,27 @@ class RoleResolver:
                         role_config=role_config,
                         agent_settings=agent_sett,
                     )
+                tried.append(f"{adapter.provider_name}(unavailable)")
                 logger.info(
                     "Provider %s unavailable for role '%s', trying next",
                     adapter.provider_name,
                     role,
                 )
-            except Exception:
+            except Exception as exc:
+                tried.append(f"{adapter.provider_name}(error: {exc})")
                 logger.warning(
                     "Availability check failed for %s, trying next",
                     adapter.provider_name,
                     exc_info=True,
                 )
 
-        # Step 5: settings default
+        # Step 5: settings default — but warn clearly about what was tried
+        if tried:
+            logger.warning(
+                "All configured providers failed for role '%s': %s — falling back to settings default (Ollama)",
+                role,
+                ", ".join(tried),
+            )
         return ResolvedRole(adapter=self._settings_default(role), role_config=role_config)
 
     async def _load_role_config(
