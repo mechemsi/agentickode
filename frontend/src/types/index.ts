@@ -17,3 +17,4 @@ export * from "./comparison";
 export * from "./settings";
 export * from "./backup";
 export * from "./instructions";
+export * from "./gitConnections";

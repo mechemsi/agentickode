@@ -49,6 +49,14 @@ from backend.schemas.git import (
     SSHKeyOut,
     UserGitAccessStatus,
 )
+from backend.schemas.git_connections import (
+    VALID_GIT_PROVIDERS,
+    VALID_SCOPES,
+    GitConnectionCreate,
+    GitConnectionOut,
+    GitConnectionTestResult,
+    GitConnectionUpdate,
+)
 from backend.schemas.health import HealthResponse, ServiceHealth
 from backend.schemas.instructions import (
     InstructionVersionOut,
@@ -144,9 +152,11 @@ __all__ = [
     "DEFAULT_VALID_ROLES",
     "VALID_AGENT_NAMES",
     "VALID_CHANNEL_TYPES",
+    "VALID_GIT_PROVIDERS",
     "VALID_NOTIFICATION_EVENTS",
     "VALID_PROVIDER_TYPES",
     "VALID_ROLES",
+    "VALID_SCOPES",
     "AdvancePhaseRequest",
     "AgentCostStat",
     "AgentInstallRequest",
@@ -170,6 +180,10 @@ __all__ = [
     "GitAccessCheckRequest",
     "GitAccessGenerateKeyRequest",
     "GitAccessStatus",
+    "GitConnectionCreate",
+    "GitConnectionOut",
+    "GitConnectionTestResult",
+    "GitConnectionUpdate",
     "GitIssueOut",
     "GitProviderStatus",
     "GitUrlParseRequest",

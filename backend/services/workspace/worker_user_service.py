@@ -37,8 +37,17 @@ class WorkerUserService:
     def __init__(self, ssh: SSHService):
         self._ssh = ssh
 
-    async def setup(self, username: str = "coder") -> WorkerUserInfo:
+    async def setup(
+        self,
+        username: str = "coder",
+        token_overrides: dict[str, str] | None = None,
+    ) -> WorkerUserInfo:
         """Create OS user, copy config/SSH keys, verify agents.
+
+        Args:
+            username: OS username to create.
+            token_overrides: Optional provider→token dict from DB GitConnections.
+                If a provider key exists, it overrides the .env token.
 
         Agents are installed directly as the worker user (via
         ``AgentInstallService.install_agent(as_user=...)``) rather than
@@ -95,7 +104,7 @@ class WorkerUserService:
         ]
 
         # Write platform env vars (tokens, API URLs) for agent plugins
-        env_lines = self._build_env_vars()
+        env_lines = self._build_env_vars(token_overrides=token_overrides)
         if env_lines:
             env_content = "\\n".join(env_lines)
             setup_cmds.extend(
@@ -110,7 +119,7 @@ class WorkerUserService:
             )
 
         # Set up git credential store with all configured provider tokens
-        cred_lines = self._build_git_credentials()
+        cred_lines = self._build_git_credentials(token_overrides=token_overrides)
         if cred_lines:
             cred_content = "\\n".join(cred_lines)
             setup_cmds.extend(
@@ -165,55 +174,65 @@ class WorkerUserService:
         return await self.setup(username)
 
     @staticmethod
-    def _build_env_vars() -> list[str]:
+    def _build_env_vars(token_overrides: dict[str, str] | None = None) -> list[str]:
         """Build environment variable exports for the worker user.
 
         These are written to ~/.agentickode_env and sourced from .bashrc so that
         agent plugins (github MCP, etc.) and CLI tools have access to tokens.
+        If token_overrides contains a provider key, it takes precedence over .env.
         """
+        overrides = token_overrides or {}
         lines: list[str] = []
 
-        if settings.github_token:
-            lines.append(
-                f"export GITHUB_PERSONAL_ACCESS_TOKEN={shlex.quote(settings.github_token)}"
-            )
-            lines.append(f"export GITHUB_TOKEN={shlex.quote(settings.github_token)}")
+        github_token = overrides.get("github") or settings.github_token
+        if github_token:
+            lines.append(f"export GITHUB_PERSONAL_ACCESS_TOKEN={shlex.quote(github_token)}")
+            lines.append(f"export GITHUB_TOKEN={shlex.quote(github_token)}")
 
-        if settings.gitea_token:
-            lines.append(f"export GITEA_TOKEN={shlex.quote(settings.gitea_token)}")
+        gitea_token = overrides.get("gitea") or settings.gitea_token
+        if gitea_token:
+            lines.append(f"export GITEA_TOKEN={shlex.quote(gitea_token)}")
 
-        if settings.gitlab_token:
-            lines.append(f"export GITLAB_TOKEN={shlex.quote(settings.gitlab_token)}")
+        gitlab_token = overrides.get("gitlab") or settings.gitlab_token
+        if gitlab_token:
+            lines.append(f"export GITLAB_TOKEN={shlex.quote(gitlab_token)}")
 
-        if settings.bitbucket_access_token:
-            lines.append(
-                f"export BITBUCKET_ACCESS_TOKEN={shlex.quote(settings.bitbucket_access_token)}"
-            )
+        bb_token = overrides.get("bitbucket") or settings.bitbucket_access_token
+        if bb_token:
+            lines.append(f"export BITBUCKET_ACCESS_TOKEN={shlex.quote(bb_token)}")
 
         return lines
 
     @staticmethod
-    def _build_git_credentials() -> list[str]:
-        """Build git-credentials lines from configured provider tokens."""
+    def _build_git_credentials(token_overrides: dict[str, str] | None = None) -> list[str]:
+        """Build git-credentials lines from configured provider tokens.
+
+        If token_overrides contains a provider key, it takes precedence over .env.
+        """
+        overrides = token_overrides or {}
         lines: list[str] = []
 
-        if settings.github_token:
-            lines.append(f"https://x-access-token:{settings.github_token}@github.com")
+        github_token = overrides.get("github") or settings.github_token
+        if github_token:
+            lines.append(f"https://x-access-token:{github_token}@github.com")
 
-        if settings.gitea_token and settings.gitea_url:
+        gitea_token = overrides.get("gitea") or settings.gitea_token
+        if gitea_token and settings.gitea_url:
             parsed = urlparse(settings.gitea_url)
             host = parsed.hostname or "gitea.local"
             port_part = f":{parsed.port}" if parsed.port and parsed.port != 443 else ""
             scheme = parsed.scheme or "https"
-            lines.append(f"{scheme}://ai-agent:{settings.gitea_token}@{host}{port_part}")
+            lines.append(f"{scheme}://ai-agent:{gitea_token}@{host}{port_part}")
 
-        if settings.gitlab_token and settings.gitlab_api_url:
+        gitlab_token = overrides.get("gitlab") or settings.gitlab_token
+        if gitlab_token and settings.gitlab_api_url:
             parsed = urlparse(settings.gitlab_api_url)
             host = parsed.hostname or "gitlab.com"
-            lines.append(f"https://oauth2:{settings.gitlab_token}@{host}")
+            lines.append(f"https://oauth2:{gitlab_token}@{host}")
 
-        if settings.bitbucket_access_token:
-            lines.append(f"https://x-token-auth:{settings.bitbucket_access_token}@bitbucket.org")
+        bb_token = overrides.get("bitbucket") or settings.bitbucket_access_token
+        if bb_token:
+            lines.append(f"https://x-token-auth:{bb_token}@bitbucket.org")
 
         return lines
 

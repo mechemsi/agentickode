@@ -15,3 +15,4 @@ export * from "./health";
 export * from "./ssh";
 export * from "./backup";
 export * from "./instructions";
+export * from "./gitConnections";

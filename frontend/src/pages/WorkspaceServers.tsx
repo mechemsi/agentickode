@@ -38,6 +38,7 @@ import {
 import { useConfirm } from "../components/shared/ConfirmDialog";
 import AgentManagementPanel from "../components/servers/AgentManagementPanel";
 import GitAccessPanel from "../components/servers/GitAccessPanel";
+import GitConnectionsPanel from "../components/servers/GitConnectionsPanel";
 import ProjectsPanel from "../components/servers/ProjectsPanel";
 import ServerHistoryPanel from "../components/servers/ServerHistoryPanel";
 import WorkspaceServerForm from "../components/servers/WorkspaceServerForm";
@@ -146,6 +147,7 @@ export default function WorkspaceServers() {
   const [projectsExpanded, setProjectsExpanded] = useState<Set<number>>(new Set());
   const [terminalExpanded, setTerminalExpanded] = useState<Set<number>>(new Set());
   const [historyExpanded, setHistoryExpanded] = useState<Set<number>>(new Set());
+  const [gitTokensExpanded, setGitTokensExpanded] = useState<Set<number>>(new Set());
   const [sshConfigExpanded, setSshConfigExpanded] = useState<Set<number>>(new Set());
   const [setupExpanded, setSetupExpanded] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -442,6 +444,13 @@ export default function WorkspaceServers() {
                       Git Access
                     </button>
                     <button
+                      onClick={() => toggleSet(setGitTokensExpanded, s.id)}
+                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                    >
+                      <KeyRound className="w-3 h-3" />
+                      Git Tokens
+                    </button>
+                    <button
                       onClick={() => toggleSet(setProjectsExpanded, s.id)}
                       className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
                     >
@@ -575,6 +584,15 @@ export default function WorkspaceServers() {
                 {gitExpanded.has(s.id) && (
                   <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
                     <GitAccessPanel serverId={s.id} />
+                  </div>
+                )}
+                {gitTokensExpanded.has(s.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+                    <h4 className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5" />
+                      Git Tokens
+                    </h4>
+                    <GitConnectionsPanel serverId={s.id} />
                   </div>
                 )}
                 {projectsExpanded.has(s.id) && (
