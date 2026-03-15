@@ -138,24 +138,27 @@ async def get_project_token(task_run: TaskRun, session: AsyncSession) -> str | N
     4. Legacy ProjectConfig.git_provider_token_enc
     5. None (caller falls back to .env via GitProvider)
     """
-    from backend.repositories.git_connection_repo import GitConnectionRepository
-
-    provider = task_run.git_provider or "github"
-    conn_repo = GitConnectionRepository(session)
-
     # Try git_connections table (project → server → global)
-    ws_id = getattr(task_run, "workspace_server_id", None)
-    if ws_id is None:
-        project = await session.get(ProjectConfig, task_run.project_id)
-        ws_id = project.workspace_server_id if project else None
+    try:
+        from backend.repositories.git_connection_repo import GitConnectionRepository
 
-    token = await conn_repo.resolve_token(
-        provider=provider,
-        project_id=task_run.project_id,
-        workspace_server_id=ws_id,
-    )
-    if token:
-        return token
+        provider = task_run.git_provider or "github"
+        conn_repo = GitConnectionRepository(session)
+
+        ws_id = getattr(task_run, "workspace_server_id", None)
+        if ws_id is None:
+            project = await session.get(ProjectConfig, task_run.project_id)
+            ws_id = project.workspace_server_id if project else None
+
+        token = await conn_repo.resolve_token(
+            provider=provider,
+            project_id=task_run.project_id,
+            workspace_server_id=ws_id,
+        )
+        if token:
+            return token
+    except Exception:
+        logger.debug("git_connections lookup failed (table may not exist yet)", exc_info=True)
 
     # Legacy: per-project encrypted token
     stmt = select(ProjectConfig.git_provider_token_enc).where(
