@@ -9,6 +9,7 @@ from the PhaseExecution row. Git operations execute on remote via SSH.
 """
 
 import logging
+import shlex
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,7 @@ from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.html_to_text import html_to_text
 from backend.services.http_client import get_http_client
+from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_ssh_for_run
 
@@ -83,26 +85,32 @@ async def run(
     await remote_git.run_git(["push", "-u", "origin", task_run.branch_name], cwd=cwd)
     await broadcaster.log(task_run.id, "Branch pushed successfully", phase="approval")
 
-    # Create PR
+    # Create PR — try gh CLI first (works for contributor repos), fall back to API
     pr_body = _build_pr_body(task_run, review)
     repo_path = f"{task_run.repo_owner}/{task_run.repo_name}"
+    pr_title = f"[AI] {task_run.title}"
 
     await broadcaster.log(
         task_run.id,
-        f"Creating PR: [AI] {task_run.title} on {task_run.git_provider}",
+        f"Creating PR: {pr_title} on {task_run.git_provider}",
         phase="approval",
     )
 
-    provider = get_git_provider(
-        task_run.git_provider, get_http_client(), access_token=project_token
-    )
-    pr_url = await provider.create_pr(
-        repo_path,
-        title=f"[AI] {task_run.title}",
-        body=pr_body,
-        head=task_run.branch_name,
-        base=task_run.default_branch,
-    )
+    pr_url: str | None = None
+    if task_run.git_provider == "github":
+        pr_url = await _try_gh_pr_create(ssh, cwd, pr_title, pr_body, task_run)
+
+    if not pr_url:
+        provider = get_git_provider(
+            task_run.git_provider, get_http_client(), access_token=project_token
+        )
+        pr_url = await provider.create_pr(
+            repo_path,
+            title=pr_title,
+            body=pr_body,
+            head=task_run.branch_name,
+            base=task_run.default_branch,
+        )
 
     await broadcaster.log(task_run.id, f"PR created: {pr_url}", phase="approval")
 
@@ -110,6 +118,49 @@ async def run(
     await session.commit()
 
     await broadcaster.event(task_run.id, "approval_requested", {"pr_url": pr_url})
+
+
+async def _try_gh_pr_create(
+    ssh: SSHService,
+    cwd: str,
+    title: str,
+    body: str,
+    task_run: TaskRun,
+) -> str | None:
+    """Try creating PR via gh CLI on the workspace server. Returns PR URL or None."""
+    try:
+        # Check if gh is available
+        _, _, rc = await ssh.run_command("command -v gh", timeout=10)
+        if rc != 0:
+            return None
+
+        await broadcaster.log(task_run.id, "Using gh CLI for PR creation", phase="approval")
+
+        # Run as worker user with env sourced (GITHUB_TOKEN lives in .agentickode_env)
+        gh_cmd = (
+            f"cd {shlex.quote(cwd)} && "
+            f"gh pr create"
+            f" --title {shlex.quote(title)}"
+            f" --body {shlex.quote(body)}"
+            f" --base {shlex.quote(str(task_run.default_branch))}"
+            f" --head {shlex.quote(task_run.branch_name)}"
+        )
+        # Source env for GITHUB_TOKEN, then run gh
+        inner = f". ~/.agentickode_env 2>/dev/null; {gh_cmd}"
+        # Try as worker user first (has token in env), fall back to root
+        for user_wrap in [
+            f"runuser -l coder -c {shlex.quote(inner)}",
+            inner,
+        ]:
+            stdout, stderr, rc = await ssh.run_command(user_wrap, timeout=30)
+            if rc == 0 and stdout.strip():
+                pr_url = stdout.strip().splitlines()[-1]
+                if pr_url.startswith("http"):
+                    return pr_url
+        logger.info("gh pr create failed (rc=%d): %s", rc, stderr.strip()[:300])
+    except Exception:
+        logger.debug("gh pr create unavailable, falling back to API", exc_info=True)
+    return None
 
 
 def _build_pr_body(task_run: TaskRun, review: dict) -> str:

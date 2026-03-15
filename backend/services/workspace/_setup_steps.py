@@ -262,6 +262,22 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
     if rc != 0:
         failed.append(f"apt packages: {stderr.strip()[:500]}")
 
+    # Install GitHub CLI (gh) for PR creation from workspace servers
+    gh_cmd = (
+        "if ! command -v gh >/dev/null 2>&1; then "
+        "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg "
+        "| dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && "
+        "echo 'deb [arch=$(dpkg --print-architecture) "
+        "signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] "
+        "https://cli.github.com/packages stable main' "
+        "> /etc/apt/sources.list.d/github-cli.list && "
+        "apt-get update -qq && apt-get install -y -qq gh 2>/dev/null; "
+        "fi"
+    )
+    _, stderr, rc = await ssh.run_command(gh_cmd, timeout=120)
+    if rc != 0:
+        failed.append(f"gh cli: {stderr.strip()[:500]}")
+
     node_cmd = (
         "if ! command -v node >/dev/null 2>&1; then "
         "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && "
