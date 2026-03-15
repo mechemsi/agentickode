@@ -6,4 +6,6 @@ export { default as AgentManagementPanel } from "./AgentManagementPanel";
 export { default as GitAccessPanel } from "./GitAccessPanel";
 export { default as ProjectsPanel } from "./ProjectsPanel";
 export { default as ServerHistoryPanel } from "./ServerHistoryPanel";
+export { default as GitConnectionsPanel } from "./GitConnectionsPanel";
+export { default as GitConnectionForm } from "./GitConnectionForm";
 export { default as WorkspaceServerForm } from "./WorkspaceServerForm";

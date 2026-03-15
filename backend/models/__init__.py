@@ -4,6 +4,7 @@
 
 from backend.models.agents import AgentSettings, RoleConfig, RolePromptOverride
 from backend.models.base import Base
+from backend.models.git_connections import GitConnection
 from backend.models.instructions import ProjectInstruction, ProjectInstructionVersion, ProjectSecret
 from backend.models.notifications import NotificationChannel
 from backend.models.ollama import OllamaServer
@@ -20,6 +21,7 @@ __all__ = [
     "AppSetting",
     "Base",
     "DiscoveredAgent",
+    "GitConnection",
     "NotificationChannel",
     "OllamaServer",
     "PhaseExecution",

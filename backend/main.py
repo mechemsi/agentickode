@@ -16,6 +16,7 @@ from backend.api import (
     analytics,
     app_settings,
     backup,
+    git_connections,
     health,
     llm_roles,
     logs,
@@ -227,4 +228,5 @@ app.include_router(app_settings.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
+app.include_router(git_connections.router, prefix="/api")
 app.include_router(ws.router)
