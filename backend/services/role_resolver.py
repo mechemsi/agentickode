@@ -33,6 +33,8 @@ class ResolvedRole:
     adapter: RoleAdapter
     role_config: RoleConfig | None = None
     agent_settings: AgentSettings | None = None
+    tried: list[str] | None = None  # providers tried before settling on this one
+    is_fallback: bool = False  # True when using settings default (Ollama)
 
 
 # Default model per role — used as ultimate fallback from settings
@@ -128,7 +130,12 @@ class RoleResolver:
                 role,
                 ", ".join(tried),
             )
-        return ResolvedRole(adapter=self._settings_default(role), role_config=role_config)
+        return ResolvedRole(
+            adapter=self._settings_default(role),
+            role_config=role_config,
+            tried=tried or None,
+            is_fallback=True,
+        )
 
     async def _load_role_config(
         self,

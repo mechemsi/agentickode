@@ -136,6 +136,14 @@ async def run(
 
     role = get_phase_role("coding", phase_config, phase_exec_row)
     resolved = await services.role_resolver.resolve(role, session, ws_id, phase_name="coding")
+    if resolved.is_fallback and resolved.tried:
+        tried_msg = ", ".join(resolved.tried)
+        await broadcaster.log(
+            task_run.id,
+            f"⚠ Configured agents failed: {tried_msg} — fell back to Ollama",
+            level="warning",
+            phase="coding",
+        )
     adapter = resolved.adapter
     config = resolved.role_config
     settings_kwargs = get_agent_settings_kwargs(resolved.agent_settings, phase_config)
