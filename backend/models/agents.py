@@ -78,7 +78,7 @@ class AgentSettings(Base):
     display_name = Column(Text, nullable=False)  # "Claude CLI", "OpenAI Codex", etc.
     description = Column(Text, nullable=False, default="")
     supports_session = Column(Boolean, nullable=False, default=False)
-    default_timeout = Column(Integer, nullable=False, default=600)  # seconds
+    default_timeout = Column(Integer, nullable=False, default=3600)  # seconds
     max_retries = Column(Integer, nullable=False, default=1)
     environment_vars = Column(
         JSONB, nullable=False, default=dict

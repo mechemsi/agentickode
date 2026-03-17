@@ -129,7 +129,7 @@ async def run_cli_task(
     if env_vars:
         cmd = apply_env_vars(cmd, env_vars)
 
-    timeout: int = kwargs.get("timeout", 600)  # type: ignore[assignment]
+    timeout: int = kwargs.get("timeout", 3600)  # type: ignore[assignment]
     start = time.monotonic()
     stdout, stderr, rc = await adapter._run_ssh(cmd, timeout, log_fn, "agent-run")
     elapsed = time.monotonic() - start

@@ -84,7 +84,7 @@ async def _run_migrations() -> None:
             display_name TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
             supports_session BOOLEAN NOT NULL DEFAULT FALSE,
-            default_timeout INTEGER NOT NULL DEFAULT 600,
+            default_timeout INTEGER NOT NULL DEFAULT 3600,
             max_retries INTEGER NOT NULL DEFAULT 1,
             environment_vars JSONB NOT NULL DEFAULT '{}',
             cli_flags JSONB NOT NULL DEFAULT '{}',
