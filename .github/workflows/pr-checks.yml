@@ -4,12 +4,22 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # ── Detect which parts of the codebase changed ─────────────────
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
 
@@ -20,14 +30,17 @@ jobs:
             backend:
               - 'backend/**'
               - 'alembic/**'
+              - 'tests/**'
+            frontend:
+              - 'frontend/**'
 
+  # ── Always runs ────────────────────────────────────────────────
   pr-size:
     name: PR Size Check
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -128,6 +141,7 @@ jobs:
               });
             }
 
+  # ── Backend-only checks ────────────────────────────────────────
   alembic-check:
     name: Alembic Migration Check
     needs: changes
@@ -136,7 +150,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -249,3 +262,158 @@ jobs:
       - name: Fail on multiple heads
         if: steps.heads.outputs.exit_code != '0'
         run: exit 1
+
+  # ── Complexity checks (comment-only, never blocks merge) ───────
+  complexity:
+    name: Code Complexity Report
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch origin "$BASE_REF"
+          BASE="origin/$BASE_REF"
+
+          # Backend: only .py files under backend/
+          BACKEND_FILES=$(git diff --name-only "$BASE"...HEAD -- 'backend/**/*.py' || true)
+          echo "backend_files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BACKEND_FILES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          # Frontend: only .ts/.tsx files under frontend/src/
+          FRONTEND_FILES=$(git diff --name-only "$BASE"...HEAD -- 'frontend/src/**/*.ts' 'frontend/src/**/*.tsx' | sed 's|^frontend/||' || true)
+          echo "frontend_files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FRONTEND_FILES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Backend complexity check
+        id: backend-complexity
+        if: needs.changes.outputs.backend == 'true' && steps.changed-files.outputs.backend_files != ''
+        run: |
+          pip install -q radon
+          FILES="${{ steps.changed-files.outputs.backend_files }}"
+          FILE_ARGS=$(echo "$FILES" | tr '\n' ' ')
+          set +e
+          OUTPUT=$(python scripts/check_complexity.py C $FILE_ARGS 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "$OUTPUT"
+          echo "$OUTPUT" > /tmp/backend-complexity.txt
+          echo "has_issues=$( [ $EXIT_CODE -eq 1 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Frontend complexity check
+        id: frontend-complexity
+        if: needs.changes.outputs.frontend == 'true' && steps.changed-files.outputs.frontend_files != ''
+        working-directory: frontend
+        run: |
+          npm ci --silent
+          FILES="${{ steps.changed-files.outputs.frontend_files }}"
+          FILE_ARGS=$(echo "$FILES" | tr '\n' ' ')
+          set +e
+          OUTPUT=$(node scripts/check-complexity.mjs 15 $FILE_ARGS 2>&1)
+          EXIT_CODE=$?
+          set -e
+          echo "$OUTPUT"
+          echo "$OUTPUT" > /tmp/frontend-complexity.txt
+          echo "has_issues=$( [ $EXIT_CODE -eq 1 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Post or update PR comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          BACKEND_HAS_ISSUES: ${{ steps.backend-complexity.outputs.has_issues }}
+          FRONTEND_HAS_ISSUES: ${{ steps.frontend-complexity.outputs.has_issues }}
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- complexity-check -->';
+            const backendHasIssues = process.env.BACKEND_HAS_ISSUES === 'true';
+            const frontendHasIssues = process.env.FRONTEND_HAS_ISSUES === 'true';
+            const backendChanged = process.env.BACKEND_CHANGED === 'true';
+            const frontendChanged = process.env.FRONTEND_CHANGED === 'true';
+            const hasAnyIssues = backendHasIssues || frontendHasIssues;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (!hasAnyIssues) {
+              // No issues — remove old comment if it exists
+              if (existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                });
+              }
+              return;
+            }
+
+            const lines = [marker, '### Code Complexity Report', ''];
+
+            if (backendChanged && backendHasIssues) {
+              let backendOutput = 'No output';
+              try { backendOutput = fs.readFileSync('/tmp/backend-complexity.txt', 'utf8'); } catch {}
+              lines.push(
+                '#### Backend (Python — radon cyclomatic complexity)',
+                '',
+                '```',
+                backendOutput.trim(),
+                '```',
+                '',
+                '**Grades:** A (1-5) simple | B (6-10) well-structured | **C (11-15) slightly complex** | D (16-20) more complex | E (21-25) very complex | F (26+) unmaintainable',
+                ''
+              );
+            }
+
+            if (frontendChanged && frontendHasIssues) {
+              let frontendOutput = 'No output';
+              try { frontendOutput = fs.readFileSync('/tmp/frontend-complexity.txt', 'utf8'); } catch {}
+              lines.push(
+                '#### Frontend (TypeScript — ESLint complexity rule)',
+                '',
+                '```',
+                frontendOutput.trim(),
+                '```',
+                ''
+              );
+            }
+
+            lines.push(
+              '---',
+              '> **Note:** This check is informational only and does not block merging. Consider refactoring high-complexity functions into smaller, focused units.'
+            );
+
+            const body = lines.join('\n');
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
