@@ -311,3 +311,140 @@ class TestWorkerEngine:
         with patch.object(engine, "_run_pipeline", new_callable=AsyncMock):
             await engine._dispatch_pending(db_session)
             assert len(engine._active_runs) == 1
+
+    async def test_check_pr_statuses_merged(self, db_session, make_task_run):
+        """Merged PR → approved = True."""
+        project = ProjectConfig(
+            project_id="proj-pr1", project_slug="pr1", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pr1", status="awaiting_approval")
+        run.pr_url = "https://github.com/org/repo/pull/1"
+        run.git_provider = "github"
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_provider = AsyncMock()
+        mock_provider.get_pr_status = AsyncMock(return_value="merged")
+
+        engine = WorkerEngine()
+        with (
+            patch(
+                "backend.worker.engine.get_project_token", new_callable=AsyncMock, return_value=None
+            ),
+            patch("backend.worker.engine.get_git_provider", return_value=mock_provider),
+            patch("backend.worker.engine.get_http_client", return_value=MagicMock()),
+        ):
+            await engine._check_pr_statuses(db_session)
+
+        await db_session.refresh(run)
+        assert run.approved is True
+
+    async def test_check_pr_statuses_closed(self, db_session, make_task_run):
+        """Closed PR → approved = False with rejection_reason."""
+        project = ProjectConfig(
+            project_id="proj-pr2", project_slug="pr2", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pr2", status="awaiting_approval")
+        run.pr_url = "https://github.com/org/repo/pull/2"
+        run.git_provider = "github"
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_provider = AsyncMock()
+        mock_provider.get_pr_status = AsyncMock(return_value="closed")
+
+        engine = WorkerEngine()
+        with (
+            patch(
+                "backend.worker.engine.get_project_token", new_callable=AsyncMock, return_value=None
+            ),
+            patch("backend.worker.engine.get_git_provider", return_value=mock_provider),
+            patch("backend.worker.engine.get_http_client", return_value=MagicMock()),
+        ):
+            await engine._check_pr_statuses(db_session)
+
+        await db_session.refresh(run)
+        assert run.approved is False
+        assert run.rejection_reason == "PR was closed in git provider"
+
+    async def test_check_pr_statuses_open(self, db_session, make_task_run):
+        """Open PR → no change."""
+        project = ProjectConfig(
+            project_id="proj-pr3", project_slug="pr3", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pr3", status="awaiting_approval")
+        run.pr_url = "https://github.com/org/repo/pull/3"
+        run.git_provider = "github"
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_provider = AsyncMock()
+        mock_provider.get_pr_status = AsyncMock(return_value="open")
+
+        engine = WorkerEngine()
+        with (
+            patch(
+                "backend.worker.engine.get_project_token", new_callable=AsyncMock, return_value=None
+            ),
+            patch("backend.worker.engine.get_git_provider", return_value=mock_provider),
+            patch("backend.worker.engine.get_http_client", return_value=MagicMock()),
+        ):
+            await engine._check_pr_statuses(db_session)
+
+        await db_session.refresh(run)
+        assert run.approved is None
+
+    async def test_check_pr_statuses_skips_if_no_pr_url(self, db_session, make_task_run):
+        """Runs without pr_url are not checked."""
+        project = ProjectConfig(
+            project_id="proj-pr4", project_slug="pr4", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pr4", status="awaiting_approval")
+        run.pr_url = None
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_provider = AsyncMock()
+        mock_provider.get_pr_status = AsyncMock(return_value="merged")
+
+        engine = WorkerEngine()
+        with (
+            patch("backend.worker.engine.get_git_provider", return_value=mock_provider),
+            patch("backend.worker.engine.get_http_client", return_value=MagicMock()),
+        ):
+            await engine._check_pr_statuses(db_session)
+
+        mock_provider.get_pr_status.assert_not_called()
+
+    async def test_check_pr_statuses_handles_provider_error(self, db_session, make_task_run):
+        """Provider exception is logged and run is left unchanged."""
+        project = ProjectConfig(
+            project_id="proj-pr5", project_slug="pr5", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pr5", status="awaiting_approval")
+        run.pr_url = "https://github.com/org/repo/pull/5"
+        run.git_provider = "github"
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_provider = AsyncMock()
+        mock_provider.get_pr_status = AsyncMock(side_effect=RuntimeError("network error"))
+
+        engine = WorkerEngine()
+        with (
+            patch(
+                "backend.worker.engine.get_project_token", new_callable=AsyncMock, return_value=None
+            ),
+            patch("backend.worker.engine.get_git_provider", return_value=mock_provider),
+            patch("backend.worker.engine.get_http_client", return_value=MagicMock()),
+        ):
+            # Should not raise
+            await engine._check_pr_statuses(db_session)
+
+        await db_session.refresh(run)
+        assert run.approved is None

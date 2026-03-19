@@ -77,6 +77,36 @@ class TestGiteaProvider:
         provider = self._make_provider(client)
         assert await provider.merge_pr("https://gitea.test/org/repo/pulls/5") is False
 
+    async def test_get_pr_status_open(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "open", "merged": False}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://gitea.test/org/repo/pulls/1")
+        assert status == "open"
+
+    async def test_get_pr_status_merged(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "closed", "merged": True}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://gitea.test/org/repo/pulls/1")
+        assert status == "merged"
+
+    async def test_get_pr_status_closed(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "closed", "merged": False}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://gitea.test/org/repo/pulls/1")
+        assert status == "closed"
+
 
 class TestGiteaListIssues:
     def _make_provider(self, client=None):
@@ -184,6 +214,36 @@ class TestGitHubProvider:
         provider = self._make_provider(client)
         assert await provider.merge_pr("https://github.com/org/repo/pull/3") is True
         client.put.assert_called_once()
+
+    async def test_get_pr_status_open(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "open", "merged_at": None}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://github.com/org/repo/pull/1")
+        assert status == "open"
+
+    async def test_get_pr_status_merged(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "closed", "merged_at": "2026-01-01T00:00:00Z"}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://github.com/org/repo/pull/1")
+        assert status == "merged"
+
+    async def test_get_pr_status_closed(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "closed", "merged_at": None}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status("https://github.com/org/repo/pull/1")
+        assert status == "closed"
 
 
 class TestGitHubListIssues:

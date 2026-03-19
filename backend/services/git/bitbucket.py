@@ -97,6 +97,25 @@ class BitbucketProvider:
         )
         resp.raise_for_status()
 
+    async def get_pr_status(self, pr_url: str) -> str:
+        # URL format: https://bitbucket.org/{workspace}/{repo_slug}/pull-requests/{id}
+        parts = pr_url.rstrip("/").split("/")
+        pr_id = parts[-1]
+        workspace = parts[-4]
+        repo_slug = parts[-3]
+        resp = await self._client.get(
+            f"{self._base_url}/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}",
+            headers=self._headers(),
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        state = resp.json().get("state", "")
+        if state == "MERGED":
+            return "merged"
+        if state == "OPEN":
+            return "open"
+        return "closed"
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         resp = await self._client.get(
             f"{self._base_url}/repositories/{repo_path}/issues",

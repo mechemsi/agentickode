@@ -295,6 +295,47 @@ class TestGitLabProvider:
         assert "org%2Frepo" in call_url
         assert "org/repo" not in call_url.split("/api/v4/projects/")[1]
 
+    # --- get_pr_status ---
+
+    async def test_get_pr_status_merged(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "merged"}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status(
+            "https://gitlab.com/mygroup/myrepo/-/merge_requests/5"
+        )
+        assert status == "merged"
+        call_url = client.get.call_args[0][0]
+        assert "mygroup%2Fmyrepo" in call_url
+        assert "merge_requests/5" in call_url
+
+    async def test_get_pr_status_open(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "opened"}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status(
+            "https://gitlab.com/mygroup/myrepo/-/merge_requests/5"
+        )
+        assert status == "open"
+
+    async def test_get_pr_status_closed(self):
+        client = AsyncMock(spec=httpx.AsyncClient)
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json.return_value = {"state": "closed"}
+        client.get.return_value = resp
+        provider = self._make_provider(client)
+        status = await provider.get_pr_status(
+            "https://gitlab.com/mygroup/myrepo/-/merge_requests/5"
+        )
+        assert status == "closed"
+
     # --- list_issues ---
 
     async def test_list_issues_normalizes_gitlab_fields(self):
