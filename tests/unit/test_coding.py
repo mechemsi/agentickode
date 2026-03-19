@@ -349,3 +349,15 @@ class TestCoding:
         git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
         assert ["status", "--porcelain"] in git_calls
         assert ["add", "-A"] not in git_calls
+
+
+def test_agent_creates_pr_instruction_block():
+    from backend.worker.phases._coding_utils import build_agent_creates_pr_instructions
+
+    result = build_agent_creates_pr_instructions(
+        branch_name="feat/my-task", task_title="Fix the bug", base_branch="main"
+    )
+    assert "git push" in result
+    assert "feat/my-task" in result
+    assert "Fix the bug" in result
+    assert "pr_url" in result
