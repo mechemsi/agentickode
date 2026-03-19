@@ -105,9 +105,7 @@ class AgentSettings(Base):
     consolidated_default = Column(
         Boolean, nullable=False, default=True
     )  # whether agent prefers consolidated mode (plan+code+review in one invocation)
-    agent_creates_pr = Column(
-        Boolean, nullable=False, default=False
-    )
+    agent_creates_pr = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()

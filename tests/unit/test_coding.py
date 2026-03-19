@@ -364,13 +364,11 @@ def test_agent_creates_pr_instruction_block():
 
 
 class TestConsolidatedPrUrl:
-    async def test_consolidated_captures_pr_url(
-        self, db_session, make_task_run, mock_services
-    ):
+    async def test_consolidated_captures_pr_url(self, db_session, make_task_run, mock_services):
         """When agent outputs pr_url in JSON, it gets stored on task_run."""
         from backend.worker.phases._coding_consolidated import _parse_consolidated_summary
 
-        agent_output = '''
+        agent_output = """
 ```json
 {
   "plan": {"subtasks": [{"title": "t", "description": "d", "files_affected": []}], "complexity": "simple"},
@@ -378,6 +376,6 @@ class TestConsolidatedPrUrl:
   "pr_url": "https://github.com/org/repo/pull/42"
 }
 ```
-'''
+"""
         summary = _parse_consolidated_summary(agent_output)
         assert summary.get("pr_url") == "https://github.com/org/repo/pull/42"

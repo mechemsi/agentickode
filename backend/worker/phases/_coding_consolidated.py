@@ -212,9 +212,7 @@ async def run_consolidated(
     agent_pr_url = summary.get("pr_url")
     if agent_pr_url and isinstance(agent_pr_url, str) and agent_pr_url.startswith("http"):
         task_run.pr_url = agent_pr_url
-        await broadcaster.log(
-            task_run.id, f"Agent created PR: {agent_pr_url}", phase="coding"
-        )
+        await broadcaster.log(task_run.id, f"Agent created PR: {agent_pr_url}", phase="coding")
 
     coding_results = [
         {
