@@ -349,3 +349,33 @@ class TestCoding:
         git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
         assert ["status", "--porcelain"] in git_calls
         assert ["add", "-A"] not in git_calls
+
+
+def test_agent_creates_pr_instruction_block():
+    from backend.worker.phases._coding_utils import build_agent_creates_pr_instructions
+
+    result = build_agent_creates_pr_instructions(
+        branch_name="feat/my-task", task_title="Fix the bug", base_branch="main"
+    )
+    assert "git push" in result
+    assert "feat/my-task" in result
+    assert "Fix the bug" in result
+    assert "pr_url" in result
+
+
+class TestConsolidatedPrUrl:
+    async def test_consolidated_captures_pr_url(self, db_session, make_task_run, mock_services):
+        """When agent outputs pr_url in JSON, it gets stored on task_run."""
+        from backend.worker.phases._coding_consolidated import _parse_consolidated_summary
+
+        agent_output = """
+```json
+{
+  "plan": {"subtasks": [{"title": "t", "description": "d", "files_affected": []}], "complexity": "simple"},
+  "review": {"approved": true, "issues": [], "suggestions": []},
+  "pr_url": "https://github.com/org/repo/pull/42"
+}
+```
+"""
+        summary = _parse_consolidated_summary(agent_output)
+        assert summary.get("pr_url") == "https://github.com/org/repo/pull/42"

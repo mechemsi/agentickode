@@ -68,56 +68,68 @@ async def run(
             "The coding agent may not have made any changes."
         )
 
-    # Resolve per-project token (e.g. Bitbucket repo access token)
-    project_token = await get_project_token(task_run, session)
-
-    # Ensure remote has auth credentials, then push
-    base_url = get_repo_https_url(task_run.git_provider, task_run.repo_owner, task_run.repo_name)
-    auth_url, method = await get_auth_url(
-        base_url, task_run.git_provider, ssh, token_override=project_token
-    )
-    await broadcaster.log(
-        task_run.id,
-        f"Pushing branch {task_run.branch_name} (auth={method})",
-        phase="approval",
-    )
-    await remote_git.run_git(["remote", "set-url", "origin", auth_url], cwd=cwd)
-    await remote_git.run_git(["push", "-u", "origin", task_run.branch_name], cwd=cwd)
-    await broadcaster.log(task_run.id, "Branch pushed successfully", phase="approval")
-
-    # Create PR — try gh CLI first (works for contributor repos), fall back to API
-    pr_body = _build_pr_body(task_run, review)
-    repo_path = f"{task_run.repo_owner}/{task_run.repo_name}"
-    pr_title = f"[AI] {task_run.title}"
-
-    await broadcaster.log(
-        task_run.id,
-        f"Creating PR: {pr_title} on {task_run.git_provider}",
-        phase="approval",
-    )
-
-    pr_url: str | None = None
-    if task_run.git_provider == "github":
-        pr_url = await _try_gh_pr_create(ssh, cwd, pr_title, pr_body, task_run)
-
-    if not pr_url:
-        provider = get_git_provider(
-            task_run.git_provider, get_http_client(), access_token=project_token
+    if task_run.pr_url:
+        # Agent already pushed and created the PR during coding phase
+        await broadcaster.log(
+            task_run.id,
+            f"PR already created by agent: {task_run.pr_url}",
+            phase="approval",
         )
-        pr_url = await provider.create_pr(
-            repo_path,
-            title=pr_title,
-            body=pr_body,
-            head=task_run.branch_name,
-            base=task_run.default_branch,
+    else:
+        # Standard flow: resolve token, push branch, create PR
+
+        # Resolve per-project token (e.g. Bitbucket repo access token)
+        project_token = await get_project_token(task_run, session)
+
+        # Ensure remote has auth credentials, then push
+        base_url = get_repo_https_url(
+            task_run.git_provider, task_run.repo_owner, task_run.repo_name
+        )
+        auth_url, method = await get_auth_url(
+            base_url, task_run.git_provider, ssh, token_override=project_token
+        )
+        await broadcaster.log(
+            task_run.id,
+            f"Pushing branch {task_run.branch_name} (auth={method})",
+            phase="approval",
+        )
+        await remote_git.run_git(["remote", "set-url", "origin", auth_url], cwd=cwd)
+        await remote_git.run_git(["push", "-u", "origin", task_run.branch_name], cwd=cwd)
+        await broadcaster.log(task_run.id, "Branch pushed successfully", phase="approval")
+
+        # Create PR — try gh CLI first (works for contributor repos), fall back to API
+        pr_body = _build_pr_body(task_run, review)
+        repo_path = f"{task_run.repo_owner}/{task_run.repo_name}"
+        pr_title = f"[AI] {task_run.title}"
+
+        await broadcaster.log(
+            task_run.id,
+            f"Creating PR: {pr_title} on {task_run.git_provider}",
+            phase="approval",
         )
 
-    await broadcaster.log(task_run.id, f"PR created: {pr_url}", phase="approval")
+        pr_url: str | None = None
+        if task_run.git_provider == "github":
+            pr_url = await _try_gh_pr_create(ssh, cwd, pr_title, pr_body, task_run)
 
-    task_run.pr_url = pr_url
-    await session.commit()
+        if not pr_url:
+            provider = get_git_provider(
+                task_run.git_provider, get_http_client(), access_token=project_token
+            )
+            pr_url = await provider.create_pr(
+                repo_path,
+                title=pr_title,
+                body=pr_body,
+                head=task_run.branch_name,
+                base=task_run.default_branch,
+            )
 
-    await broadcaster.event(task_run.id, "approval_requested", {"pr_url": pr_url})
+        await broadcaster.log(task_run.id, f"PR created: {pr_url}", phase="approval")
+
+        task_run.pr_url = pr_url
+        await session.commit()
+
+    await broadcaster.event(task_run.id, "approval_requested", {"pr_url": task_run.pr_url})
 
 
 async def _try_gh_pr_create(

@@ -18,6 +18,7 @@ from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._coding_utils import (
     CONSOLIDATED_TEMPLATE,
     auto_commit_changes,
+    build_agent_creates_pr_instructions,
     make_results,
 )
 from backend.worker.phases._helpers import get_ssh_for_run, get_token_usage
@@ -38,6 +39,7 @@ async def run_consolidated(
     session_is_new: bool,
     phase_exec_row: PhaseExecution | None,
     ws_id: int | None,
+    agent_creates_pr: bool = False,
 ) -> None:
     """Run a single all-in-one invocation: plan + implement + test + self-review.
 
@@ -67,6 +69,12 @@ async def run_consolidated(
         description=description,
         context_section=context_section,
     )
+    if agent_creates_pr:
+        consolidated_prompt += "\n" + build_agent_creates_pr_instructions(
+            branch_name=task_run.branch_name,
+            task_title=task_run.title or "Task",
+            base_branch=str(task_run.default_branch),
+        )
 
     await broadcaster.log(
         task_run.id,
@@ -199,6 +207,12 @@ async def run_consolidated(
     summary = _parse_consolidated_summary(agent_output)
     plan_data = summary.get("plan", {})
     review_data = summary.get("review", {})
+
+    # Capture PR URL if agent created the PR
+    agent_pr_url = summary.get("pr_url")
+    if agent_pr_url and isinstance(agent_pr_url, str) and agent_pr_url.startswith("http"):
+        task_run.pr_url = agent_pr_url
+        await broadcaster.log(task_run.id, f"Agent created PR: {agent_pr_url}", phase="coding")
 
     coding_results = [
         {

@@ -118,6 +118,21 @@ The "review" section should describe your self-review findings.
 If you found and fixed issues during self-review, list them with severity.
 If everything looks clean, set approved=true with empty issues."""
 
+_AGENT_CREATES_PR_INSTRUCTIONS = """\n\n## Git & PR\nAfter all code changes and commits are complete:\n1. Push the branch to origin: `git push -u origin {branch_name}`\n2. Create a PR using the gh CLI:\n   ```\n   gh pr create --title {pr_title_quoted} --body "Automated PR for: {task_title}" --base {base_branch}\n   ```\n   If gh is unavailable, use the git provider's API or CLI equivalent.\n3. Add the PR URL to your JSON output as `"pr_url"`.\n\nYour JSON summary must include the `pr_url` field:\n```json\n{{{{\n  "plan": {{{{...}}}},\n  "review": {{{{...}}}},\n  "pr_url": "https://..."\n}}}}\n```\n"""
+
+
+def build_agent_creates_pr_instructions(branch_name: str, task_title: str, base_branch: str) -> str:
+    """Return the git/PR instruction block to append to the consolidated prompt."""
+    import shlex
+
+    pr_title_quoted = shlex.quote(f"[AI] {task_title}")
+    return _AGENT_CREATES_PR_INSTRUCTIONS.format(
+        branch_name=branch_name,
+        pr_title_quoted=pr_title_quoted,
+        task_title=task_title,
+        base_branch=base_branch,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Prompt builders

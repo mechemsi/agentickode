@@ -21,8 +21,11 @@ from backend.dependencies import get_service_container
 from backend.models import PhaseExecution, TaskRun
 from backend.repositories.app_setting_repo import AppSettingRepository
 from backend.services.container import ServiceContainer
+from backend.services.git.protocol import get_git_provider
+from backend.services.http_client import get_http_client
 from backend.services.schedule import is_within_schedule
 from backend.worker.broadcaster import broadcaster
+from backend.worker.phases._helpers import get_project_token
 from backend.worker.pipeline import execute_pipeline
 
 logger = logging.getLogger("agentickode.worker")
@@ -30,6 +33,7 @@ logger = logging.getLogger("agentickode.worker")
 
 class WorkerEngine:
     SCHEDULE_CACHE_TTL = 60  # seconds
+    PR_CHECK_INTERVAL = 3600  # seconds
 
     def __init__(self):
         self._running = False
@@ -37,6 +41,7 @@ class WorkerEngine:
         self._services: ServiceContainer | None = None
         self._schedule_cache: dict | None = None
         self._schedule_loaded_at: float = 0.0
+        self._pr_check_last_run: float = 0.0
 
     def _get_services(self) -> ServiceContainer:
         if self._services is None:
@@ -105,6 +110,12 @@ class WorkerEngine:
             await self._dispatch_pending(session)
             await self._handle_waiting(session)
             await self._handle_timeouts(session)
+
+        now = time.monotonic()
+        if now - self._pr_check_last_run >= self.PR_CHECK_INTERVAL:
+            self._pr_check_last_run = now
+            async with async_session() as session:
+                await self._check_pr_statuses(session)
 
     async def _dispatch_pending(self, session):
         available_slots = settings.max_concurrent_runs - len(self._active_runs)
@@ -249,3 +260,36 @@ class WorkerEngine:
             run.completed_at = datetime.now(UTC)
             await session.commit()
             await broadcaster.event(run.id, "run_timeout", {"run_id": run.id})
+
+    async def _check_pr_statuses(self, session):
+        """Check PR status for awaiting-approval runs and auto-approve/reject."""
+        result = await session.execute(
+            select(TaskRun).where(
+                TaskRun.status == "awaiting_approval",
+                TaskRun.approved.is_(None),
+                TaskRun.pr_url.isnot(None),
+            )
+        )
+        runs = result.scalars().all()
+        if not runs:
+            return
+
+        client = get_http_client()
+        for run in runs:
+            try:
+                project_token = await get_project_token(run, session)
+                provider = get_git_provider(run.git_provider, client, access_token=project_token)
+                status = await provider.get_pr_status(run.pr_url)
+            except Exception:
+                logger.warning(f"Run #{run.id}: failed to check PR status", exc_info=True)
+                continue
+
+            if status == "merged":
+                logger.info(f"Run #{run.id}: PR merged externally, auto-approving")
+                run.approved = True
+                await session.commit()
+            elif status == "closed":
+                logger.info(f"Run #{run.id}: PR closed externally, auto-rejecting")
+                run.approved = False
+                run.rejection_reason = "PR was closed in git provider"
+                await session.commit()

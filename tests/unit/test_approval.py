@@ -122,3 +122,33 @@ class TestApproval:
 
             with pytest.raises(RuntimeError, match="no commits ahead"):
                 await approval.run(run, db_session, mock_services)
+
+    async def test_skips_push_and_pr_when_pr_url_already_set(
+        self, db_session, make_task_run, mock_services
+    ):
+        """When task_run.pr_url is already set (agent created it), approval skips git work."""
+        run = make_task_run(review_result={"approved": True, "issues": [], "suggestions": []})
+        run.pr_url = "https://github.com/org/repo/pull/99"
+        db_session.add(run)
+        await db_session.commit()
+
+        patches = _approval_patches()
+        with (
+            patches["get_git_provider"] as mock_factory,
+            patches["get_auth_url"] as mock_auth,
+            patches["get_ssh_for_run"],
+            patches["RemoteGitOps"] as mock_remote_git_cls,
+            patches["broadcaster"],
+        ):
+            mock_remote_git = mock_remote_git_cls.return_value
+            mock_remote_git.run_git = AsyncMock(return_value=_git_result("abc1234 some commit\n"))
+
+            await approval.run(run, db_session, mock_services)
+
+        # Git provider create_pr should NOT be called
+        mock_factory.return_value.create_pr.assert_not_called()
+        # Auth URL setup should NOT be called (no push needed)
+        mock_auth.assert_not_called()
+        # pr_url must still be the original value
+        await db_session.refresh(run)
+        assert run.pr_url == "https://github.com/org/repo/pull/99"

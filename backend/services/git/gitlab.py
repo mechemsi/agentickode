@@ -122,6 +122,25 @@ class GitLabProvider:
         )
         resp.raise_for_status()
 
+    async def get_pr_status(self, pr_url: str) -> str:
+        # URL format: https://gitlab.com/{owner}/{repo}/-/merge_requests/{iid}
+        parts = pr_url.rstrip("/").split("/")
+        iid = parts[-1]
+        repo_path = "/".join(parts[-5:-3])
+        encoded = self._encode_path(repo_path)
+        resp = await self._client.get(
+            f"{self._base_url}/api/v4/projects/{encoded}/merge_requests/{iid}",
+            headers=self._headers(),
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        state = resp.json().get("state", "")
+        if state == "merged":
+            return "merged"
+        if state == "opened":
+            return "open"
+        return "closed"
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         encoded = self._encode_path(repo_path)
         gl_state = "opened" if state == "open" else state

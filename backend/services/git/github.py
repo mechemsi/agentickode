@@ -117,6 +117,21 @@ class GitHubProvider:
         )
         resp.raise_for_status()
 
+    async def get_pr_status(self, pr_url: str) -> str:
+        parts = pr_url.rstrip("/").split("/")
+        pr_number = parts[-1]
+        repo_path = "/".join(parts[-4:-2])
+        resp = await self._client.get(
+            f"{self._base_url}/repos/{repo_path}/pulls/{pr_number}",
+            headers=self._headers(),
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("merged_at"):
+            return "merged"
+        return "open" if data.get("state") == "open" else "closed"
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         resp = await self._client.get(
             f"{self._base_url}/repos/{repo_path}/issues",

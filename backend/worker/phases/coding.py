@@ -229,6 +229,9 @@ async def run(
             session_is_new,
             phase_exec_row,
             ws_id,
+            agent_creates_pr=bool(
+                resolved.agent_settings and resolved.agent_settings.agent_creates_pr
+            ),
         )
         return
 
