@@ -79,6 +79,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
   const [prereqName, setPrereqName] = useState(agent.prereq_name ?? "");
   const [needsNonRoot, setNeedsNonRoot] = useState(agent.needs_non_root ?? false);
   const [consolidatedDefault, setConsolidatedDefault] = useState(agent.consolidated_default ?? true);
+  const [agentCreatesPr, setAgentCreatesPr] = useState(agent.agent_creates_pr ?? false);
 
   // Sync when agent prop changes
   useEffect(() => {
@@ -99,6 +100,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
     setPrereqName(agent.prereq_name ?? "");
     setNeedsNonRoot(agent.needs_non_root ?? false);
     setConsolidatedDefault(agent.consolidated_default ?? true);
+    setAgentCreatesPr(agent.agent_creates_pr ?? false);
   }, [agent]);
 
   const loadAvailability = async () => {
@@ -151,6 +153,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
         prereq_name: prereqName || null,
         needs_non_root: needsNonRoot,
         consolidated_default: consolidatedDefault,
+        agent_creates_pr: agentCreatesPr,
       });
       toast.success(`Saved ${agent.display_name}`);
       onSaved();
@@ -388,6 +391,19 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   checked={consolidatedDefault}
                   onChange={setConsolidatedDefault}
                   ariaLabel="Toggle consolidated mode"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs text-gray-500">Agent Creates PR</label>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Agent commits, pushes, and creates PR itself
+                  </p>
+                </div>
+                <Toggle
+                  checked={agentCreatesPr}
+                  onChange={setAgentCreatesPr}
+                  ariaLabel="Toggle agent creates PR"
                 />
               </div>
             </div>
