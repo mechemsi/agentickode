@@ -66,13 +66,16 @@ async def run(
     ws_cfg = task_run.workspace_config or {}
     ws_type = ws_cfg.get("workspace_type", "existing")
 
-    # Resolve full workspace path: prepend workspace_root for relative paths
+    # Resolve full workspace path: prepend workspace_root for relative paths,
+    # then isolate per task run to prevent git index races between parallel runs.
     raw_path = task_run.workspace_path
     if raw_path.startswith("/"):
         workspace = raw_path
     else:
         workspace_root = server.workspace_root or "/home/workspace"
         workspace = f"{workspace_root}/{raw_path}".rstrip("/")
+    # Append task run ID to make the path unique per run (task-scoped isolation)
+    workspace = f"{workspace}/{task_run.id}"
     task_run.workspace_path = workspace
 
     worker_user = server.worker_user

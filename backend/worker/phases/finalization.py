@@ -11,6 +11,7 @@ For pr-review workflows, posts the AI review as a comment on the source PR.
 """
 
 import logging
+import shlex
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,6 +71,18 @@ async def run(
     ssh = await get_ssh_for_run(task_run, session)
     remote_sandbox = RemoteSandbox(ssh)
     await remote_sandbox.stop_sandbox(task_run.workspace_path)
+
+    # Remove task-scoped workspace directory to free disk space.
+    # Only delete if path ends with the task run ID (safety guard against
+    # accidentally removing a shared base directory).
+    ws_path = task_run.workspace_path
+    parts = ws_path.split("/") if ws_path else []
+    if ws_path and ws_path.endswith(f"/{task_run.id}") and len(parts) >= 4:
+        await broadcaster.log(
+            task_run.id, f"Removing task workspace: {ws_path}", phase="finalization"
+        )
+        await ssh.run_command(f"rm -rf {shlex.quote(ws_path)}", timeout=60)
+
     await broadcaster.log(task_run.id, "Cleanup complete", phase="finalization")
 
 

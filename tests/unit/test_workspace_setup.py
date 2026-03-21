@@ -139,7 +139,7 @@ class TestWorkspaceSetup:
 
             await workspace_setup.run(run, db_session, mock_services)
 
-            assert run.workspace_path == "/home/workspace/myproject"
+            assert run.workspace_path == f"/home/workspace/myproject/{run.id}"
             git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
             assert ["checkout", "-f", "main"] in git_calls
 
