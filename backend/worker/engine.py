@@ -194,42 +194,9 @@ class WorkerEngine:
             if run.id in self._active_runs:
                 continue
             if run.approved:
-                logger.info(f"Resuming run #{run.id} after approval")
-                # Find the waiting phase and set it to completed, advance run
-                waiting_phase = await session.execute(
-                    select(PhaseExecution).where(
-                        PhaseExecution.run_id == run.id,
-                        PhaseExecution.status == "waiting",
-                        PhaseExecution.trigger_mode == "wait_for_approval",
-                    )
-                )
-                pe = waiting_phase.scalar_one_or_none()
-                if pe:
-                    pe.status = "completed"
-                    pe.completed_at = datetime.now(UTC)
-                run.status = "pending"
-                await session.commit()
-                task = asyncio.create_task(self._run_pipeline(run.id))
-                self._active_runs[run.id] = task
+                await self._resume_approved_run(run, session)
             else:
-                logger.info(f"Run #{run.id} was rejected")
-                # Mark the waiting phase as failed
-                waiting_phase = await session.execute(
-                    select(PhaseExecution).where(
-                        PhaseExecution.run_id == run.id,
-                        PhaseExecution.status == "waiting",
-                    )
-                )
-                pe = waiting_phase.scalar_one_or_none()
-                if pe:
-                    pe.status = "failed"
-                    pe.error_message = f"Rejected: {run.rejection_reason or 'No reason given'}"
-                    pe.completed_at = datetime.now(UTC)
-                run.status = "failed"
-                run.error_message = f"Rejected: {run.rejection_reason or 'No reason given'}"
-                run.completed_at = datetime.now(UTC)
-                await session.commit()
-                await broadcaster.event(run.id, "run_rejected", {"reason": run.rejection_reason})
+                await self._reject_run(run, session)
 
         # 2. Runs waiting for external trigger where phase was advanced
         result = await session.execute(
@@ -238,7 +205,6 @@ class WorkerEngine:
         for run in result.scalars().all():
             if run.id in self._active_runs:
                 continue
-            # Check if the waiting phase has been advanced to pending
             pending = await session.execute(
                 select(PhaseExecution).where(
                     PhaseExecution.run_id == run.id,
@@ -251,6 +217,46 @@ class WorkerEngine:
                 await session.commit()
                 task = asyncio.create_task(self._run_pipeline(run.id))
                 self._active_runs[run.id] = task
+
+    async def _resume_approved_run(self, run: TaskRun, session) -> None:
+        """Mark the waiting approval phase complete and re-queue the run."""
+        logger.info(f"Resuming run #{run.id} after approval")
+        waiting_phase = await session.execute(
+            select(PhaseExecution).where(
+                PhaseExecution.run_id == run.id,
+                PhaseExecution.status == "waiting",
+                PhaseExecution.trigger_mode == "wait_for_approval",
+            )
+        )
+        pe = waiting_phase.scalar_one_or_none()
+        if pe:
+            pe.status = "completed"
+            pe.completed_at = datetime.now(UTC)
+        run.status = "pending"
+        await session.commit()
+        task = asyncio.create_task(self._run_pipeline(run.id))
+        self._active_runs[run.id] = task
+
+    async def _reject_run(self, run: TaskRun, session) -> None:
+        """Mark the waiting phase and the run itself as failed due to rejection."""
+        logger.info(f"Run #{run.id} was rejected")
+        reason = f"Rejected: {run.rejection_reason or 'No reason given'}"
+        waiting_phase = await session.execute(
+            select(PhaseExecution).where(
+                PhaseExecution.run_id == run.id,
+                PhaseExecution.status == "waiting",
+            )
+        )
+        pe = waiting_phase.scalar_one_or_none()
+        if pe:
+            pe.status = "failed"
+            pe.error_message = reason
+            pe.completed_at = datetime.now(UTC)
+        run.status = "failed"
+        run.error_message = reason
+        run.completed_at = datetime.now(UTC)
+        await session.commit()
+        await broadcaster.event(run.id, "run_rejected", {"reason": run.rejection_reason})
 
     async def _handle_timeouts(self, session):
         """Mark runs that have been awaiting approval beyond the timeout."""
