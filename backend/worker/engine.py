@@ -122,36 +122,45 @@ class WorkerEngine:
         if available_slots <= 0:
             return
 
-        # Projects that already have an active run — skip their pending runs
+        # (project_id, workspace_server_id) pairs that already have an active run
+        # — skip further pending runs with the same combination
         active_statuses = ("running", "waiting_for_trigger")
-        active_projects_q = (
-            select(TaskRun.project_id).where(TaskRun.status.in_(active_statuses)).distinct()
+        active_workspaces_q = (
+            select(TaskRun.project_id, TaskRun.workspace_server_id)
+            .where(TaskRun.status.in_(active_statuses))
+            .distinct()
         )
+        active_ws_result = await session.execute(active_workspaces_q)
+        active_workspaces: set[tuple[str, int | None]] = set(active_ws_result.tuples())
 
         result = await session.execute(
             select(TaskRun)
-            .where(
-                TaskRun.status == "pending",
-                TaskRun.project_id.notin_(active_projects_q),
-            )
+            .where(TaskRun.status == "pending")
             .order_by(TaskRun.created_at)
-            .limit(available_slots)
+            .limit(available_slots * 10)  # fetch more to account for filtering
         )
         runs = result.scalars().all()
 
         schedule = await self._get_schedule(session)
         within_schedule = is_within_schedule(schedule)
 
-        # Only dispatch one run per project per tick to avoid racing
-        dispatched_projects: set[str] = set()
+        # Only dispatch one run per (project, workspace) pair per tick to avoid racing
+        dispatched_workspaces: set[tuple[str, int | None]] = set()
+        dispatched_count = 0
         for run in runs:
-            if run.project_id in dispatched_projects:
+            if dispatched_count >= available_slots:
+                break
+            dispatch_key = (run.project_id, run.workspace_server_id)
+            if dispatch_key in active_workspaces:
+                continue
+            if dispatch_key in dispatched_workspaces:
                 continue
             if not within_schedule:
                 meta = run.task_source_meta or {}
                 if not meta.get("skip_schedule", False):
                     continue  # blocked by schedule
-            dispatched_projects.add(run.project_id)
+            dispatched_workspaces.add(dispatch_key)
+            dispatched_count += 1
             logger.info(f"Dispatching run #{run.id}: {run.title}")
             task = asyncio.create_task(self._run_pipeline(run.id))
             self._active_runs[run.id] = task

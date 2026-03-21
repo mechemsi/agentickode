@@ -210,6 +210,32 @@ class TestWorkerEngine:
         assert len(engine._active_runs) == 1
         assert run1.id in engine._active_runs
 
+    async def test_dispatch_parallel_same_project_different_servers(
+        self, db_session, make_task_run
+    ):
+        """Two pending runs for the same project on different workspace servers are both dispatched."""
+        db_session.add(
+            ProjectConfig(project_id="proj-qf", project_slug="qf", repo_owner="o", repo_name="r")
+        )
+
+        run1 = make_task_run(
+            task_id="TASK-F1", project_id="proj-qf", status="pending", workspace_server_id=1
+        )
+        run2 = make_task_run(
+            task_id="TASK-F2", project_id="proj-qf", status="pending", workspace_server_id=2
+        )
+        db_session.add_all([run1, run2])
+        await db_session.commit()
+
+        engine = WorkerEngine()
+        with patch.object(engine, "_run_pipeline", new_callable=AsyncMock):
+            await engine._dispatch_pending(db_session)
+
+        # Both runs should be dispatched since they target different workspace servers
+        assert len(engine._active_runs) == 2
+        assert run1.id in engine._active_runs
+        assert run2.id in engine._active_runs
+
     async def test_handle_timeouts(self, db_session, make_task_run):
         project = ProjectConfig(
             project_id="proj-eng6", project_slug="eng6", repo_owner="o", repo_name="r"

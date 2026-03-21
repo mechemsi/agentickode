@@ -19,6 +19,7 @@ from backend.schemas import (
     PaginatedRunsResponse,
     TaskRunDetail,
 )
+from backend.services.workspace.workspace_selector import select_workspace_for_run
 
 logger = logging.getLogger("agentickode.runs")
 router = APIRouter(tags=["runs"])
@@ -61,9 +62,11 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
     slug = project.project_slug or project.repo_name
     branch_name = f"agentickode/{slug}/{ts}"
 
-    # workspace_server_id from request; project-level default will be resolved
-    # by workspace selector service (Task 6) at dispatch time
-    ws_server_id = req.workspace_server_id
+    # workspace_server_id from request; auto-assign if not provided
+    if req.workspace_server_id is not None:
+        ws_server_id = req.workspace_server_id
+    else:
+        ws_server_id = await select_workspace_for_run(req.project_id, db)
     workspace_path = project.workspace_path or project.repo_name
 
     # Build task_source_meta upfront so we never mutate Column objects
@@ -88,6 +91,7 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
         description=req.description,
         branch_name=branch_name,
         workspace_path=workspace_path,
+        workspace_server_id=ws_server_id,
         repo_owner=project.repo_owner,
         repo_name=project.repo_name,
         default_branch=project.default_branch,
