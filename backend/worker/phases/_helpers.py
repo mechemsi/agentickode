@@ -11,10 +11,15 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from backend.config import DEFAULT_COST_RATE, MODEL_COST_RATES
-from backend.models import PhaseExecution, ProjectConfig, TaskRun, WorkspaceServer
+from backend.models import (
+    PhaseExecution,
+    ProjectConfig,
+    ProjectWorkspaceServer,
+    TaskRun,
+    WorkspaceServer,
+)
 from backend.models.agents import AgentSettings
 from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.adapters.cli_commands import AGENT_COMMANDS
@@ -94,32 +99,42 @@ def get_phase_role(
 
 
 async def get_workspace_server_id(task_run: TaskRun, session: AsyncSession) -> int | None:
-    """Resolve workspace_server_id from the task run's project config."""
-    stmt = select(ProjectConfig.workspace_server_id).where(
-        ProjectConfig.project_id == task_run.project_id
+    """Resolve workspace_server_id for a task run.
+
+    Priority:
+    1. TaskRun.workspace_server_id (set during dispatch).
+    2. First (highest-priority) entry in ProjectWorkspaceServer for the project.
+    """
+    run_server_id: int | None = task_run.workspace_server_id  # type: ignore[assignment]
+    if run_server_id is not None:
+        return run_server_id
+
+    stmt = (
+        select(ProjectWorkspaceServer.workspace_server_id)
+        .where(ProjectWorkspaceServer.project_id == task_run.project_id)
+        .order_by(ProjectWorkspaceServer.priority)
+        .limit(1)
     )
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    return result.scalar_one_or_none()  # type: ignore[return-value]
 
 
 async def get_workspace_server(task_run: TaskRun, session: AsyncSession) -> WorkspaceServer:
     """Resolve the full WorkspaceServer model for a task run.
 
+    Uses TaskRun.workspace_server_id when available; otherwise falls back to
+    the highest-priority server in ProjectWorkspaceServer for the project.
+
     Raises ValueError if no workspace server is configured.
     """
-    stmt = (
-        select(ProjectConfig)
-        .options(selectinload(ProjectConfig.workspace_server))
-        .where(ProjectConfig.project_id == task_run.project_id)
-    )
-    result = await session.execute(stmt)
-    project = result.scalar_one_or_none()
-
-    if project is None:
-        raise ValueError(f"No project config for project_id={task_run.project_id}")
-    if project.workspace_server is None:
+    server_id = await get_workspace_server_id(task_run, session)
+    if server_id is None:
         raise ValueError(f"No workspace server configured for project {task_run.project_id}")
-    return project.workspace_server
+
+    server = await session.get(WorkspaceServer, server_id)
+    if server is None:
+        raise ValueError(f"WorkspaceServer id={server_id} not found in database")
+    return server
 
 
 async def get_ssh_for_run(task_run: TaskRun, session: AsyncSession) -> SSHService:
@@ -147,8 +162,7 @@ async def get_project_token(task_run: TaskRun, session: AsyncSession) -> str | N
 
         ws_id = getattr(task_run, "workspace_server_id", None)
         if ws_id is None:
-            project = await session.get(ProjectConfig, task_run.project_id)
-            ws_id = project.workspace_server_id if project else None
+            ws_id = await get_workspace_server_id(task_run, session)
 
         token = await conn_repo.resolve_token(
             provider=provider,

@@ -13,7 +13,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from backend.database import async_session
-from backend.models import ProjectConfig, TaskRun, WorkspaceServer
+from backend.models import ProjectWorkspaceServer, TaskRun, WorkspaceServer
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
 
@@ -142,11 +142,16 @@ async def ws_run_terminal(websocket: WebSocket, run_id: int):
             return
 
         meta = run.task_source_meta or {}
-        server_id = meta.get("workspace_server_id")
+        server_id = meta.get("workspace_server_id") or run.workspace_server_id
         if not server_id:
-            project = await session.get(ProjectConfig, run.project_id)
-            if project:
-                server_id = project.workspace_server_id
+            # Fall back to highest-priority workspace server for the project
+            pws_result = await session.execute(
+                select(ProjectWorkspaceServer.workspace_server_id)
+                .where(ProjectWorkspaceServer.project_id == run.project_id)
+                .order_by(ProjectWorkspaceServer.priority)
+                .limit(1)
+            )
+            server_id = pws_result.scalar_one_or_none()
         if not server_id:
             await websocket.send_text(
                 json.dumps({"type": "output", "data": "No workspace server configured.\r\n"})

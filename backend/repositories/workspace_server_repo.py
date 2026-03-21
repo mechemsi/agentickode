@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.models import DiscoveredAgent, ProjectConfig, WorkspaceServer
+from backend.models import DiscoveredAgent, ProjectWorkspaceServer, WorkspaceServer
 
 
 class WorkspaceServerRepository:
@@ -52,21 +52,8 @@ class WorkspaceServerRepository:
         return server
 
     async def delete(self, server: WorkspaceServer) -> None:
-        # Nullify project FK references before deleting
-        await self._session.execute(
-            select(ProjectConfig).where(ProjectConfig.workspace_server_id == server.id)
-        )
-        for proj in (
-            (
-                await self._session.execute(
-                    select(ProjectConfig).where(ProjectConfig.workspace_server_id == server.id)
-                )
-            )
-            .scalars()
-            .all()
-        ):
-            proj.workspace_server_id = None
-
+        # ProjectWorkspaceServer rows are removed automatically via ON DELETE CASCADE
+        # on the workspace_server_id FK, so no manual cleanup is needed here.
         await self._session.delete(server)
         await self._session.commit()
 
@@ -82,8 +69,8 @@ class WorkspaceServerRepository:
 
     async def get_project_count(self, server_id: int) -> int:
         result = await self._session.execute(
-            select(func.count(ProjectConfig.project_id)).where(
-                ProjectConfig.workspace_server_id == server_id
+            select(func.count(ProjectWorkspaceServer.project_id)).where(
+                ProjectWorkspaceServer.workspace_server_id == server_id
             )
         )
         return result.scalar_one()

@@ -7,7 +7,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import ProjectConfig
+from backend.models import ProjectConfig, ProjectWorkspaceServer
 
 
 class ProjectConfigRepository:
@@ -25,7 +25,11 @@ class ProjectConfigRepository:
     async def list_by_server(self, server_id: int) -> list[ProjectConfig]:
         result = await self._session.execute(
             select(ProjectConfig)
-            .where(ProjectConfig.workspace_server_id == server_id)
+            .join(
+                ProjectWorkspaceServer,
+                ProjectWorkspaceServer.project_id == ProjectConfig.project_id,
+            )
+            .where(ProjectWorkspaceServer.workspace_server_id == server_id)
             .order_by(ProjectConfig.project_slug)
         )
         return list(result.scalars().all())
