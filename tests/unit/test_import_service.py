@@ -34,15 +34,17 @@ async def _seed_source(session: AsyncSession) -> None:
 
     session.add(OllamaServer(name="ollama-01", url="http://ollama:11434"))
     session.add(AppSetting(key="theme", value={"mode": "dark"}))
-    session.add(
-        ProjectConfig(
-            project_id="proj-1",
-            project_slug="proj-1",
-            repo_owner="org",
-            repo_name="repo",
-            workspace_server_id=ws.id,
-        )
+    proj = ProjectConfig(
+        project_id="proj-1",
+        project_slug="proj-1",
+        repo_owner="org",
+        repo_name="repo",
     )
+    session.add(proj)
+    await session.flush()
+    from backend.models.projects import ProjectWorkspaceServer
+
+    session.add(ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0))
     rc = RoleConfig(
         agent_name="planner",
         display_name="Planner",

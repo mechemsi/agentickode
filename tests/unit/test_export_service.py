@@ -57,15 +57,17 @@ async def _seed(session: AsyncSession) -> None:
         )
     )
     session.add(WorkflowTemplate(name="default", description="Default workflow"))
-    session.add(
-        ProjectConfig(
-            project_id="proj-1",
-            project_slug="proj-1",
-            repo_owner="org",
-            repo_name="repo",
-            workspace_server_id=ws.id,
-        )
+    proj = ProjectConfig(
+        project_id="proj-1",
+        project_slug="proj-1",
+        repo_owner="org",
+        repo_name="repo",
     )
+    session.add(proj)
+    await session.flush()
+    from backend.models.projects import ProjectWorkspaceServer
+
+    session.add(ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0))
     rc = RoleConfig(
         agent_name="planner",
         display_name="Planner",
@@ -114,7 +116,7 @@ async def test_export_full_redacted(db_session: AsyncSession):
 
     assert len(entities["project_configs"]) == 1
     proj = entities["project_configs"][0]
-    assert proj["workspace_server_name"] == "ws-01"
+    # workspace_server association now via project_workspace_servers join table (Task 4)
     assert "workspace_server_id" not in proj
 
     assert len(entities["agent_settings"]) == 1

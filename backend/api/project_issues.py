@@ -10,12 +10,9 @@ import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import settings
-from backend.database import get_db
 from backend.repositories.project_config_repo import ProjectConfigRepository
-from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.schemas.projects import GitIssueOut
 from backend.services.encryption import decrypt_value
 from backend.services.git.protocol import get_git_provider
@@ -106,7 +103,6 @@ async def _fetch_issues_via_ssh(ssh: SSHService, provider: str, repo_path: str) 
 async def list_project_issues(
     project_id: str,
     repo: ProjectConfigRepository = Depends(_get_repo),
-    db: AsyncSession = Depends(get_db),
 ):
     """Fetch open issues from the project's git provider."""
     project = await repo.get_by_id(project_id)
@@ -118,21 +114,8 @@ async def list_project_issues(
 
     repo_path = f"{project.repo_owner}/{project.repo_name}"
 
-    # If project is linked to a workspace server, fetch through SSH
-    if project.workspace_server_id:
-        server_repo = WorkspaceServerRepository(db)
-        server = await server_repo.get_by_id(project.workspace_server_id)
-        if server:
-            try:
-                ssh = SSHService.for_server(server)
-                return await _fetch_issues_via_ssh(ssh, project.git_provider, repo_path)
-            except Exception as exc:
-                logger.warning(
-                    "SSH issue fetch failed for %s (server %d), falling back to direct: %s",
-                    project_id,
-                    server.id,
-                    exc,
-                )
+    # SSH issue fetching via workspace server is being migrated to the
+    # project_workspace_servers join table and will be restored in Task 5.
 
     # Fallback: direct HTTP from backend
     project_token = None

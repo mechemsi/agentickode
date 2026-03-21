@@ -215,6 +215,8 @@ async def create_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token:
         data["git_provider_token_enc"] = encrypt_value(raw_token)
+    # workspace_server_id is now stored in the project_workspace_servers join table
+    data.pop("workspace_server_id", None)
     project = ProjectConfig(**data)
     created = await repo.create(project)
     return _project_out(created)
@@ -234,6 +236,8 @@ async def update_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token is not None:
         data["git_provider_token_enc"] = encrypt_value(raw_token) if raw_token else None
+    # workspace_server_id is now stored in the project_workspace_servers join table
+    data.pop("workspace_server_id", None)
     updated = await repo.update(project, data)
     return _project_out(updated)
 

@@ -72,7 +72,9 @@ class ExportService:
 
         proj = (
             await self._session.execute(
-                select(ProjectConfig).where(ProjectConfig.project_id == project_id)
+                select(ProjectConfig)
+                .where(ProjectConfig.project_id == project_id)
+                .options(selectinload(ProjectConfig.workspace_servers))
             )
         ).scalar_one_or_none()
         if proj is None:
@@ -82,12 +84,14 @@ class ExportService:
         cfg = ENTITY_CONFIGS["project_configs"]
         entities["project_configs"] = [serialize_entity(proj, cfg, handler, id_to_name)]
 
-        # Include the linked workspace server if present
-        if proj.workspace_server_id:
+        # Include linked workspace servers if present (via project_workspace_servers join table)
+        # TODO(Task4): properly export all linked workspace servers from join table
+        ws_server_ids = [pws.workspace_server_id for pws in proj.workspace_servers]
+        if ws_server_ids:
             ws_cfg = ENTITY_CONFIGS["workspace_servers"]
             ws = (
                 await self._session.execute(
-                    select(WorkspaceServer).where(WorkspaceServer.id == proj.workspace_server_id)
+                    select(WorkspaceServer).where(WorkspaceServer.id == ws_server_ids[0])
                 )
             ).scalar_one_or_none()
             if ws:

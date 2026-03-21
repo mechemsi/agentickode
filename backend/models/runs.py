@@ -30,6 +30,7 @@ class TaskRun(Base):
     description = Column(Text, nullable=False, default="")
     branch_name = Column(Text, nullable=False)
     workspace_path = Column(Text, nullable=False)
+    workspace_server_id = Column(Integer, ForeignKey("workspace_servers.id", ondelete="SET NULL"), nullable=True)
     repo_owner = Column(Text, nullable=False, default="")
     repo_name = Column(Text, nullable=False, default="")
     default_branch = Column(Text, nullable=False, default="main")
@@ -52,6 +53,10 @@ class TaskRun(Base):
     coding_results = Column(JSONB, nullable=True)
     test_results = Column(JSONB, nullable=True)
     review_result = Column(JSONB, nullable=True)
+
+    # Autonomous agent loop results
+    agent_plan = Column(JSONB, nullable=True)
+    follow_up_tasks = Column(JSONB, nullable=True)
 
     # Approval
     pr_url = Column(Text, nullable=True)
@@ -88,6 +93,9 @@ class TaskRun(Base):
     )
     parent_run = relationship("TaskRun", remote_side="TaskRun.id", foreign_keys=[parent_run_id])
     child_runs = relationship("TaskRun", foreign_keys=[parent_run_id], overlaps="parent_run")
+    agent_loop_executions = relationship(
+        "AgentLoopExecution", back_populates="task_run", cascade="all, delete-orphan"
+    )
 
 
 class PhaseExecution(Base):

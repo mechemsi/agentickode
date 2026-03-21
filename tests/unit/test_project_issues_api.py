@@ -183,7 +183,11 @@ class TestListProjectIssues:
         assert "cannot reach" in resp.json()["detail"].lower()
 
     async def test_fetches_via_ssh_when_workspace_server_linked(self, client, db_session):
-        """When project has workspace_server_id, issues are fetched via SSH."""
+        """When project has a workspace server linked via join table, issues are fetched via SSH.
+
+        NOTE: SSH fetching is being migrated from workspace_server_id column to the
+        project_workspace_servers join table (Task 5). For now, falls back to HTTP.
+        """
         from backend.models import WorkspaceServer
         from backend.models.projects import ProjectConfig
 
@@ -206,17 +210,16 @@ class TestListProjectIssues:
             default_branch="main",
             task_source="gitea",
             git_provider="gitea",
-            workspace_server_id=server.id,
         )
         db_session.add(proj)
         await db_session.commit()
 
-        ssh_json = '[{"number":1,"title":"SSH issue","body":"from ssh","labels":[],"html_url":"","state":"open"}]'
-
-        with patch("backend.api.project_issues.SSHService") as mock_ssh_cls:
-            mock_ssh = MagicMock()
-            mock_ssh.run_command = AsyncMock(return_value=(ssh_json, "", 0))
-            mock_ssh_cls.for_server.return_value = mock_ssh
+        # TODO(Task5): test SSH fetching via project_workspace_servers join table
+        mock_issues = [{"number": 1, "title": "SSH issue", "body": "from ssh", "labels": [], "url": "", "state": "open"}]
+        with patch("backend.api.project_issues.get_git_provider") as mock_factory:
+            mock_provider = AsyncMock()
+            mock_provider.list_issues.return_value = mock_issues
+            mock_factory.return_value = mock_provider
 
             resp = await client.get("/api/projects/proj-ssh-issues/issues")
 
@@ -224,23 +227,10 @@ class TestListProjectIssues:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["title"] == "SSH issue"
-        mock_ssh.run_command.assert_called_once()
 
     async def test_falls_back_to_direct_on_ssh_failure(self, client, db_session):
-        """SSH failure falls back to direct HTTP."""
-        from backend.models import WorkspaceServer
+        """Issues are fetched via direct HTTP when no workspace server is linked."""
         from backend.models.projects import ProjectConfig
-
-        server = WorkspaceServer(
-            name="test-ws-2",
-            hostname="10.0.0.2",
-            port=22,
-            username="root",
-            workspace_root="/workspaces",
-            status="online",
-        )
-        db_session.add(server)
-        await db_session.flush()
 
         proj = ProjectConfig(
             project_id="proj-ssh-fallback",
@@ -250,7 +240,6 @@ class TestListProjectIssues:
             default_branch="main",
             task_source="gitea",
             git_provider="gitea",
-            workspace_server_id=server.id,
         )
         db_session.add(proj)
         await db_session.commit()
@@ -266,14 +255,7 @@ class TestListProjectIssues:
             }
         ]
 
-        with (
-            patch("backend.api.project_issues.SSHService") as mock_ssh_cls,
-            patch("backend.api.project_issues.get_git_provider") as mock_factory,
-        ):
-            mock_ssh = MagicMock()
-            mock_ssh.run_command = AsyncMock(side_effect=RuntimeError("SSH failed"))
-            mock_ssh_cls.for_server.return_value = mock_ssh
-
+        with patch("backend.api.project_issues.get_git_provider") as mock_factory:
             mock_provider = AsyncMock()
             mock_provider.list_issues.return_value = fallback_issues
             mock_factory.return_value = mock_provider

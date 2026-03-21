@@ -45,7 +45,9 @@ class WorkspaceServer(Base):
     agents = relationship(
         "DiscoveredAgent", back_populates="workspace_server", cascade="all, delete-orphan"
     )
-    projects = relationship("ProjectConfig", back_populates="workspace_server")
+    project_workspace_servers = relationship(
+        "ProjectWorkspaceServer", back_populates="workspace_server", cascade="all, delete-orphan"
+    )
 
 
 class DiscoveredAgent(Base):

@@ -61,7 +61,9 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
     slug = project.project_slug or project.repo_name
     branch_name = f"agentickode/{slug}/{ts}"
 
-    ws_server_id = req.workspace_server_id or project.workspace_server_id
+    # workspace_server_id from request; project-level default will be resolved
+    # by workspace selector service (Task 6) at dispatch time
+    ws_server_id = req.workspace_server_id
     workspace_path = project.workspace_path or project.repo_name
 
     # Build task_source_meta upfront so we never mutate Column objects

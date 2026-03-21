@@ -113,7 +113,6 @@ class TestComparisonResults:
             default_branch="main",
             task_source="manual",
             git_provider="gitea",
-            workspace_server_id=None,
         )
         db_session.add(proj)
         await db_session.commit()
@@ -187,7 +186,6 @@ class TestComparisonResults:
             default_branch="main",
             task_source="manual",
             git_provider="gitea",
-            workspace_server_id=None,
         )
         db_session.add(proj)
         await db_session.commit()

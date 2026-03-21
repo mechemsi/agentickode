@@ -123,15 +123,8 @@ ENTITY_CONFIGS: dict[str, EntityConfig] = {
         model=ProjectConfig,
         export_key="project_configs",
         match_fields=("project_id",),
-        excluded_fields=_COMMON_EXCLUDED | {"workspace_server_id"},
-        fk_mappings=(
-            FKMapping(
-                column="workspace_server_id",
-                target_model=WorkspaceServer,
-                target_name_col="name",
-                export_field="workspace_server_name",
-            ),
-        ),
+        excluded_fields=_COMMON_EXCLUDED,
+        # TODO(Task4): add workspace_servers export via project_workspace_servers join table
     ),
     "role_configs": EntityConfig(
         model=RoleConfig,
