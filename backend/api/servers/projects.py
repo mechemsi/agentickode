@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.models import ProjectConfig
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.schemas import ProjectConfigOut
@@ -23,6 +24,14 @@ def _get_project_repo(db: AsyncSession = Depends(get_db)) -> ProjectConfigReposi
     return ProjectConfigRepository(db)
 
 
+def _project_out(project: ProjectConfig) -> ProjectConfigOut:
+    """Serialize a ProjectConfig ORM object to its output schema."""
+    out = ProjectConfigOut.model_validate(project)
+    out.has_git_provider_token = bool(project.git_provider_token_enc)
+    out.workspace_server_ids = [ws.workspace_server_id for ws in project.workspace_servers]
+    return out
+
+
 @router.get(
     "/workspace-servers/{server_id}/projects",
     response_model=list[ProjectConfigOut],
@@ -36,4 +45,5 @@ async def list_server_projects(
     server = await server_repo.get_by_id(server_id)
     if not server:
         raise HTTPException(404, "Workspace server not found")
-    return await project_repo.list_by_server(server_id)
+    projects = await project_repo.list_by_server(server_id)
+    return [_project_out(p) for p in projects]

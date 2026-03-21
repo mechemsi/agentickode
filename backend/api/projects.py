@@ -51,6 +51,7 @@ def _project_out(project: ProjectConfig) -> ProjectConfigOut:
     """Convert a ProjectConfig model to its output schema, computing derived fields."""
     out = ProjectConfigOut.model_validate(project)
     out.has_git_provider_token = bool(project.git_provider_token_enc)
+    out.workspace_server_ids = [ws.workspace_server_id for ws in project.workspace_servers]
     return out
 
 
@@ -171,12 +172,13 @@ async def create_project(
 
     detected_branch: str | None = None
 
-    # Step 1: If workspace server is provided, verify repo via SSH first
-    if body.workspace_server_id:
+    # Step 1: If workspace servers are provided, verify repo via SSH using the first one
+    first_server_id = body.workspace_server_ids[0] if body.workspace_server_ids else None
+    if first_server_id:
         server_repo = WorkspaceServerRepository(repo._session)
-        server = await server_repo.get_by_id(body.workspace_server_id)
+        server = await server_repo.get_by_id(first_server_id)
         if not server:
-            raise HTTPException(422, f"Workspace server {body.workspace_server_id} not found")
+            raise HTTPException(422, f"Workspace server {first_server_id} not found")
 
         git_url = f"git@{_provider_host(body.git_provider)}:{body.repo_owner}/{body.repo_name}.git"
         ssh = SSHService.for_server(server)
@@ -215,10 +217,10 @@ async def create_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token:
         data["git_provider_token_enc"] = encrypt_value(raw_token)
-    # workspace_server_id is now stored in the project_workspace_servers join table
-    data.pop("workspace_server_id", None)
+    # workspace_server_ids stored via join table, not as a model column
+    workspace_server_ids = data.pop("workspace_server_ids", [])
     project = ProjectConfig(**data)
-    created = await repo.create(project)
+    created = await repo.create(project, workspace_server_ids=workspace_server_ids)
     return _project_out(created)
 
 
@@ -236,8 +238,7 @@ async def update_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token is not None:
         data["git_provider_token_enc"] = encrypt_value(raw_token) if raw_token else None
-    # workspace_server_id is now stored in the project_workspace_servers join table
-    data.pop("workspace_server_id", None)
+    # workspace_server_ids is handled by the repository via the join table
     updated = await repo.update(project, data)
     return _project_out(updated)
 

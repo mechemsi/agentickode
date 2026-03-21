@@ -74,7 +74,7 @@ class TestListServerProjects:
                 "project_slug": "proj-a",
                 "repo_owner": "org",
                 "repo_name": "repo-a",
-                "workspace_server_id": server_id,
+                "workspace_server_ids": [server_id],
             },
         )
         # Create an unlinked project
@@ -93,7 +93,7 @@ class TestListServerProjects:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["project_id"] == "proj-a"
-        assert data[0]["workspace_server_id"] == server_id
+        assert server_id in data[0]["workspace_server_ids"]
 
     async def test_404_for_missing_server(self, client: AsyncClient, mock_ssh_for_projects):
         resp = await client.get("/api/workspace-servers/999/projects")

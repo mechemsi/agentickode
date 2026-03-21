@@ -3,9 +3,28 @@
 # Commercial licensing: info@mechemsi.com
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+class ThresholdRule(BaseModel):
+    metric: str  # test_coverage, lint_errors
+    operator: Literal["<", ">", "==", "<=", ">="]
+    value: float
+    task: str  # task description template, may use {metric}, {value}
+
+
+class AutonomyConfig(BaseModel):
+    execution_mode: Literal["structured", "autonomous", "hybrid", "multi_agent"] = "structured"
+    plan_approval: Literal["none", "show_and_continue", "require_approval", "adaptive"] = "none"
+    adaptive_max_files: int = 5
+    merge_mode: Literal["pr_only", "auto_merge", "risk_based"] = "pr_only"
+    auto_merge_max_files: int = 3
+    auto_merge_require_green_ci: bool = True
+    allow_agent_followups: bool = False
+    max_followup_depth: int = 2
+    threshold_rules: list[ThresholdRule] = []
 
 
 class ProjectConfigCreate(BaseModel):
@@ -18,9 +37,17 @@ class ProjectConfigCreate(BaseModel):
     git_provider: str = "gitea"
     workspace_config: dict[str, Any] | None = None
     ai_config: dict[str, Any] | None = None
-    workspace_server_id: int | None = None
+    workspace_server_ids: list[int] = []
     workspace_path: str | None = None
     git_provider_token: str | None = None
+
+    @field_validator("workspace_server_ids")
+    @classmethod
+    def deduplicate_workspace_servers(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return v
+        seen: set[int] = set()
+        return [x for x in v if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
 
 
 class ProjectConfigUpdate(BaseModel):
@@ -32,9 +59,18 @@ class ProjectConfigUpdate(BaseModel):
     git_provider: str | None = None
     workspace_config: dict[str, Any] | None = None
     ai_config: dict[str, Any] | None = None
-    workspace_server_id: int | None = None
+    workspace_server_ids: list[int] | None = None
     workspace_path: str | None = None
     git_provider_token: str | None = None
+    autonomy_config: AutonomyConfig | None = None
+
+    @field_validator("workspace_server_ids")
+    @classmethod
+    def deduplicate_workspace_servers(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return v
+        seen: set[int] = set()
+        return [x for x in v if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
 
 
 class ProjectConfigOut(BaseModel):
@@ -47,9 +83,10 @@ class ProjectConfigOut(BaseModel):
     git_provider: str
     workspace_config: dict[str, Any] | None
     ai_config: dict[str, Any] | None
-    workspace_server_id: int | None = None
+    workspace_server_ids: list[int] = []
     workspace_path: str | None = None
     has_git_provider_token: bool = False
+    autonomy_config: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 

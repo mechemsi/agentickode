@@ -318,8 +318,10 @@ class TestDeleteWorkspaceServer:
         resp = await client.delete("/api/workspace-servers/999")
         assert resp.status_code == 404
 
-    async def test_delete_nullifies_project_fk(self, client: AsyncClient, mock_ssh_with_discovery):
-        """Deleting a workspace server should nullify workspace_server_id on linked projects."""
+    async def test_delete_removes_project_server_links(
+        self, client: AsyncClient, mock_ssh_with_discovery
+    ):
+        """Deleting a workspace server should remove it from linked projects' workspace_server_ids."""
         # Create server
         create_resp = await client.post(
             "/api/workspace-servers",
@@ -343,20 +345,20 @@ class TestDeleteWorkspaceServer:
         proj_resp = await client.get("/api/projects")
         assert proj_resp.status_code == 200
         projects_data = proj_resp.json()
-        linked = [p for p in projects_data if p.get("workspace_server_id") == server_id]
+        linked = [p for p in projects_data if server_id in p.get("workspace_server_ids", [])]
         assert len(linked) == 2
 
         # Delete server
         resp = await client.delete(f"/api/workspace-servers/{server_id}")
         assert resp.status_code == 204
 
-        # Verify projects still exist but FK is nullified
+        # Verify projects still exist but are no longer linked to the deleted server
         proj_resp = await client.get("/api/projects")
         assert proj_resp.status_code == 200
         projects_data = proj_resp.json()
         assert len(projects_data) == 2
         for p in projects_data:
-            assert p.get("workspace_server_id") is None
+            assert server_id not in p.get("workspace_server_ids", [])
 
 
 class TestSSHTest:

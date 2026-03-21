@@ -95,14 +95,13 @@ async def deploy_key_to_server(
                     repo_owner=dp.owner,
                     repo_name=dp.name,
                     git_provider=dp.git_provider,
-                    workspace_server_id=server.id,
                     workspace_path=dp.path,
                 )
-                await project_repo.create(proj)
+                await project_repo.create(proj, workspace_server_ids=[server.id])
             else:
                 await project_repo.update(
                     existing,
-                    {"workspace_path": dp.path, "workspace_server_id": server.id},
+                    {"workspace_path": dp.path, "workspace_server_ids": [server.id]},
                 )
     else:
         await repo.update(server, {"status": "error", "error_message": result.error})
@@ -188,15 +187,14 @@ async def scan_workspace_server(
                 repo_owner=dp.owner,
                 repo_name=dp.name,
                 git_provider=dp.git_provider,
-                workspace_server_id=server.id,
                 workspace_path=dp.path,
             )
-            await project_repo.create(proj)
+            await project_repo.create(proj, workspace_server_ids=[server.id])
             imported += 1
         else:
             await project_repo.update(
                 existing,
-                {"workspace_path": dp.path, "workspace_server_id": server.id},
+                {"workspace_path": dp.path, "workspace_server_ids": [server.id]},
             )
 
     await repo.update(
