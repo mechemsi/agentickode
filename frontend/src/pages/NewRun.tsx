@@ -34,6 +34,7 @@ export default function NewRun() {
   const [servers, setServers] = useState<WorkspaceServer[]>([]);
 
   const [projectId, setProjectId] = useState("");
+  const selectedProject = projects.find((p) => p.project_id === projectId) ?? null;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [workflowTemplateId, setWorkflowTemplateId] = useState<number | "">("");
@@ -42,7 +43,7 @@ export default function NewRun() {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [agentOverride, setAgentOverride] = useState("");
-  const [workspaceServerId, setWorkspaceServerId] = useState<number | "">("");
+  const [workspaceServerId, setWorkspaceServerId] = useState<number | null>(null);
   const [phaseOverrides, setPhaseOverrides] = useState<Record<string, string>>({});
   const [executionMode, setExecutionMode] = useState<"consolidated" | "batch" | "separate">("consolidated");
 
@@ -141,7 +142,7 @@ export default function NewRun() {
         labels: labelList,
         run_type: runType,
         agent_override: agentOverride || null,
-        workspace_server_id: workspaceServerId !== "" ? workspaceServerId : null,
+        workspace_server_id: workspaceServerId,
         phase_overrides:
           Object.keys(phaseOverridesPayload).length > 0 ? phaseOverridesPayload : null,
         issue_number: selectedIssue?.number ?? null,
@@ -195,6 +196,27 @@ export default function NewRun() {
               <p className="text-red-400 text-xs mt-1">{errors.project_id}</p>
             )}
           </div>
+
+          {/* Workspace Server selector — shown only when project has multiple servers */}
+          {selectedProject && (selectedProject.workspace_server_ids ?? []).length > 1 && (
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wide">
+                Workspace Server
+              </label>
+              <select
+                value={workspaceServerId ?? ""}
+                onChange={(e) => setWorkspaceServerId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              >
+                <option value="">Auto-select (least loaded)</option>
+                {servers
+                  .filter((s) => (selectedProject.workspace_server_ids ?? []).includes(s.id))
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} — {s.host}</option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           {/* Issue picker */}
           {projectId && issuesLoading && (
@@ -358,9 +380,9 @@ export default function NewRun() {
                   Workspace Server
                 </label>
                 <select
-                  value={workspaceServerId}
+                  value={workspaceServerId ?? ""}
                   onChange={(e) =>
-                    setWorkspaceServerId(e.target.value !== "" ? parseInt(e.target.value) : "")
+                    setWorkspaceServerId(e.target.value !== "" ? Number(e.target.value) : null)
                   }
                   className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                 >

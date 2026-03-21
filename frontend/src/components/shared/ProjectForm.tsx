@@ -28,7 +28,7 @@ function defaultTaskSource(p: string) {
 }
 
 type Status = { ok: boolean; msg: string };
-type FD = { project_id: string; project_slug: string; repo_owner: string; repo_name: string; default_branch: string; task_source: string; git_provider: string; workspace_server_id: number | null; git_provider_token: string };
+type FD = { project_id: string; project_slug: string; repo_owner: string; repo_name: string; default_branch: string; task_source: string; git_provider: string; workspace_server_ids: number[]; git_provider_token: string };
 type Initial = Partial<Omit<ProjectConfig, "created_at" | "updated_at" | "workspace_config" | "ai_config">>;
 
 function Field({ label, icon: Icon, children }: { label: string; icon?: React.ElementType; children: React.ReactNode }) {
@@ -90,10 +90,10 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     default_branch: initial?.default_branch ?? "main",
     task_source: initial?.task_source ?? "plain",
     git_provider: initial?.git_provider ?? "gitea",
-    workspace_server_id: initial?.workspace_server_id ?? null,
+    workspace_server_ids: initial?.workspace_server_ids ?? [],
     git_provider_token: "",
   });
-  const set = (k: keyof FD, v: string | number | null) => setForm((p) => ({ ...p, [k]: v }));
+  const set = (k: keyof FD, v: string | number | null | number[]) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleParsed = (r: GitUrlParseResponse) => {
     setParsed(true);
@@ -102,11 +102,12 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
   };
 
   const handleTestConn = async () => {
-    if (!form.workspace_server_id) { setConnStatus({ ok: false, msg: "Select a workspace server first" }); return; }
+    const firstServer = form.workspace_server_ids[0] ?? null;
+    if (!firstServer) { setConnStatus({ ok: false, msg: "Select a workspace server first" }); return; }
     setConnStatus(null);
     try {
       const url = isEdit ? `https://placeholder/${form.repo_owner}/${form.repo_name}` : gitUrl;
-      const r = await testConnection(form.workspace_server_id, url);
+      const r = await testConnection(firstServer, url);
       setConnStatus(r.success ? { ok: true, msg: "SSH connection OK" } : { ok: false, msg: r.error ?? "Connection failed" });
     } catch (e) { setConnStatus({ ok: false, msg: e instanceof Error ? e.message : "Connection failed" }); }
   };
@@ -124,21 +125,42 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {!isEdit && (
         <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
-          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />Workspace Server (used to verify repo access)</span>
-          <div className="flex gap-2">
-            <select className={CLS} value={form.workspace_server_id ?? ""} onChange={(e) => set("workspace_server_id", e.target.value ? parseInt(e.target.value) : null)}>
-              <option value="">-- none (direct API) --</option>
-              {servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <button onClick={handleTestConn} title="Test SSH connection" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-              <Zap className="w-4 h-4" />
+          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />Workspace Servers (used to verify repo access)</span>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {servers.map((s) => (
+              <label key={s.id} className="flex items-center gap-2 cursor-pointer py-1">
+                <input
+                  type="checkbox"
+                  checked={(form.workspace_server_ids ?? []).includes(s.id)}
+                  onChange={(e) => {
+                    const ids = form.workspace_server_ids ?? [];
+                    setForm((p) => ({
+                      ...p,
+                      workspace_server_ids: e.target.checked
+                        ? [...ids, s.id]
+                        : ids.filter((id) => id !== s.id),
+                    }));
+                  }}
+                  className="accent-blue-500 w-3.5 h-3.5"
+                />
+                <span className="text-sm text-gray-300">{s.name}</span>
+                <span className="text-xs text-gray-600">{s.host}</span>
+              </label>
+            ))}
+          </div>
+          {servers.length === 0 && (
+            <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
+          )}
+          <div className="flex gap-2 mt-1">
+            <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
+              <Zap className="w-4 h-4" />Test Connection
             </button>
           </div>
           {connStatus && <StatusLine s={connStatus} />}
         </div>
       )}
 
-      {!isEdit && <UrlSection gitUrl={gitUrl} setGitUrl={setGitUrl} onParsed={handleParsed} workspaceServerId={form.workspace_server_id} />}
+      {!isEdit && <UrlSection gitUrl={gitUrl} setGitUrl={setGitUrl} onParsed={handleParsed} workspaceServerId={form.workspace_server_ids[0] ?? null} />}
 
       <Field label="project_id" icon={Tag}>
         <input className={CLS} value={form.project_id} onChange={(e) => set("project_id", e.target.value)} disabled={isEdit} />
@@ -170,15 +192,36 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       </Field>
 
       {isEdit && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />workspace_server</span>
-          <div className="flex gap-2">
-            <select className={CLS} value={form.workspace_server_id ?? ""} onChange={(e) => set("workspace_server_id", e.target.value ? parseInt(e.target.value) : null)}>
-              <option value="">-- none --</option>
-              {servers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <button onClick={handleTestConn} title="Test SSH connection" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-              <Zap className="w-4 h-4" />
+        <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
+          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />workspace_servers</span>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {servers.map((s) => (
+              <label key={s.id} className="flex items-center gap-2 cursor-pointer py-1">
+                <input
+                  type="checkbox"
+                  checked={(form.workspace_server_ids ?? []).includes(s.id)}
+                  onChange={(e) => {
+                    const ids = form.workspace_server_ids ?? [];
+                    setForm((p) => ({
+                      ...p,
+                      workspace_server_ids: e.target.checked
+                        ? [...ids, s.id]
+                        : ids.filter((id) => id !== s.id),
+                    }));
+                  }}
+                  className="accent-blue-500 w-3.5 h-3.5"
+                />
+                <span className="text-sm text-gray-300">{s.name}</span>
+                <span className="text-xs text-gray-600">{s.host}</span>
+              </label>
+            ))}
+          </div>
+          {servers.length === 0 && (
+            <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
+          )}
+          <div className="flex gap-2 mt-1">
+            <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
+              <Zap className="w-4 h-4" />Test Connection
             </button>
           </div>
           {connStatus && <StatusLine s={connStatus} />}

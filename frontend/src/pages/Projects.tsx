@@ -3,10 +3,11 @@
 // Commercial licensing: info@mechemsi.com
 
 import { useEffect, useState } from "react";
-import { FileText, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, FileText, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
 import { createProject, deleteProject, getProjects, getWorkspaceServers, updateProject } from "../api";
 import ProjectForm from "../components/shared/ProjectForm";
 import ProjectInstructionsTab from "../components/settings/ProjectInstructionsTab";
+import AutonomyConfigPanel from "../components/settings/AutonomyConfigPanel";
 import type { ProjectConfig, WorkspaceServer } from "../types";
 
 export default function Projects() {
@@ -14,6 +15,7 @@ export default function Projects() {
   const [servers, setServers] = useState<WorkspaceServer[]>([]);
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [instructionsFor, setInstructionsFor] = useState<string | null>(null);
+  const [autonomyFor, setAutonomyFor] = useState<string | null>(null);
 
   const load = async () => setProjects(await getProjects());
   useEffect(() => { load(); getWorkspaceServers().then(setServers); }, []);
@@ -73,7 +75,7 @@ export default function Projects() {
                 <div>
                   <span className="font-medium text-white">{p.project_slug}</span>
                   <span className="text-gray-500 ml-3 text-sm">
-                    {p.repo_owner}/{p.repo_name} · {p.task_source}/{p.git_provider}
+                    {p.repo_owner}/{p.repo_name} · {p.task_source}/{p.git_provider} · {p.workspace_server_ids.length} workspace{p.workspace_server_ids.length !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -83,6 +85,17 @@ export default function Projects() {
                   >
                     <FileText className="w-3 h-3" />
                     Instructions
+                  </button>
+                  <button
+                    onClick={() => setAutonomyFor(autonomyFor === p.project_id ? null : p.project_id)}
+                    className={`text-xs inline-flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                      autonomyFor === p.project_id
+                        ? "text-blue-300 bg-blue-900/20"
+                        : "text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                    }`}
+                  >
+                    <Bot className="w-3 h-3" />
+                    Autonomy
                   </button>
                   <button
                     onClick={() => setEditing(p.project_id)}
@@ -104,6 +117,15 @@ export default function Projects() {
             {instructionsFor === p.project_id && (
               <div className="mt-3 pt-3 border-t border-gray-800/50">
                 <ProjectInstructionsTab projectId={p.project_id} />
+              </div>
+            )}
+            {autonomyFor === p.project_id && (
+              <div className="mt-3 pt-3 border-t border-gray-800/50">
+                <AutonomyConfigPanel
+                  projectId={p.project_id}
+                  initial={p.autonomy_config}
+                  onSaved={load}
+                />
               </div>
             )}
           </div>

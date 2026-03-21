@@ -12,7 +12,7 @@ vi.mock("../api", () => ({
       project_id: "p1", project_slug: "my-project", repo_owner: "org",
       repo_name: "repo", default_branch: "main", task_source: "plane",
       git_provider: "gitea", workspace_config: null, ai_config: null,
-      workspace_server_id: null,
+      workspace_server_ids: [],
       created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
     },
   ]),

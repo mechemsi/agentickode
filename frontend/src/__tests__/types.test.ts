@@ -118,7 +118,7 @@ describe("TypeScript interfaces", () => {
       workspace_path: null,
       workspace_config: null,
       ai_config: null,
-      workspace_server_id: null,
+      workspace_server_ids: [],
       created_at: "2024-01-01T00:00:00Z",
       updated_at: "2024-01-01T00:00:00Z",
     };

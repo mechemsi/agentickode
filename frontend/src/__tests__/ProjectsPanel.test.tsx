@@ -23,7 +23,7 @@ const sampleProject = {
   git_provider: "github",
   workspace_config: null,
   ai_config: null,
-  workspace_server_id: 1,
+  workspace_server_ids: [1],
   workspace_path: null as string | null,
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",

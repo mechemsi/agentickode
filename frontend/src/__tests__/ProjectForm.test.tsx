@@ -58,7 +58,7 @@ const editInitial = {
   default_branch: "main",
   task_source: "plain",
   git_provider: "gitea",
-  workspace_server_id: null,
+  workspace_server_ids: [],
 };
 
 describe("ProjectForm", () => {
@@ -102,19 +102,19 @@ describe("ProjectForm", () => {
     expect(screen.getByDisplayValue("org")).toBeInTheDocument();
   });
 
-  it("shows workspace_server dropdown always (with or without servers)", () => {
+  it("shows workspace server checkboxes in create mode", () => {
     render(<ProjectForm onSubmit={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByText("Workspace Server (used to verify repo access)")).toBeInTheDocument();
+    expect(screen.getByText("Workspace Servers (used to verify repo access)")).toBeInTheDocument();
   });
 
-  it("shows server options when servers prop provided", () => {
+  it("shows server checkboxes when servers prop provided", () => {
     render(<ProjectForm onSubmit={vi.fn()} onCancel={vi.fn()} servers={mockServers} />);
-    expect(screen.getByText("-- none (direct API) --")).toBeInTheDocument();
     expect(screen.getByText("coding-01")).toBeInTheDocument();
     expect(screen.getByText("coding-02")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("includes workspace_server_id in onSubmit data when server selected (edit mode)", () => {
+  it("includes workspace_server_ids in onSubmit data when server checked (edit mode)", () => {
     const onSubmit = vi.fn();
     render(
       <ProjectForm
@@ -125,19 +125,18 @@ describe("ProjectForm", () => {
       />,
     );
 
-    // Find the server select (the one containing coding-01)
-    const allSelects = screen.getAllByRole("combobox");
-    const serverSelect = allSelects.find((s) => s.querySelector('option[value="1"]'));
-    fireEvent.change(serverSelect!, { target: { value: "1" } });
+    // Check the first server checkbox
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[0]);
 
     fireEvent.click(screen.getByText("Save"));
 
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ workspace_server_id: 1 }),
+      expect.objectContaining({ workspace_server_ids: [1] }),
     );
   });
 
-  it("sends workspace_server_id as null when none selected (edit mode)", () => {
+  it("sends workspace_server_ids as empty array when none checked (edit mode)", () => {
     const onSubmit = vi.fn();
     render(
       <ProjectForm
@@ -151,7 +150,7 @@ describe("ProjectForm", () => {
     fireEvent.click(screen.getByText("Save"));
 
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ workspace_server_id: null }),
+      expect.objectContaining({ workspace_server_ids: [] }),
     );
   });
 });
