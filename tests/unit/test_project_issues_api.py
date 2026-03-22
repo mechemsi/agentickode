@@ -215,7 +215,16 @@ class TestListProjectIssues:
         await db_session.commit()
 
         # TODO(Task5): test SSH fetching via project_workspace_servers join table
-        mock_issues = [{"number": 1, "title": "SSH issue", "body": "from ssh", "labels": [], "url": "", "state": "open"}]
+        mock_issues = [
+            {
+                "number": 1,
+                "title": "SSH issue",
+                "body": "from ssh",
+                "labels": [],
+                "url": "",
+                "state": "open",
+            }
+        ]
         with patch("backend.api.project_issues.get_git_provider") as mock_factory:
             mock_provider = AsyncMock()
             mock_provider.list_issues.return_value = mock_issues

@@ -110,3 +110,68 @@ class AgentSettings(Base):
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+
+class ScheduledTask(Base):
+    __tablename__ = "scheduled_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(
+        Text, ForeignKey("project_configs.project_id", ondelete="CASCADE"), nullable=False
+    )
+    name = Column(Text, nullable=False)
+    schedule = Column(Text, nullable=False)  # cron expression
+    task_description = Column(Text, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    next_run_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    project = relationship("ProjectConfig", back_populates="scheduled_tasks")
+
+
+class MonitoringRule(Base):
+    __tablename__ = "monitoring_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(
+        Text, ForeignKey("project_configs.project_id", ondelete="CASCADE"), nullable=False
+    )
+    source = Column(Text, nullable=False)  # sentry, datadog, grafana, generic
+    min_severity = Column(Text, nullable=False, default="error")
+    task_template = Column(Text, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    project = relationship("ProjectConfig", back_populates="monitoring_rules")
+
+
+class AgentLoopExecution(Base):
+    __tablename__ = "agent_loop_executions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_run_id = Column(Integer, ForeignKey("task_runs.id", ondelete="CASCADE"), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    session_id = Column(Text, nullable=True)
+    progress_snapshots = Column(JSONB, nullable=False, default=list)
+    result = Column(JSONB, nullable=True)
+    status = Column(Text, nullable=False, default="running")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    task_run = relationship("TaskRun", back_populates="agent_loop_executions")
+
+
+class NotificationSource(Base):
+    __tablename__ = "notification_sources"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    type = Column(Text, nullable=False)  # slack, discord
+    config = Column(JSONB, nullable=False, default=dict)  # token, channel_id, workspace_id
+    project_id = Column(
+        Text, ForeignKey("project_configs.project_id", ondelete="CASCADE"), nullable=True
+    )
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    project = relationship("ProjectConfig", back_populates="notification_sources")

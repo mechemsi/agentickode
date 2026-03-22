@@ -62,9 +62,7 @@ async def select_workspace_for_run(
         .limit(1)
     )
     if exclude:
-        stmt = stmt.where(
-            ProjectWorkspaceServer.workspace_server_id.not_in(exclude)
-        )
+        stmt = stmt.where(ProjectWorkspaceServer.workspace_server_id.not_in(exclude))
 
     result = await session.execute(stmt)
     return result.scalar_one_or_none()

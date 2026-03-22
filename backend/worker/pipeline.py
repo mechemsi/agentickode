@@ -38,6 +38,15 @@ PHASE_NAMES = [
     "finalization",
 ]
 
+# Phase sequences for each execution mode.
+# "structured" uses the default PHASE_NAMES above (resolved via workflow templates).
+# Other modes bypass workflow templates and use these fixed sequences.
+_AUTONOMOUS_PHASE_SEQUENCES: dict[str, list[str]] = {
+    "autonomous": ["workspace_setup", "agent_loop", "approval", "finalization"],
+    "hybrid": ["workspace_setup", "init", "agent_loop", "approval", "finalization"],
+    "multi_agent": ["workspace_setup", "agent_loop_multi", "approval", "finalization"],
+}
+
 # Populated lazily from the phase registry.
 _phase_modules: dict | None = None
 
@@ -64,24 +73,59 @@ def _get_phase_module(phase_name: str):
     return _get_phase_modules().get(phase_name)
 
 
+async def _get_project_execution_mode(run: TaskRun, session: AsyncSession) -> str:
+    """Return the execution_mode from project autonomy_config, defaulting to 'structured'."""
+    try:
+        from sqlalchemy import select as sa_select
+
+        from backend.models import ProjectConfig
+
+        result = await session.execute(
+            sa_select(ProjectConfig.autonomy_config).where(
+                ProjectConfig.project_id == run.project_id
+            )
+        )
+        config = result.scalar_one_or_none() or {}
+        return (
+            config.get("execution_mode", "structured") if isinstance(config, dict) else "structured"
+        )
+    except Exception:
+        logger.debug("Could not read execution_mode for run #%s", run.id, exc_info=True)
+        return "structured"
+
+
 async def _resolve_workflow_phases(run: TaskRun, session: AsyncSession) -> list[dict[str, Any]]:
-    """Resolve which phases to run based on workflow templates and task labels.
+    """Resolve which phases to run based on execution_mode, workflow templates, and task labels.
 
     Priority:
-    1. Explicit workflow_template_id on the run
-    2. Label-based matching
-    3. Default template
-    4. Hardcoded PHASE_NAMES fallback
+    1. autonomy_config.execution_mode (autonomous/hybrid/multi_agent) → fixed sequence
+    2. Explicit workflow_template_id on the run
+    3. Label-based matching
+    4. Default template
+    5. Hardcoded PHASE_NAMES fallback
     """
+    # 1. Check execution mode — autonomous modes use fixed sequences
+    execution_mode = await _get_project_execution_mode(run, session)
+    if execution_mode in _AUTONOMOUS_PHASE_SEQUENCES:
+        phase_names = _AUTONOMOUS_PHASE_SEQUENCES[execution_mode]
+        logger.info(
+            "Run #%s using execution_mode=%s: phases=%s",
+            run.id,
+            execution_mode,
+            phase_names,
+        )
+        return [{"phase_name": name, "enabled": True} for name in phase_names]
+
+    # 2-5. Structured mode: resolve via workflow templates
     try:
         repo = WorkflowTemplateRepository(session)
         template = None
 
-        # 1. Explicit workflow_template_id takes priority
+        # 2. Explicit workflow_template_id takes priority
         if run.workflow_template_id:
             template = await repo.get_by_id(run.workflow_template_id)
 
-        # 2. Try label-based matching
+        # 3. Try label-based matching
         if not template:
             labels = (run.task_source_meta or {}).get("labels", [])
             template = await repo.match_labels(labels) if labels else await repo.get_default()

@@ -88,4 +88,13 @@ AGENT_COMMANDS: dict[str, dict[str, str | bool]] = {
         "check": "command -v copilot",
         "supports_session": False,
     },
+    # Autonomous loop mode: Claude Code drives itself with full tool access.
+    # The agent reads .autodev/agent_prompt.md and runs until done.
+    "claude_autonomous": {
+        "generate": "cat {prompt_file} | claude --print --output-format json",
+        "task": "cd {workspace} && claude --dangerously-skip-permissions --print --output-format stream-json < .autodev/agent_prompt.md",
+        "task_resume": "cd {workspace} && claude --dangerously-skip-permissions --print --output-format stream-json --resume {session_id}",
+        "check": "command -v claude",
+        "supports_session": True,
+    },
 }

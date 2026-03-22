@@ -67,7 +67,9 @@ async def _seed(session: AsyncSession) -> None:
     await session.flush()
     from backend.models.projects import ProjectWorkspaceServer
 
-    session.add(ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0))
+    session.add(
+        ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0)
+    )
     rc = RoleConfig(
         agent_name="planner",
         display_name="Planner",

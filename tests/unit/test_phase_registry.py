@@ -15,7 +15,7 @@ class TestDiscoverPhases:
         _reset_cache()
 
     def test_discover_finds_all_builtin_phases(self):
-        """All 10 built-in phase modules are discovered."""
+        """All built-in phase modules are discovered."""
         phases = discover_phases()
         expected = {
             "workspace_setup",
@@ -28,6 +28,7 @@ class TestDiscoverPhases:
             "finalization",
             "task_creation",
             "pr_fetch",
+            "agent_loop",
         }
         assert set(phases.keys()) == expected
 

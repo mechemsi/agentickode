@@ -30,7 +30,9 @@ class TaskRun(Base):
     description = Column(Text, nullable=False, default="")
     branch_name = Column(Text, nullable=False)
     workspace_path = Column(Text, nullable=False)
-    workspace_server_id = Column(Integer, ForeignKey("workspace_servers.id", ondelete="SET NULL"), nullable=True)
+    workspace_server_id = Column(
+        Integer, ForeignKey("workspace_servers.id", ondelete="SET NULL"), nullable=True
+    )
     repo_owner = Column(Text, nullable=False, default="")
     repo_name = Column(Text, nullable=False, default="")
     default_branch = Column(Text, nullable=False, default="main")

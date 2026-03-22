@@ -72,7 +72,9 @@ class ProjectConfigRepository:
         )
         return result.scalars().first()
 
-    async def create(self, project: ProjectConfig, workspace_server_ids: list[int] | None = None) -> ProjectConfig:
+    async def create(
+        self, project: ProjectConfig, workspace_server_ids: list[int] | None = None
+    ) -> ProjectConfig:
         self._session.add(project)
         await self._session.flush()  # get project_id populated before inserting join rows
         if workspace_server_ids:
