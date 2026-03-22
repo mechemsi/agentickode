@@ -18,7 +18,11 @@ class WorkspaceServerRepository:
         self._session = session
 
     async def list_all(self) -> list[WorkspaceServer]:
-        result = await self._session.execute(select(WorkspaceServer).order_by(WorkspaceServer.name))
+        result = await self._session.execute(
+            select(WorkspaceServer)
+            .options(selectinload(WorkspaceServer.server_group))
+            .order_by(WorkspaceServer.name)
+        )
         return list(result.scalars().all())
 
     async def get_by_id(self, server_id: int) -> WorkspaceServer | None:
@@ -28,7 +32,10 @@ class WorkspaceServerRepository:
         result = await self._session.execute(
             select(WorkspaceServer)
             .where(WorkspaceServer.id == server_id)
-            .options(selectinload(WorkspaceServer.agents))
+            .options(
+                selectinload(WorkspaceServer.agents),
+                selectinload(WorkspaceServer.server_group),
+            )
         )
         return result.scalar_one_or_none()
 
