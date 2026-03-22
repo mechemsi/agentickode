@@ -33,6 +33,15 @@ class SessionService:
         """Create a tmux session and launch an agent inside it."""
         tmux_name = tmux_name or f"{agent_name}-{session_id[:8]}"
 
+        # Ensure tmux is installed
+        _out, _err, rc_check = await self._ssh.run_command("command -v tmux")
+        if rc_check != 0:
+            await self._ssh.run_command(
+                "apt-get update -qq && apt-get install -y -qq tmux >/dev/null 2>&1 "
+                "|| yum install -y -q tmux 2>/dev/null "
+                "|| apk add --no-cache tmux 2>/dev/null"
+            )
+
         # Create tmux session
         stdout, stderr, rc = await self._ssh.run_command(
             f"tmux new-session -d -s {shlex.quote(tmux_name)} -x 200 -y 50"
