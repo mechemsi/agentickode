@@ -42,6 +42,7 @@ import {
 import { useConfirm } from "../components/shared/ConfirmDialog";
 import AgentManagementPanel from "../components/servers/AgentManagementPanel";
 import DockerPanel from "../components/servers/DockerPanel";
+import SessionsPanel from "../components/servers/SessionsPanel";
 import GitAccessPanel from "../components/servers/GitAccessPanel";
 import GitConnectionsPanel from "../components/servers/GitConnectionsPanel";
 import ProjectsPanel from "../components/servers/ProjectsPanel";
@@ -157,6 +158,7 @@ export default function WorkspaceServers() {
   const [sshConfigExpanded, setSshConfigExpanded] = useState<Set<number>>(new Set());
   const [setupExpanded, setSetupExpanded] = useState<Set<number>>(new Set());
   const [dockerExpanded, setDockerExpanded] = useState<Set<number>>(new Set());
+  const [sessionsExpanded, setSessionsExpanded] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [deployingKey, setDeployingKey] = useState<number | null>(null);
   const [deployPassword, setDeployPassword] = useState("");
@@ -565,6 +567,13 @@ export default function WorkspaceServers() {
                       {dockerExpanded.has(s.id) ? "Close Docker" : "Docker"}
                     </button>
                     <button
+                      onClick={() => toggleSet(setSessionsExpanded, s.id)}
+                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                    >
+                      <SquareTerminal className="w-3 h-3" />
+                      {sessionsExpanded.has(s.id) ? "Close Sessions" : "Sessions"}
+                    </button>
+                    <button
                       onClick={() => handleTest(s.id)}
                       disabled={busyAction === `test-${s.id}`}
                       className="text-xs text-gray-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
@@ -721,6 +730,11 @@ export default function WorkspaceServers() {
                 {dockerExpanded.has(s.id) && (
                   <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
                     <DockerPanel serverId={s.id} />
+                  </div>
+                )}
+                {sessionsExpanded.has(s.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+                    <SessionsPanel serverId={s.id} workerUser={s.worker_user} />
                   </div>
                 )}
                 {sshConfigExpanded.has(s.id) && (

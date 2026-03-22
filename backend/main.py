@@ -42,6 +42,7 @@ from backend.api.servers import (
     git_access_router,
     server_groups_router,
     server_projects_router,
+    sessions_router,
     ssh_keys_router,
     worker_user_router,
     workspace_servers_router,
@@ -184,6 +185,31 @@ async def _run_migrations() -> None:
         "ALTER TABLE workspace_servers ADD COLUMN server_group_id INTEGER "
         "REFERENCES server_groups(id) ON DELETE SET NULL"
     )
+    # cli_sessions table for persistent CLI agent sessions
+    await _run_migration_step("""
+        CREATE TABLE IF NOT EXISTS cli_sessions (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL UNIQUE,
+            workspace_server_id INT NOT NULL REFERENCES workspace_servers(id) ON DELETE CASCADE,
+            project_id TEXT REFERENCES project_configs(project_id) ON DELETE SET NULL,
+            task_run_id INT REFERENCES task_runs(id) ON DELETE SET NULL,
+            agent_name TEXT NOT NULL,
+            user_context TEXT NOT NULL DEFAULT 'coder',
+            workspace_path TEXT,
+            display_name TEXT,
+            tmux_session TEXT NOT NULL,
+            pid INT,
+            status TEXT NOT NULL DEFAULT 'starting',
+            remote_control_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            remote_control_port INT,
+            started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            closed_at TIMESTAMPTZ,
+            metadata JSONB,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
 
 
 @asynccontextmanager
@@ -250,6 +276,7 @@ app.include_router(role_configs.router, prefix="/api")
 app.include_router(workflow_templates.router, prefix="/api")
 app.include_router(webhook_callbacks.router, prefix="/api")
 app.include_router(worker_user_router, prefix="/api")
+app.include_router(sessions_router, prefix="/api")
 app.include_router(app_settings.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")

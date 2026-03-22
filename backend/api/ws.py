@@ -7,6 +7,8 @@
 import asyncio
 import json
 import logging
+import shlex
+from datetime import UTC, datetime
 
 import asyncssh
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -82,8 +84,6 @@ async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = N
     # Determine shell command based on user selection
     shell_cmd = "bash"
     if user == "worker" and server.worker_user:
-        import shlex
-
         shell_cmd = f"runuser -l {server.worker_user} -c {shlex.quote('bash')}"
 
     try:
@@ -195,17 +195,15 @@ async def ws_run_terminal(websocket: WebSocket, run_id: int):
         full_path = f"{workspace_root}/{workspace_path}".rstrip("/")
 
     coding_results = run.coding_results or {}
-    session_id = coding_results.get("session_id")
+    run_session_id = coding_results.get("session_id")
 
-    if session_id:
-        shell_cmd = f"cd {full_path} && claude --resume {session_id}"
+    if run_session_id:
+        shell_cmd = f"cd {full_path} && claude --resume {run_session_id}"
     else:
         shell_cmd = f"cd {full_path} && bash"
 
     worker_user = server.worker_user
     if worker_user:
-        import shlex
-
         shell_cmd = f"runuser -l {worker_user} -c {shlex.quote(shell_cmd)}"
 
     try:
@@ -255,3 +253,118 @@ async def ws_run_terminal(websocket: WebSocket, run_id: int):
     finally:
         process.close()
         conn.close()
+
+
+@router.websocket("/ws/sessions/{session_id}/terminal")
+async def ws_session_terminal(websocket: WebSocket, session_id: str):
+    """Attach a browser xterm.js session to an existing tmux-managed CLI session."""
+    await websocket.accept()
+
+    # Load session from DB
+    async with async_session() as db:
+        from backend.models.sessions import CliSession
+
+        result = await db.execute(select(CliSession).where(CliSession.session_id == session_id))
+        cli_session = result.scalar_one_or_none()
+
+    if not cli_session:
+        await websocket.send_text(json.dumps({"type": "output", "data": "Session not found.\r\n"}))
+        await websocket.close()
+        return
+
+    if cli_session.status == "closed":
+        await websocket.send_text(json.dumps({"type": "output", "data": "Session is closed.\r\n"}))
+        await websocket.close()
+        return
+
+    # Load workspace server
+    async with async_session() as db:
+        result = await db.execute(
+            select(WorkspaceServer).where(WorkspaceServer.id == cli_session.workspace_server_id)
+        )
+        server = result.scalar_one_or_none()
+
+    if not server:
+        await websocket.send_text(json.dumps({"type": "output", "data": "Server not found.\r\n"}))
+        await websocket.close()
+        return
+
+    # Connect via SSH
+    ssh = SSHService.for_server(server)
+    try:
+        conn = await ssh._connect()
+    except Exception as exc:
+        await websocket.send_text(
+            json.dumps({"type": "output", "data": f"SSH connection failed: {exc}\r\n"})
+        )
+        await websocket.close()
+        return
+
+    # Attach to tmux session
+    tmux_cmd = f"tmux attach-session -t {shlex.quote(cli_session.tmux_session)}"
+
+    try:
+        process = await conn.create_process(
+            tmux_cmd,
+            term_type="xterm-256color",
+            term_size=(120, 40),
+        )
+    except Exception as exc:
+        await websocket.send_text(
+            json.dumps({"type": "output", "data": f"Failed to attach to session: {exc}\r\n"})
+        )
+        conn.close()
+        await websocket.close()
+        return
+
+    # Update session status to active
+    async with async_session() as db:
+        result = await db.execute(select(CliSession).where(CliSession.session_id == session_id))
+        s = result.scalar_one_or_none()
+        if s:
+            s.status = "active"
+            s.last_activity_at = datetime.now(UTC)
+            await db.commit()
+
+    # Bridge SSH PTY <-> WebSocket (same pattern as existing ws_terminal)
+    async def ssh_to_ws():
+        try:
+            while True:
+                data = await process.stdout.read(4096)
+                if not data:
+                    break
+                await websocket.send_text(json.dumps({"type": "output", "data": data}))
+        except (asyncssh.BreakReceived, asyncssh.SignalReceived, asyncssh.TerminalSizeChanged):
+            pass
+        except Exception:
+            pass
+
+    async def ws_to_ssh():
+        try:
+            while True:
+                raw = await websocket.receive_text()
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    process.stdin.write(msg["data"])
+                elif msg.get("type") == "resize":
+                    process.change_terminal_size(msg.get("cols", 120), msg.get("rows", 40))
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+
+    read_task = asyncio.create_task(ssh_to_ws())
+    write_task = asyncio.create_task(ws_to_ssh())
+    try:
+        await asyncio.gather(read_task, write_task, return_exceptions=True)
+    finally:
+        process.close()
+        conn.close()
+        # Mark session as detached on disconnect
+        async with async_session() as db:
+            result = await db.execute(select(CliSession).where(CliSession.session_id == session_id))
+            s = result.scalar_one_or_none()
+            if s and s.status == "active":
+                s.status = "detached"
+                s.last_activity_at = datetime.now(UTC)
+                await db.commit()

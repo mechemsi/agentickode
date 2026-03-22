@@ -9,7 +9,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 
-export default function TerminalPanel({ serverId, user }: { serverId: number; user?: string }) {
+export default function TerminalPanel({ serverId, user, sessionId }: { serverId: number; user?: string; sessionId?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
 
@@ -37,10 +37,14 @@ export default function TerminalPanel({ serverId, user }: { serverId: number; us
     fitAddon.fit();
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const userParam = user ? `?user=${user}` : "";
-    const ws = new WebSocket(
-      `${proto}//${window.location.host}/ws/servers/${serverId}/terminal${userParam}`,
-    );
+    let wsUrl: string;
+    if (sessionId) {
+      wsUrl = `${proto}//${window.location.host}/ws/sessions/${sessionId}/terminal`;
+    } else {
+      const userParam = user ? `?user=${user}` : "";
+      wsUrl = `${proto}//${window.location.host}/ws/servers/${serverId}/terminal${userParam}`;
+    }
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       ws.send(
@@ -84,7 +88,7 @@ export default function TerminalPanel({ serverId, user }: { serverId: number; us
       ws.close();
       term.dispose();
     };
-  }, [serverId, user]);
+  }, [serverId, user, sessionId]);
 
   return (
     <div

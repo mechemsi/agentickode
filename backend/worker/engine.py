@@ -26,6 +26,7 @@ from backend.services.git.protocol import get_git_provider
 from backend.services.http_client import get_http_client
 from backend.services.queue_service import queue_service
 from backend.services.schedule import is_within_schedule
+from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_project_token
 from backend.worker.pipeline import execute_pipeline
@@ -36,6 +37,7 @@ logger = logging.getLogger("agentickode.worker")
 class WorkerEngine:
     SCHEDULE_CACHE_TTL = 60  # seconds
     PR_CHECK_INTERVAL = 3600  # seconds
+    SESSION_CHECK_INTERVAL = 30  # seconds
 
     def __init__(self):
         self._running = False
@@ -44,6 +46,7 @@ class WorkerEngine:
         self._schedule_cache: dict | None = None
         self._schedule_loaded_at: float = 0.0
         self._pr_check_last_run: float = 0.0
+        self._session_check_last_run: float = 0.0
 
     def _get_services(self) -> ServiceContainer:
         if self._services is None:
@@ -129,6 +132,14 @@ class WorkerEngine:
             self._pr_check_last_run = now
             async with async_session() as session:
                 await self._check_pr_statuses(session)
+
+        if now - self._session_check_last_run >= self.SESSION_CHECK_INTERVAL:
+            self._session_check_last_run = now
+            try:
+                async with async_session() as session:
+                    await self._check_sessions(session)
+            except Exception:
+                logger.exception("Session health check failed")
 
     async def _dispatch_pending(self, session):
         available_slots = settings.max_concurrent_runs - len(self._active_runs)
@@ -342,3 +353,52 @@ class WorkerEngine:
                 run.approved = False
                 run.rejection_reason = "PR was closed in git provider"
                 await session.commit()
+
+    async def _check_sessions(self, session):
+        """Check health of active CLI sessions by verifying tmux on remote servers."""
+        from backend.models.sessions import CliSession
+
+        result = await session.execute(
+            select(CliSession).where(
+                CliSession.status.in_(["starting", "active", "idle", "detached"])
+            )
+        )
+        sessions_list = result.scalars().all()
+        if not sessions_list:
+            return
+
+        # Group by server
+        by_server: dict[int, list] = {}
+        for s in sessions_list:
+            by_server.setdefault(s.workspace_server_id, []).append(s)
+
+        for server_id, cli_sessions in by_server.items():
+            try:
+                server = await session.get(WorkspaceServer, server_id)
+                if not server:
+                    for cs in cli_sessions:
+                        cs.status = "error"
+                        cs.closed_at = datetime.now(UTC)
+                    continue
+
+                ssh = SSHService.for_server(server)
+                # Get list of active tmux sessions in one SSH call
+                try:
+                    stdout, _stderr, _exit_code = await ssh.run_command(
+                        "tmux list-sessions -F '#{session_name}' 2>/dev/null || true"
+                    )
+                    active_tmux = set(stdout.strip().split("\n")) if stdout.strip() else set()
+                except Exception:
+                    active_tmux = set()
+
+                for cs in cli_sessions:
+                    if cs.tmux_session not in active_tmux:
+                        logger.info(
+                            f"Session {cs.session_id} ({cs.tmux_session}) tmux died, marking closed"
+                        )
+                        cs.status = "closed"
+                        cs.closed_at = datetime.now(UTC)
+            except Exception:
+                logger.warning(f"Failed to check sessions on server {server_id}", exc_info=True)
+
+        await session.commit()

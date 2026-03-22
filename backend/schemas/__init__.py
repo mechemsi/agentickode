@@ -155,6 +155,13 @@ from backend.schemas.servers import (
     WorkspaceServerOut,
     WorkspaceServerUpdate,
 )
+from backend.schemas.sessions import (
+    CliSessionCreate,
+    CliSessionOut,
+    SessionCaptureResponse,
+    SessionSendRequest,
+    SessionSendResponse,
+)
 from backend.schemas.webhooks import (
     WebhookCallbackCreate,
     WebhookCallbackOut,
@@ -189,6 +196,8 @@ __all__ = [
     "AgentSettingsOut",
     "AgentStat",
     "AnalyticsSummary",
+    "CliSessionCreate",
+    "CliSessionOut",
     "ConflictResolution",
     "ContainerInspectResponse",
     "ContainerLogsResponse",
@@ -276,6 +285,9 @@ __all__ = [
     "ServerGroupSetToken",
     "ServerGroupUpdate",
     "ServiceHealth",
+    "SessionCaptureResponse",
+    "SessionSendRequest",
+    "SessionSendResponse",
     "StatsResponse",
     "TaskLogOut",
     "TaskRunDetail",
