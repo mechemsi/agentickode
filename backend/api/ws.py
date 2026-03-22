@@ -54,7 +54,7 @@ async def ws_global_events(websocket: WebSocket):
 
 
 @router.websocket("/ws/servers/{server_id}/terminal")
-async def ws_terminal(websocket: WebSocket, server_id: int):
+async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = None):
     """Bridge a browser xterm.js session to an SSH PTY on the workspace server."""
     await websocket.accept()
 
@@ -79,9 +79,16 @@ async def ws_terminal(websocket: WebSocket, server_id: int):
         await websocket.close()
         return
 
+    # Determine shell command based on user selection
+    shell_cmd = "bash"
+    if user == "worker" and server.worker_user:
+        import shlex
+
+        shell_cmd = f"runuser -l {server.worker_user} -c {shlex.quote('bash')}"
+
     try:
         process = await conn.create_process(
-            "bash",
+            shell_cmd,
             term_type="xterm-256color",
             term_size=(120, 40),
         )

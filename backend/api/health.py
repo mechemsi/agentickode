@@ -16,6 +16,7 @@ from backend.repositories.ollama_server_repo import OllamaServerRepository
 from backend.repositories.task_run_repo import TaskRunRepository
 from backend.services.http_client import get_http_client
 from backend.services.openhands_service import OpenHandsService
+from backend.services.queue_service import queue_service
 
 router = APIRouter(tags=["health"])
 
@@ -83,3 +84,9 @@ async def health(db: AsyncSession = Depends(get_db)):
         "worker_running": True,
         "active_runs": active,
     }
+
+
+@router.get("/queue/status")
+async def get_queue_status():
+    """Get Redis-backed queue status with per-server load info."""
+    return await queue_service.get_queue_status()

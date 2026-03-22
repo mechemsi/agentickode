@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # App
     app_base_url: str = "http://localhost:5173"
 
+    # Redis
+    redis_url: str = "redis://redis:6379/0"
+
     # Worker
     max_concurrent_runs: int = 3
     poll_interval_seconds: int = 2

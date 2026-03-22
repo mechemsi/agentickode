@@ -38,7 +38,9 @@ from backend.api import (
 )
 from backend.api.servers import (
     agent_management_router,
+    docker_management_router,
     git_access_router,
+    server_groups_router,
     server_projects_router,
     ssh_keys_router,
     worker_user_router,
@@ -50,6 +52,7 @@ from backend.database import engine as db_engine
 from backend.seed import seed_all
 from backend.services.http_client import close_http_client
 from backend.services.notifications.dispatcher import NotificationDispatcher
+from backend.services.queue_service import queue_service
 from backend.worker.engine import WorkerEngine
 
 logger = logging.getLogger("agentickode")
@@ -162,6 +165,25 @@ async def _run_migrations() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
+    await _run_migration_step(
+        "ALTER TABLE workspace_servers ADD COLUMN max_concurrent_tasks INTEGER NOT NULL DEFAULT 1"
+    )
+    # Server groups table and FK
+    await _run_migration_step("""
+        CREATE TABLE IF NOT EXISTS server_groups (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            git_token_encrypted TEXT,
+            git_provider_type TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    await _run_migration_step(
+        "ALTER TABLE workspace_servers ADD COLUMN server_group_id INTEGER "
+        "REFERENCES server_groups(id) ON DELETE SET NULL"
+    )
 
 
 @asynccontextmanager
@@ -172,6 +194,7 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting agentickode backend")
     await _run_migrations()
+    await queue_service.connect()
     from backend.database import async_session
 
     async with async_session() as db:
@@ -186,6 +209,7 @@ async def lifespan(app: FastAPI):
     with contextlib.suppress(asyncio.CancelledError):
         await worker_task
     await close_http_client()
+    await queue_service.close()
 
 
 app = FastAPI(title="AgenticKode", version="1.0.0", lifespan=lifespan)
@@ -215,6 +239,8 @@ app.include_router(ws_discovery_router, prefix="/api")
 app.include_router(ws_ops_router, prefix="/api")
 app.include_router(git_access_router, prefix="/api")
 app.include_router(agent_management_router, prefix="/api")
+app.include_router(docker_management_router, prefix="/api")
+app.include_router(server_groups_router, prefix="/api")
 app.include_router(server_projects_router, prefix="/api")
 app.include_router(ollama_servers.router, prefix="/api")
 app.include_router(llm_roles.router, prefix="/api")

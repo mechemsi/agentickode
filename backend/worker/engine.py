@@ -19,10 +19,12 @@ from backend.config import settings
 from backend.database import async_session
 from backend.dependencies import get_service_container
 from backend.models import PhaseExecution, TaskRun
+from backend.models.servers import WorkspaceServer
 from backend.repositories.app_setting_repo import AppSettingRepository
 from backend.services.container import ServiceContainer
 from backend.services.git.protocol import get_git_provider
 from backend.services.http_client import get_http_client
+from backend.services.queue_service import queue_service
 from backend.services.schedule import is_within_schedule
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_project_token
@@ -82,8 +84,12 @@ class WorkerEngine:
             result = await session.execute(select(TaskRun).where(TaskRun.status == "running"))
             interrupted = result.scalars().all()
             if not interrupted:
+                # Still clean up stale Redis entries even when no DB runs are interrupted
+                await queue_service.cleanup_stale_entries(set())
                 return
+            interrupted_ids: set[int] = set()
             for run in interrupted:
+                interrupted_ids.add(run.id)
                 # Reset any phase that was mid-execution back to pending
                 phase_result = await session.execute(
                     select(PhaseExecution).where(
@@ -97,6 +103,13 @@ class WorkerEngine:
                 run.status = "pending"
                 logger.info(f"Recovered interrupted run #{run.id}, resetting to pending")
             await session.commit()
+
+            # Sync Redis state: only keep runs that are genuinely active
+            active_result = await session.execute(
+                select(TaskRun.id).where(TaskRun.status.in_(("running", "pending")))
+            )
+            valid_ids = {r[0] for r in active_result.all()}
+            await queue_service.cleanup_stale_entries(valid_ids)
 
     async def _tick(self):
         # Cleanup completed/failed tasks from active set
@@ -144,6 +157,9 @@ class WorkerEngine:
         schedule = await self._get_schedule(session)
         within_schedule = is_within_schedule(schedule)
 
+        # Cache server concurrency limits per tick to avoid repeated DB lookups
+        server_limits: dict[int, int] = {}
+
         # Only dispatch one run per (project, workspace) pair per tick to avoid racing
         dispatched_workspaces: set[tuple[str, int | None]] = set()
         dispatched_count = 0
@@ -159,6 +175,17 @@ class WorkerEngine:
                 meta = run.task_source_meta or {}
                 if not meta.get("skip_schedule", False):
                     continue  # blocked by schedule
+
+            # Check per-server concurrency limit
+            sid = run.workspace_server_id
+            if sid:
+                if sid not in server_limits:
+                    server = await session.get(WorkspaceServer, sid)
+                    server_limits[sid] = server.max_concurrent_tasks if server else 1
+                active_on_server = await queue_service.get_server_active_count(sid)
+                if active_on_server >= server_limits[sid]:
+                    continue  # server at capacity
+
             dispatched_workspaces.add(dispatch_key)
             dispatched_count += 1
             logger.info(f"Dispatching run #{run.id}: {run.title}")
@@ -167,10 +194,14 @@ class WorkerEngine:
 
     async def _run_pipeline(self, run_id: int):
         """Execute pipeline with its own session."""
+        server_id: int | None = None
         async with async_session() as session:
             run = await session.get(TaskRun, run_id)
             if not run or run.status != "pending":
                 return
+            server_id = int(run.workspace_server_id) if run.workspace_server_id else None
+            if server_id:
+                await queue_service.mark_run_started(run_id, server_id)
             try:
                 await execute_pipeline(run, session, self._get_services())
             except Exception:
@@ -180,6 +211,9 @@ class WorkerEngine:
                 run.error_message = "Unhandled pipeline error"
                 run.completed_at = datetime.now(UTC)
                 await session.commit()
+            finally:
+                if server_id:
+                    await queue_service.mark_run_completed(run_id, server_id)
 
     async def _handle_waiting(self, session):
         """Pick up runs where a waiting phase can now be resumed."""

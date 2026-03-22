@@ -36,7 +36,11 @@ class WorkspaceServer(Base):
     worker_user_status = Column(Text, nullable=True)
     worker_user_error = Column(Text, nullable=True)
     worker_user_password = Column(Text, nullable=True)
+    max_concurrent_tasks = Column(Integer, nullable=False, server_default="1")
     setup_log = Column(JSONB, nullable=True)
+    server_group_id = Column(
+        Integer, ForeignKey("server_groups.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
@@ -48,6 +52,7 @@ class WorkspaceServer(Base):
     project_workspace_servers = relationship(
         "ProjectWorkspaceServer", back_populates="workspace_server", cascade="all, delete-orphan"
     )
+    server_group = relationship("ServerGroup", back_populates="servers")
 
 
 class DiscoveredAgent(Base):

@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  Box,
   ChevronDown,
   ChevronRight,
   ClipboardCopy,
@@ -25,10 +26,13 @@ import {
   Wifi,
 } from "lucide-react";
 import {
+  addServerToGroup,
   createWorkspaceServer,
   deleteWorkspaceServer,
   deployKeyToServer,
+  getServerGroups,
   getWorkspaceServers,
+  removeServerFromGroup,
   retryServerSetup,
   scanWorkspaceServer,
   setWorkerUserPassword,
@@ -37,14 +41,16 @@ import {
 } from "../api";
 import { useConfirm } from "../components/shared/ConfirmDialog";
 import AgentManagementPanel from "../components/servers/AgentManagementPanel";
+import DockerPanel from "../components/servers/DockerPanel";
 import GitAccessPanel from "../components/servers/GitAccessPanel";
 import GitConnectionsPanel from "../components/servers/GitConnectionsPanel";
 import ProjectsPanel from "../components/servers/ProjectsPanel";
+import ServerGroupPanel from "../components/servers/ServerGroupPanel";
 import ServerHistoryPanel from "../components/servers/ServerHistoryPanel";
 import WorkspaceServerForm from "../components/servers/WorkspaceServerForm";
 import TerminalPanel from "../components/runs/TerminalPanel";
 import { useToast } from "../components/shared/Toast";
-import type { WorkspaceServer as WSType } from "../types";
+import type { ServerGroup, WorkspaceServer as WSType } from "../types";
 import { generateSSHConfig } from "../utils/vscode";
 
 const statusColor: Record<string, string> = {
@@ -150,6 +156,7 @@ export default function WorkspaceServers() {
   const [gitTokensExpanded, setGitTokensExpanded] = useState<Set<number>>(new Set());
   const [sshConfigExpanded, setSshConfigExpanded] = useState<Set<number>>(new Set());
   const [setupExpanded, setSetupExpanded] = useState<Set<number>>(new Set());
+  const [dockerExpanded, setDockerExpanded] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [deployingKey, setDeployingKey] = useState<number | null>(null);
   const [deployPassword, setDeployPassword] = useState("");
@@ -157,8 +164,10 @@ export default function WorkspaceServers() {
   const [workerPassword, setWorkerPassword] = useState("");
   const [workerPasswordLoading, setWorkerPasswordLoading] = useState(false);
   const [showPassword, setShowPassword] = useState<number | null>(null);
+  const [terminalUser, setTerminalUser] = useState<Record<number, string>>({});
   const [busyAction, setBusyAction] = useState<string | null>(null); // "test-3", "scan-3", etc.
   const [initialLoading, setInitialLoading] = useState(true);
+  const [groups, setGroups] = useState<ServerGroup[]>([]);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -170,6 +179,13 @@ export default function WorkspaceServers() {
       return next;
     });
 
+  const loadGroups = async () => {
+    try {
+      const data = await getServerGroups();
+      setGroups(data);
+    } catch { /* ignore */ }
+  };
+
   const load = async (check?: boolean) => {
     const data = await getWorkspaceServers(check);
     setServers(data);
@@ -177,10 +193,27 @@ export default function WorkspaceServers() {
   };
   useEffect(() => {
     load(true); // Check connectivity on first load
+    loadGroups();
     // Poll for setup progress (without re-pinging each time)
     const interval = setInterval(() => load(), 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleGroupChange = async (serverId: number, groupId: number | null, currentGroupId: number | null) => {
+    try {
+      if (currentGroupId) {
+        await removeServerFromGroup(currentGroupId, serverId);
+      }
+      if (groupId) {
+        await addServerToGroup(groupId, serverId);
+      }
+      toast.success("Group assignment updated");
+      load();
+      loadGroups();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update group");
+    }
+  };
 
   const handleCreate = async (data: Record<string, unknown>) => {
     setLoading(true);
@@ -341,6 +374,8 @@ export default function WorkspaceServers() {
         </div>
       </div>
 
+      <ServerGroupPanel onGroupsChanged={() => { loadGroups(); load(); }} />
+
       {adding && (
         <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 mb-4 animate-fade-in">
           {error && (
@@ -405,6 +440,20 @@ export default function WorkspaceServers() {
                         )}
                       </span>
                     )}
+                    <select
+                      value={s.server_group_id ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        handleGroupChange(s.id, val, s.server_group_id);
+                      }}
+                      className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                      title="Server group"
+                    >
+                      <option value="">No group</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     {s.setup_log && (
@@ -471,12 +520,49 @@ export default function WorkspaceServers() {
                       <Monitor className="w-3 h-3" />
                       VS Code
                     </button>
+                    {!terminalExpanded.has(s.id) ? (
+                      <div className="relative inline-flex">
+                        <button
+                          onClick={() => {
+                            setTerminalUser((prev) => ({ ...prev, [s.id]: "root" }));
+                            toggleSet(setTerminalExpanded, s.id);
+                          }}
+                          className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded-l hover:bg-gray-700/50 transition-colors"
+                        >
+                          <SquareTerminal className="w-3 h-3" />
+                          Terminal
+                        </button>
+                        {s.worker_user && (
+                          <select
+                            value={terminalUser[s.id] || "root"}
+                            onChange={(e) => {
+                              setTerminalUser((prev) => ({ ...prev, [s.id]: e.target.value }));
+                              if (!terminalExpanded.has(s.id)) {
+                                toggleSet(setTerminalExpanded, s.id);
+                              }
+                            }}
+                            className="text-xs bg-gray-800 text-gray-400 border-l border-gray-600 px-1 py-1 rounded-r hover:bg-gray-700/50 cursor-pointer"
+                          >
+                            <option value="root">root</option>
+                            <option value="worker">{s.worker_user}</option>
+                          </select>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => toggleSet(setTerminalExpanded, s.id)}
+                        className="text-xs text-orange-400 hover:text-orange-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                      >
+                        <SquareTerminal className="w-3 h-3" />
+                        Close Terminal
+                      </button>
+                    )}
                     <button
-                      onClick={() => toggleSet(setTerminalExpanded, s.id)}
+                      onClick={() => toggleSet(setDockerExpanded, s.id)}
                       className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
                     >
-                      <SquareTerminal className="w-3 h-3" />
-                      {terminalExpanded.has(s.id) ? "Close Terminal" : "Terminal"}
+                      <Box className="w-3 h-3" />
+                      {dockerExpanded.has(s.id) ? "Close Docker" : "Docker"}
                     </button>
                     <button
                       onClick={() => handleTest(s.id)}
@@ -602,12 +688,39 @@ export default function WorkspaceServers() {
                 )}
                 {terminalExpanded.has(s.id) && (
                   <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <TerminalPanel serverId={s.id} />
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs text-gray-500">
+                        Connected as: <span className="text-gray-300">{terminalUser[s.id] === "worker" ? s.worker_user : "root"}</span>
+                      </span>
+                      {s.worker_user && (
+                        <button
+                          onClick={() => {
+                            const newUser = terminalUser[s.id] === "worker" ? "root" : "worker";
+                            setTerminalUser((prev) => ({ ...prev, [s.id]: newUser }));
+                            setTerminalExpanded((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
+                            setTimeout(() => setTerminalExpanded((prev) => new Set(prev).add(s.id)), 50);
+                          }}
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          Switch to {terminalUser[s.id] === "worker" ? "root" : s.worker_user}
+                        </button>
+                      )}
+                    </div>
+                    <TerminalPanel
+                      serverId={s.id}
+                      user={terminalUser[s.id] || "root"}
+                      key={`terminal-${s.id}-${terminalUser[s.id] || "root"}`}
+                    />
                   </div>
                 )}
                 {historyExpanded.has(s.id) && (
                   <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
                     <ServerHistoryPanel serverId={s.id} />
+                  </div>
+                )}
+                {dockerExpanded.has(s.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+                    <DockerPanel serverId={s.id} />
                   </div>
                 )}
                 {sshConfigExpanded.has(s.id) && (

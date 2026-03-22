@@ -17,6 +17,8 @@ class WorkspaceServerCreate(BaseModel):
     worker_user: str | None = "coder"
     workspace_root: str | None = None  # if set, use this instead of auto-creating
     setup_password: str | None = None  # transient — used to deploy SSH key, never stored
+    max_concurrent_tasks: int = 1
+    server_group_id: int | None = None
 
 
 class WorkspaceServerUpdate(BaseModel):
@@ -27,6 +29,8 @@ class WorkspaceServerUpdate(BaseModel):
     ssh_key_path: str | None = None
     worker_user: str | None = None
     workspace_root: str | None = None
+    max_concurrent_tasks: int | None = None
+    server_group_id: int | None = None
 
 
 class DiscoveredAgentOut(BaseModel):
@@ -104,9 +108,12 @@ class WorkspaceServerOut(BaseModel):
     worker_user: str | None = None
     worker_user_status: str | None = None
     worker_user_password: str | None = None
+    max_concurrent_tasks: int = 1
     setup_log: dict[str, Any] | None = None
     agent_count: int = 0
     project_count: int = 0
+    server_group_id: int | None = None
+    server_group_name: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -31,6 +31,9 @@ def _get_repo(db: AsyncSession = Depends(get_db)) -> WorkspaceServerRepository:
 
 
 def _server_to_out(server: WorkspaceServer, agent_count: int, project_count: int):
+    group_name = None
+    if server.server_group_id and hasattr(server, "server_group") and server.server_group:
+        group_name = server.server_group.name
     return WorkspaceServerOut(
         id=server.id,
         name=server.name,
@@ -47,6 +50,8 @@ def _server_to_out(server: WorkspaceServer, agent_count: int, project_count: int
         setup_log=server.setup_log,
         agent_count=agent_count,
         project_count=project_count,
+        server_group_id=server.server_group_id,
+        server_group_name=group_name,
         created_at=server.created_at,
         updated_at=server.updated_at,
     )
@@ -65,6 +70,9 @@ async def _ping_server(server: WorkspaceServer) -> tuple[int, bool, str | None]:
 
 
 def _server_to_detail(server: WorkspaceServer, ac: int, pc: int) -> WorkspaceServerDetail:
+    group_name = None
+    if server.server_group_id and hasattr(server, "server_group") and server.server_group:
+        group_name = server.server_group.name
     return WorkspaceServerDetail(
         id=server.id,
         name=server.name,
@@ -81,6 +89,8 @@ def _server_to_detail(server: WorkspaceServer, ac: int, pc: int) -> WorkspaceSer
         setup_log=server.setup_log,
         agent_count=ac,
         project_count=pc,
+        server_group_id=server.server_group_id,
+        server_group_name=group_name,
         created_at=server.created_at,
         updated_at=server.updated_at,
         agents=[

@@ -25,6 +25,8 @@ export interface WorkspaceServer {
   setup_log: Record<string, SetupStepEntry> | null;
   agent_count: number;
   project_count: number;
+  server_group_id: number | null;
+  server_group_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,4 +85,76 @@ export interface WorkerUserStatus {
   status: string | null;
   error: string | null;
   agents: string[];
+}
+
+// Docker management types
+export interface DockerContainer {
+  id: string;
+  names: string;
+  image: string;
+  status: string;
+  state: string;
+  ports: string;
+  created_at: string | null;
+  size: string | null;
+}
+
+export interface DockerImage {
+  id: string;
+  repository: string;
+  tag: string;
+  size: string;
+  created_at: string | null;
+}
+
+export interface DockerVolume {
+  name: string;
+  driver: string;
+  mountpoint: string | null;
+}
+
+export interface DockerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+}
+
+export interface DockerComposeStack {
+  name: string;
+  status: string;
+  config_files: string | null;
+}
+
+export interface DockerOverview {
+  containers: DockerContainer[];
+  images: DockerImage[];
+  volumes: DockerVolume[];
+  networks: DockerNetwork[];
+  stacks: DockerComposeStack[];
+  disk_usage: string;
+}
+
+export interface PruneResult {
+  output: string;
+}
+
+export interface ServerGroup {
+  id: number;
+  name: string;
+  description: string | null;
+  git_provider_type: string | null;
+  has_git_token: boolean;
+  server_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServerGroupDetail extends ServerGroup {
+  servers: { id: number; name: string; hostname: string; status: string }[];
+}
+
+export interface ServerGroupCreate {
+  name: string;
+  description?: string;
 }

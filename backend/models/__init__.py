@@ -19,6 +19,7 @@ from backend.models.ollama import OllamaServer
 from backend.models.projects import ProjectConfig, ProjectWorkspaceServer
 from backend.models.roles import RoleAssignment
 from backend.models.runs import AgentInvocation, PhaseExecution, TaskLog, TaskRun
+from backend.models.server_groups import ServerGroup
 from backend.models.servers import DiscoveredAgent, WorkspaceServer
 from backend.models.settings import AppSetting
 from backend.models.workflows import WebhookCallback, WorkflowTemplate
@@ -45,6 +46,7 @@ __all__ = [
     "RoleConfig",
     "RolePromptOverride",
     "ScheduledTask",
+    "ServerGroup",
     "TaskLog",
     "TaskRun",
     "WebhookCallback",

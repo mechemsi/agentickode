@@ -9,7 +9,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 
-export default function TerminalPanel({ serverId }: { serverId: number }) {
+export default function TerminalPanel({ serverId, user }: { serverId: number; user?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
 
@@ -37,8 +37,9 @@ export default function TerminalPanel({ serverId }: { serverId: number }) {
     fitAddon.fit();
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const userParam = user ? `?user=${user}` : "";
     const ws = new WebSocket(
-      `${proto}//${window.location.host}/ws/servers/${serverId}/terminal`,
+      `${proto}//${window.location.host}/ws/servers/${serverId}/terminal${userParam}`,
     );
 
     ws.onopen = () => {
@@ -83,7 +84,7 @@ export default function TerminalPanel({ serverId }: { serverId: number }) {
       ws.close();
       term.dispose();
     };
-  }, [serverId]);
+  }, [serverId, user]);
 
   return (
     <div

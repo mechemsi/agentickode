@@ -228,13 +228,77 @@ class TestWorkerEngine:
         await db_session.commit()
 
         engine = WorkerEngine()
-        with patch.object(engine, "_run_pipeline", new_callable=AsyncMock):
+        mock_qs = AsyncMock()
+        mock_qs.get_server_active_count = AsyncMock(return_value=0)
+        with (
+            patch.object(engine, "_run_pipeline", new_callable=AsyncMock),
+            patch("backend.worker.engine.queue_service", mock_qs),
+        ):
             await engine._dispatch_pending(db_session)
 
         # Both runs should be dispatched since they target different workspace servers
         assert len(engine._active_runs) == 2
         assert run1.id in engine._active_runs
         assert run2.id in engine._active_runs
+
+    async def test_dispatch_blocked_by_server_concurrency(self, db_session, make_task_run):
+        """Runs are not dispatched when server is at max_concurrent_tasks capacity."""
+        from backend.models.servers import WorkspaceServer
+
+        db_session.add(
+            ProjectConfig(project_id="proj-qg", project_slug="qg", repo_owner="o", repo_name="r")
+        )
+        server = WorkspaceServer(name="srv-limit", hostname="10.0.0.1", max_concurrent_tasks=1)
+        db_session.add(server)
+        await db_session.flush()
+
+        run1 = make_task_run(
+            task_id="TASK-G1", project_id="proj-qg", status="pending", workspace_server_id=server.id
+        )
+        db_session.add(run1)
+        await db_session.commit()
+
+        engine = WorkerEngine()
+        mock_qs = AsyncMock()
+        # Server already has 1 active run (at capacity)
+        mock_qs.get_server_active_count = AsyncMock(return_value=1)
+        with (
+            patch.object(engine, "_run_pipeline", new_callable=AsyncMock),
+            patch("backend.worker.engine.queue_service", mock_qs),
+        ):
+            await engine._dispatch_pending(db_session)
+
+        # No runs dispatched because server is at max capacity
+        assert len(engine._active_runs) == 0
+
+    async def test_dispatch_allowed_when_server_has_capacity(self, db_session, make_task_run):
+        """Runs are dispatched when server has available capacity."""
+        from backend.models.servers import WorkspaceServer
+
+        db_session.add(
+            ProjectConfig(project_id="proj-qh", project_slug="qh", repo_owner="o", repo_name="r")
+        )
+        server = WorkspaceServer(name="srv-cap", hostname="10.0.0.2", max_concurrent_tasks=3)
+        db_session.add(server)
+        await db_session.flush()
+
+        run1 = make_task_run(
+            task_id="TASK-H1", project_id="proj-qh", status="pending", workspace_server_id=server.id
+        )
+        db_session.add(run1)
+        await db_session.commit()
+
+        engine = WorkerEngine()
+        mock_qs = AsyncMock()
+        # Server has 1 active, max is 3 — capacity available
+        mock_qs.get_server_active_count = AsyncMock(return_value=1)
+        with (
+            patch.object(engine, "_run_pipeline", new_callable=AsyncMock),
+            patch("backend.worker.engine.queue_service", mock_qs),
+        ):
+            await engine._dispatch_pending(db_session)
+
+        assert len(engine._active_runs) == 1
 
     async def test_handle_timeouts(self, db_session, make_task_run):
         project = ProjectConfig(
