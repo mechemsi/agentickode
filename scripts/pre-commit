@@ -219,7 +219,22 @@ if $HAS_FRONTEND; then
         fi
     fi
 
-    # 3b. Run related tests
+    # 3b. TypeScript type check (full project — tsc doesn't support per-file)
+    if [ -n "$RUN_FE" ] && [ "$RUN_FE" != "cd frontend &&" ]; then
+        if $RUN_FE npx tsc -b --noEmit 2>&1; then
+            ok "TypeScript type check"
+        else
+            fail "TypeScript type errors (run: npx tsc -b)"
+        fi
+    else
+        if (cd frontend && npx tsc -b --noEmit 2>&1); then
+            ok "TypeScript type check"
+        else
+            fail "TypeScript type errors (run: npx tsc -b)"
+        fi
+    fi
+
+    # 3c. Run related tests
     FE_TEST_FILES=""
     for f in $FRONTEND_TS; do
         basename=$(basename "$f" | sed 's/\.\(ts\|tsx\)$//')
