@@ -4,7 +4,7 @@
 
 ### Turn issues into pull requests with AI agents
 
-**Create an issue. AgenticKode clones your repo, plans the work, writes the code, runs tests, opens a PR, and waits for your approval. Fully automated. Fully self-hosted. You stay in control.**
+**Create an issue. AgenticKode clones your repo, plans the work, writes the code, runs tests, opens a PR, and waits for your approval. Run a structured 8-phase pipeline or let agents work autonomously — either way, fully self-hosted, you stay in control.**
 
 <br>
 
@@ -39,14 +39,25 @@ Most AI coding tools are chat-based — you type prompts, copy-paste code, manua
 
 **What makes AgenticKode different:**
 
-- **Issue-to-PR pipeline** — Not a chatbot. A full automation pipeline that takes an issue and delivers a PR with code, tests, and review.
+- **Two workflow modes** — Structured 8-phase pipeline for maximum control, or autonomous mode where agents work independently and deliver a PR.
+- **Issue-to-PR automation** — Not a chatbot. A full automation platform that takes an issue and delivers a PR with code, tests, and review.
 - **Self-hosted & private** — Your code never leaves your infrastructure. Run it on your own servers with your own models.
-- **Bring any AI agent** — Use Ollama with local LLMs, OpenHands, Claude CLI, or build your own adapter. Mix and match agents per role (planner, coder, reviewer).
+- **7+ AI agents** — Claude CLI, Codex, Gemini, Aider, OpenCode, Kimi, Copilot, Ollama, OpenHands — all with auto-install. Mix and match per role.
+- **Smart workspaces** — Multi-server assignment, server groups, automatic load balancing, parallel runs, persistent CLI sessions with tmux.
 - **Human-in-the-loop** — Every PR requires your approval. You see the plan before coding starts. You control every phase.
 - **Multi-agent comparison** — Run the same task with different agents in parallel, compare the results, pick the winner.
 - **Works with your stack** — GitHub, GitLab, Gitea, Bitbucket. Plane, GitHub Issues, GitLab Issues. Slack, Discord, Telegram notifications.
 
 ## How It Works
+
+AgenticKode offers two workflow modes:
+
+| Mode | How It Works | Best For |
+|------|-------------|----------|
+| **Pipeline Mode** | 8-phase sequential pipeline with per-phase controls, approval gates, and live streaming | Structured tasks where you want full visibility and control over each step |
+| **Autonomous Mode** | Agent works independently — analyzes context, writes code, runs tests, opens PR | Fast turnaround where you trust the agent and just want to review the result |
+
+### Pipeline Mode
 
 ```
 ┌─────────────┐     ┌──────────────────────────────────────────────────────────────────┐     ┌──────────────┐
@@ -155,12 +166,35 @@ Reviewing →  Ollama (qwen2.5-coder:14b)      # Cost-effective review
 
 AgenticKode runs AI agents on **remote workspace servers** — dedicated machines accessed via SSH:
 
+- **Multi-workspace assignment**: Assign multiple servers to a project with automatic load balancing
+- **Server groups**: Organize workspace servers into logical groups for easier management
+- **Parallel runs**: Run multiple tasks concurrently across different workspaces for the same project
 - **Worker user isolation**: Code execution runs under a non-root user for security
 - **Agent discovery & sync**: AgenticKode finds and manages installed agents on your servers
-- **SSH terminal bridge**: Jump into any workspace server directly from the UI via xterm.js
-- **Multi-server support**: Distribute work across multiple machines
+- **SSH terminal bridge**: Jump into any server from the UI via xterm.js with user selection
+- **Docker management**: Monitor and manage Docker containers on workspace servers
+- **Per-server git connections**: Configure git tokens per server and project
 
 <img src="docs/screenshots/workspace-servers.png" alt="Workspace Servers" width="100%">
+
+### Persistent CLI Sessions
+
+Manage long-running AI agent sessions with tmux-based persistence:
+
+- **Attach & detach**: Connect to running agent sessions, detach without stopping them
+- **Session management**: Create, list, kill sessions from the UI
+- **Chat interface**: Interact with AI agents through a built-in chat UI
+- **Health monitoring**: Automatic session health checks with status tracking
+- **Cross-server**: Sessions run on remote workspace servers via SSH
+
+### Autonomous Mode
+
+For tasks that don't need phase-by-phase control:
+
+- **Context builder**: Agent analyzes project structure and relevant files before starting
+- **Configurable autonomy**: Set autonomy levels — how much freedom the agent gets
+- **Direct PR creation**: Agents can create pull requests directly, skipping the approval push step
+- **PR status monitoring**: Hourly checks auto-approve or reject runs based on PR state
 
 ### IDE Integration
 
@@ -379,29 +413,29 @@ See the [Webhook Setup Guide](docs/guides/09-webhook-setup.md) for detailed inst
 agentickode/
 ├── backend/              # FastAPI backend
 │   ├── api/              # REST routes, WebSocket, SSE, webhooks
-│   │   └── servers/      # Workspace server management endpoints
+│   │   └── servers/      # Workspace server, groups, sessions, Docker endpoints
 │   ├── services/         # Business logic layer
 │   │   ├── git/          # Git providers (GitHub, GitLab, Gitea, Bitbucket)
 │   │   ├── adapters/     # AI agent adapters (Ollama, OpenHands, CLI)
-│   │   ├── workspace/    # SSH, agent discovery, worker users
+│   │   ├── workspace/    # SSH, agent discovery, worker users, sessions
 │   │   ├── notifications/# Slack, Discord, Telegram, webhooks
 │   │   └── backup/       # Export/import with encryption
 │   ├── worker/           # Pipeline engine
 │   │   └── phases/       # 8 phase implementations
 │   ├── repositories/     # Database access layer
-│   ├── models/           # SQLAlchemy models (14+ entities)
+│   ├── models/           # SQLAlchemy models (16+ entities)
 │   └── schemas/          # Pydantic request/response schemas
 ├── frontend/src/         # React/Vite frontend
 │   ├── pages/            # 10 page components
-│   ├── components/       # 40+ reusable components
+│   ├── components/       # 47+ reusable components
 │   │   ├── runs/         # Pipeline visualization, logs, approval
 │   │   ├── servers/      # Server management UI
 │   │   ├── settings/     # Configuration panels
 │   │   └── shared/       # Common UI components
 │   ├── api/              # API client modules
 │   └── types/            # TypeScript type definitions
-├── tests/                # 88 unit + 17 integration tests
-├── alembic/              # 17 database migration versions
+├── tests/                # 73 unit + 15 integration tests
+├── alembic/              # 27 database migration versions
 ├── .github/workflows/    # CI, CLA, license check, dependency audit
 └── docs/                 # Technical docs and architecture decisions
 ```
@@ -420,6 +454,13 @@ agentickode/
 ## Roadmap
 
 - [x] Demo GIF walkthrough
+- [x] Autonomous agent mode
+- [x] Multi-workspace assignment with load balancing
+- [x] Server groups
+- [x] Persistent CLI sessions (tmux)
+- [x] Docker container management
+- [x] Per-server git connections
+- [x] 7 CLI agent integrations with auto-install
 - [ ] One-click deployment templates (Docker Hub, Railway, Coolify)
 - [ ] Plugin system for custom pipeline phases
 - [ ] Multi-tenant support with team permissions
