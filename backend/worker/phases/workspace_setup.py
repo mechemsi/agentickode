@@ -66,16 +66,17 @@ async def run(
     ws_cfg = task_run.workspace_config or {}
     ws_type = ws_cfg.get("workspace_type", "existing")
 
-    # Resolve full workspace path: prepend workspace_root for relative paths,
-    # then isolate per task run to prevent git index races between parallel runs.
+    # Resolve full workspace path: prepend workspace_root for relative paths.
+    # Keep a "base" clone at the project-level path so subsequent runs can
+    # copy from it instead of cloning fresh every time.
     raw_path = task_run.workspace_path
     if raw_path.startswith("/"):
-        workspace = raw_path
+        base_workspace = raw_path
     else:
         workspace_root = server.workspace_root or "/home/workspace"
-        workspace = f"{workspace_root}/{raw_path}".rstrip("/")
-    # Append task run ID to make the path unique per run (task-scoped isolation)
-    workspace = f"{workspace}/{task_run.id}"
+        base_workspace = f"{workspace_root}/{raw_path}".rstrip("/")
+    # Task-scoped workspace is a subfolder of the base
+    workspace = f"{base_workspace}/{task_run.id}"
     task_run.workspace_path = workspace
 
     worker_user = server.worker_user
@@ -83,31 +84,32 @@ async def run(
 
     await _log(f"Workspace type={ws_type}, path={workspace}")
 
-    # Mark directory safe for both root and worker user to avoid
+    # Mark both base and run workspace safe for git to avoid
     # "dubious ownership" errors when repo is cloned as root but
     # operated by worker user (or vice versa)
-    await remote_git._mark_safe_directory(workspace)
-    if worker_user and ssh.username == "root":
-        safe_cmd = f"runuser -l {shlex.quote(worker_user)} -c 'git config --global --add safe.directory {shlex.quote(workspace)}'"
-        with contextlib.suppress(Exception):
-            await ssh.run_command(safe_cmd, timeout=10)
+    for safe_dir in (base_workspace, workspace):
+        await remote_git._mark_safe_directory(safe_dir)
+        if worker_user and ssh.username == "root":
+            safe_cmd = (
+                f"runuser -l {shlex.quote(worker_user)} -c "
+                f"'git config --global --add safe.directory {shlex.quote(safe_dir)}'"
+            )
+            with contextlib.suppress(Exception):
+                await ssh.run_command(safe_cmd, timeout=10)
 
     if ws_type == "existing":
         branch = str(task_run.default_branch)
-        await _log(f"Checking if repo exists at {workspace}")
-        if await remote_git.has_repo(workspace):
-            await _log(
-                f"Repo found, resetting to origin/{branch}",
-                metadata=make_log_metadata("ssh_command", command=f"git checkout {branch}"),
-            )
-            # Clean reset: discard local changes and switch to default branch
-            await remote_git.run_git(["checkout", "-f", branch], cwd=workspace)
-            await remote_git.run_git(["clean", "-fd"], cwd=workspace)
-            await remote_git.run_git(["pull", "origin", branch], cwd=workspace)
-            await _log("Reset and pull complete")
+
+        # Step 1: Ensure base clone exists and is up-to-date
+        if await remote_git.has_repo(base_workspace):
+            await _log(f"Base repo found at {base_workspace}, pulling latest")
+            await remote_git.run_git(["fetch", "origin"], cwd=base_workspace)
+            await remote_git.run_git(["checkout", "-f", branch], cwd=base_workspace)
+            await remote_git.run_git(["reset", "--hard", f"origin/{branch}"], cwd=base_workspace)
+            await remote_git.run_git(["clean", "-fd"], cwd=base_workspace)
         else:
-            await _log("No repo found, will clone fresh")
-            await remote_git.mkdir(workspace)
+            await _log(f"No base repo, cloning to {base_workspace}")
+            await remote_git.mkdir(base_workspace)
             repo_url, branch = _resolve_single_repo(task_run, ws_cfg)
             auth_url, method = await get_auth_url(
                 repo_url, task_run.git_provider, ssh, token_override=project_token
@@ -118,8 +120,17 @@ async def run(
                     "ssh_command", command=f"git clone {repo_url}", branch=branch
                 ),
             )
-            await remote_git.clone(auth_url, workspace, branch=branch)
+            await remote_git.clone(auth_url, base_workspace, branch=branch)
             await _log("Clone complete")
+
+        # Step 2: Create run-specific workspace by copying base
+        await _log(f"Creating run workspace at {workspace}")
+        await ssh.run_command(
+            f"cp -a {shlex.quote(base_workspace)} {shlex.quote(workspace)}",
+            timeout=120,
+        )
+        # Remove any stale .autodev from base copy
+        await ssh.run_command(f"rm -rf {shlex.quote(workspace)}/.autodev", timeout=10)
         repos_cloned.append(workspace)
 
     elif ws_type == "new":
@@ -163,11 +174,14 @@ async def run(
     else:
         raise ValueError(f"Unknown workspace_type: {ws_type}")
 
-    # Ensure worker user can access the workspace (clone runs as root)
+    # Ensure worker user can access both base and run workspace (clone runs as root)
     if worker_user and ssh.username == "root":
-        ws_quoted = shlex.quote(workspace)
         await _log(f"Setting workspace ownership to {worker_user}")
-        await ssh.run_command(f"chown -R {worker_user}:{worker_user} {ws_quoted}", timeout=60)
+        for owned_dir in (base_workspace, workspace):
+            owned_quoted = shlex.quote(owned_dir)
+            await ssh.run_command(
+                f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60
+            )
 
     task_run.workspace_result = {"workspace_path": workspace, "repos_cloned": repos_cloned}
     await session.commit()

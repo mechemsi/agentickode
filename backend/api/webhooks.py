@@ -44,6 +44,10 @@ def _create_task_run(
     task_source_meta: dict,
     use_claude: bool,
 ) -> TaskRun:
+    execution_mode = "structured"
+    if project.autonomy_config and isinstance(project.autonomy_config, dict):
+        execution_mode = project.autonomy_config.get("execution_mode", "structured")
+
     return TaskRun(
         task_id=task_id,
         project_id=project.project_id,
@@ -59,6 +63,7 @@ def _create_task_run(
         task_source_meta=task_source_meta,
         use_claude_api=use_claude,
         workspace_config=project.workspace_config,
+        execution_mode=execution_mode,
     )
 
 

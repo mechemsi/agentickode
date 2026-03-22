@@ -29,6 +29,7 @@ describe("TypeScript interfaces", () => {
       parent_run_id: null,
       workflow_template_id: null,
       total_cost_usd: null,
+      execution_mode: "structured",
     };
     expect(run.id).toBe(1);
     expect(run.status).toBe("pending");
@@ -74,6 +75,7 @@ describe("TypeScript interfaces", () => {
       approval_requested_at: null,
       phase_started_at: null,
       total_cost_usd: null,
+      execution_mode: "structured",
       phase_executions: [],
     };
     expect(detail.max_retries).toBe(3);

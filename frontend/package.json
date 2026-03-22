@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "postinstall": "cd .. && bash scripts/setup-hooks.sh 2>/dev/null || true"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

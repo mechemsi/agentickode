@@ -51,12 +51,18 @@ const METRICS = ["test_coverage", "lint_errors", "test_failures"] as const;
 const OPERATORS = ["<", ">", "==", "<=", ">="] as const;
 
 export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Props) {
-  const [config, setConfig] = useState<AutonomyConfig>(initial ?? DEFAULT_CONFIG);
+  const mergeWithDefaults = (cfg: AutonomyConfig | null | undefined): AutonomyConfig => ({
+    ...DEFAULT_CONFIG,
+    ...(cfg ?? {}),
+    threshold_rules: cfg?.threshold_rules ?? [],
+  });
+
+  const [config, setConfig] = useState<AutonomyConfig>(() => mergeWithDefaults(initial));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setConfig(initial ?? DEFAULT_CONFIG);
+    setConfig(mergeWithDefaults(initial));
   }, [initial, projectId]);
 
   const set = <K extends keyof AutonomyConfig>(key: K, value: AutonomyConfig[K]) =>

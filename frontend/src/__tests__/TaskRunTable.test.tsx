@@ -26,6 +26,7 @@ const baseMockRun: TaskRun = {
   parent_run_id: null,
   workflow_template_id: null,
   total_cost_usd: null,
+  execution_mode: "structured",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   started_at: null,

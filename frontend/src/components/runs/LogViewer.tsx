@@ -33,14 +33,12 @@ export default function LogViewer({ runId, phase }: LogViewerProps) {
   const [showDebug, setShowDebug] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Fetch historical logs when a specific phase is selected
+  // Fetch historical logs (all phases or filtered by selected phase)
   useEffect(() => {
-    if (!phase) {
-      setHistoricalLogs([]);
-      return;
-    }
     let cancelled = false;
-    getRunLogs(runId, { phase }).then((data) => {
+    const opts: { phase?: string } = {};
+    if (phase) opts.phase = phase;
+    getRunLogs(runId, opts).then((data) => {
       if (!cancelled) setHistoricalLogs(data);
     });
     return () => { cancelled = true; };
@@ -67,13 +65,22 @@ export default function LogViewer({ runId, phase }: LogViewerProps) {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [logs, historicalLogs]);
 
-  const allLogs = phase ? [...historicalLogs, ...logs] : logs;
-  const displayLogs = showDebug ? allLogs : allLogs.filter((l) => l.level !== "debug");
+  const allLogs = [...historicalLogs, ...logs];
+  // Deduplicate by id (historical + live may overlap)
+  const seen = new Set<number>();
+  const displayLogs = (showDebug ? allLogs : allLogs.filter((l) => l.level !== "debug"))
+    .filter((l) => {
+      const key = l.id ?? -1;
+      if (key === -1) return true; // live logs without id always shown
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   const debugCount = allLogs.filter((l) => l.level === "debug").length;
 
   const emptyText = phase
     ? `No logs for ${phase.replace("_", " ")}`
-    : "Waiting for logs...";
+    : "No logs yet";
 
   return (
     <div>

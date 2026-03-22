@@ -84,6 +84,11 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
     if req.skip_schedule:
         meta["skip_schedule"] = True
 
+    # Derive execution_mode from project autonomy config
+    execution_mode = "structured"
+    if project.autonomy_config and isinstance(project.autonomy_config, dict):
+        execution_mode = project.autonomy_config.get("execution_mode", "structured")
+
     run = TaskRun(
         task_id=f"manual-{ts}",
         project_id=req.project_id,
@@ -102,6 +107,7 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
         status="pending",
         workflow_template_id=req.workflow_template_id,
         workspace_config=project.workspace_config,
+        execution_mode=execution_mode,
     )
 
     db.add(run)

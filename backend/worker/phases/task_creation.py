@@ -78,6 +78,7 @@ async def run(
             task_source_meta=task_run.task_source_meta or {},
             use_claude_api=task_run.use_claude_api,
             workspace_config=task_run.workspace_config,
+            execution_mode=task_run.execution_mode,
             parent_run_id=task_run.id,
             workflow_template_id=template_id,
             status=child_status,

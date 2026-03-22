@@ -72,10 +72,17 @@ export default function Projects() {
               />
             ) : (
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-2">
                   <span className="font-medium text-white">{p.project_slug}</span>
-                  <span className="text-gray-500 ml-3 text-sm">
+                  <span className="text-gray-500 text-sm">
                     {p.repo_owner}/{p.repo_name} · {p.task_source}/{p.git_provider} · {p.workspace_server_ids.length} workspace{p.workspace_server_ids.length !== 1 ? "s" : ""}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    (p.autonomy_config?.execution_mode ?? "structured") === "structured"
+                      ? "bg-gray-700/50 text-gray-400"
+                      : "bg-purple-900/30 text-purple-300 border border-purple-700/40"
+                  }`}>
+                    {(p.autonomy_config?.execution_mode ?? "structured").replace("_", "-")}
                   </span>
                 </div>
                 <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">

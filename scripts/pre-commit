@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+# Copyright (c) 2026 Mechemsi. All rights reserved.
+# Licensed under AGPLv3. See LICENSE file.
+# Commercial licensing: info@mechemsi.com
+#
+# Pre-commit hook — mirrors CI checks on staged files only.
+# Installs automatically via scripts/setup-hooks.sh (called from npm postinstall).
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ERRORS=0
+
+info()  { echo -e "${BOLD}[pre-commit]${NC} $1"; }
+ok()    { echo -e "${GREEN}✓${NC} $1"; }
+warn()  { echo -e "${YELLOW}⚠${NC} $1"; }
+fail()  { echo -e "${RED}✗${NC} $1"; ERRORS=$((ERRORS + 1)); }
+
+# ─── Detect changed files (staged for commit) ──────────────────────────
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+BACKEND_PY=$(echo "$STAGED_FILES" | grep -E '^(backend|tests)/.*\.py$' || true)
+FRONTEND_TS=$(echo "$STAGED_FILES" | grep -E '^frontend/src/.*\.(ts|tsx)$' || true)
+ALEMBIC_FILES=$(echo "$STAGED_FILES" | grep -E '^alembic/' || true)
+
+HAS_BACKEND=false
+HAS_FRONTEND=false
+HAS_ALEMBIC=false
+
+[ -n "$BACKEND_PY" ] && HAS_BACKEND=true
+[ -n "$FRONTEND_TS" ] && HAS_FRONTEND=true
+[ -n "$ALEMBIC_FILES" ] && HAS_ALEMBIC=true
+
+if ! $HAS_BACKEND && ! $HAS_FRONTEND && ! $HAS_ALEMBIC; then
+    ok "No backend/frontend/alembic changes — skipping checks"
+    exit 0
+fi
+
+info "Running pre-commit checks on staged files..."
+echo ""
+
+# ─── Detect execution environment ──────────────────────────────────────
+# Check if we're running inside docker or should use docker compose
+RUN_BE=""
+RUN_FE=""
+
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    # Inside container already
+    RUN_BE=""
+    RUN_FE="cd frontend &&"
+else
+    # Run via docker compose
+    DC="docker compose -f docker-compose.dev.yml"
+    if ! $DC ps --services 2>/dev/null | grep -q backend; then
+        warn "Dev containers not running. Trying local tools..."
+        RUN_BE=""
+        RUN_FE="cd frontend &&"
+    else
+        RUN_BE="$DC exec -T backend"
+        RUN_FE="$DC exec -T frontend"
+    fi
+fi
+
+# ─── 1. License header check ──────────────────────────────────────────
+info "Checking license headers..."
+MISSING_HEADERS=0
+
+for f in $BACKEND_PY; do
+    if ! head -3 "$f" | grep -q "Copyright (c) 2026 Mechemsi"; then
+        fail "Missing license header: $f"
+        MISSING_HEADERS=$((MISSING_HEADERS + 1))
+    fi
+done
+
+for f in $FRONTEND_TS; do
+    if ! head -3 "$f" | grep -q "Copyright (c) 2026 Mechemsi"; then
+        fail "Missing license header: $f"
+        MISSING_HEADERS=$((MISSING_HEADERS + 1))
+    fi
+done
+
+[ "$MISSING_HEADERS" -eq 0 ] && ok "License headers"
+
+# ─── 2. Backend checks ────────────────────────────────────────────────
+if $HAS_BACKEND; then
+    echo ""
+    info "Backend checks..."
+
+    # 2a. Ruff lint (staged files only)
+    FILE_ARGS=$(echo "$BACKEND_PY" | tr '\n' ' ')
+    if [ -n "$RUN_BE" ]; then
+        if $RUN_BE ruff check $FILE_ARGS 2>&1; then
+            ok "Ruff lint"
+        else
+            fail "Ruff lint errors (run: ruff check --fix)"
+        fi
+    else
+        if ruff check $FILE_ARGS 2>&1; then
+            ok "Ruff lint"
+        else
+            fail "Ruff lint errors (run: ruff check --fix)"
+        fi
+    fi
+
+    # 2b. Ruff format check (staged files only)
+    if [ -n "$RUN_BE" ]; then
+        if $RUN_BE ruff format --check $FILE_ARGS 2>&1; then
+            ok "Ruff format"
+        else
+            fail "Ruff format errors (run: ruff format)"
+        fi
+    else
+        if ruff format --check $FILE_ARGS 2>&1; then
+            ok "Ruff format"
+        else
+            fail "Ruff format errors (run: ruff format)"
+        fi
+    fi
+
+    # 2c. Pyright on staged files
+    if [ -n "$RUN_BE" ]; then
+        if $RUN_BE pyright $FILE_ARGS 2>&1; then
+            ok "Pyright type check"
+        else
+            fail "Pyright type errors"
+        fi
+    else
+        if command -v pyright &>/dev/null; then
+            if pyright $FILE_ARGS 2>&1; then
+                ok "Pyright type check"
+            else
+                fail "Pyright type errors"
+            fi
+        else
+            warn "Pyright not available locally — skipping type check"
+        fi
+    fi
+
+    # 2d. Run related tests for changed backend files
+    TEST_FILES=""
+    for f in $BACKEND_PY; do
+        # Map backend/foo/bar.py -> tests/unit/test_bar.py
+        basename=$(basename "$f" .py)
+        found=$(find tests/ -name "test_${basename}.py" 2>/dev/null | head -1)
+        if [ -n "$found" ]; then
+            TEST_FILES="$TEST_FILES $found"
+        fi
+    done
+    # Also include directly staged test files
+    STAGED_TESTS=$(echo "$BACKEND_PY" | grep -E '^tests/' || true)
+    if [ -n "$STAGED_TESTS" ]; then
+        TEST_FILES="$TEST_FILES $STAGED_TESTS"
+    fi
+    # Deduplicate
+    TEST_FILES=$(echo "$TEST_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+    if [ -n "$TEST_FILES" ]; then
+        if [ -n "$RUN_BE" ]; then
+            if $RUN_BE pytest $TEST_FILES -x -q 2>&1; then
+                ok "Related tests pass"
+            else
+                fail "Test failures in: $TEST_FILES"
+            fi
+        else
+            if pytest $TEST_FILES -x -q 2>&1; then
+                ok "Related tests pass"
+            else
+                fail "Test failures in: $TEST_FILES"
+            fi
+        fi
+    else
+        warn "No related test files found — skipping tests"
+    fi
+
+    # 2e. Complexity check (warning only, non-blocking)
+    if command -v radon &>/dev/null || [ -n "$RUN_BE" ]; then
+        PY_FILE_ARGS=$(echo "$BACKEND_PY" | grep -E '^backend/' | tr '\n' ' ')
+        if [ -n "$PY_FILE_ARGS" ]; then
+            if [ -n "$RUN_BE" ]; then
+                COMPLEXITY_OUT=$($RUN_BE python scripts/check_complexity.py C $PY_FILE_ARGS 2>&1) || true
+            else
+                COMPLEXITY_OUT=$(python scripts/check_complexity.py C $PY_FILE_ARGS 2>&1) || true
+            fi
+            if [ -n "$COMPLEXITY_OUT" ] && echo "$COMPLEXITY_OUT" | grep -q "Grade"; then
+                warn "Complexity issues (non-blocking):"
+                echo "$COMPLEXITY_OUT" | head -20
+            else
+                ok "Complexity check"
+            fi
+        fi
+    fi
+fi
+
+# ─── 3. Frontend checks ───────────────────────────────────────────────
+if $HAS_FRONTEND; then
+    echo ""
+    info "Frontend checks..."
+
+    # Strip frontend/ prefix for tools that run from frontend/ dir
+    FE_FILES=$(echo "$FRONTEND_TS" | sed 's|^frontend/||' | tr '\n' ' ')
+
+    # 3a. ESLint on staged files
+    if [ -n "$RUN_FE" ] && [ "$RUN_FE" != "cd frontend &&" ]; then
+        if $RUN_FE npx eslint $FE_FILES 2>&1; then
+            ok "ESLint"
+        else
+            fail "ESLint errors (run: npm run lint:fix)"
+        fi
+    else
+        if (cd frontend && npx eslint $FE_FILES 2>&1); then
+            ok "ESLint"
+        else
+            fail "ESLint errors (run: npm run lint:fix)"
+        fi
+    fi
+
+    # 3b. Run related tests
+    FE_TEST_FILES=""
+    for f in $FRONTEND_TS; do
+        basename=$(basename "$f" | sed 's/\.\(ts\|tsx\)$//')
+        found=$(find frontend/src/__tests__/ -name "${basename}.test.*" 2>/dev/null | head -1)
+        if [ -n "$found" ]; then
+            FE_TEST_FILES="$FE_TEST_FILES $(echo "$found" | sed 's|^frontend/||')"
+        fi
+    done
+    FE_TEST_FILES=$(echo "$FE_TEST_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+    if [ -n "$FE_TEST_FILES" ]; then
+        if [ -n "$RUN_FE" ] && [ "$RUN_FE" != "cd frontend &&" ]; then
+            if $RUN_FE npx vitest run $FE_TEST_FILES 2>&1; then
+                ok "Related tests pass"
+            else
+                fail "Frontend test failures"
+            fi
+        else
+            if (cd frontend && npx vitest run $FE_TEST_FILES 2>&1); then
+                ok "Related tests pass"
+            else
+                fail "Frontend test failures"
+            fi
+        fi
+    else
+        warn "No related frontend test files found — skipping tests"
+    fi
+fi
+
+# ─── 4. Alembic migration check ───────────────────────────────────────
+if $HAS_ALEMBIC; then
+    echo ""
+    info "Alembic migration check..."
+
+    # Always run on host — script parses files only, no DB needed
+    REPO_ROOT=$(git rev-parse --show-toplevel)
+    if python "$REPO_ROOT/scripts/check_alembic_heads.py" 2>&1; then
+        ok "Single Alembic head"
+    else
+        fail "Multiple Alembic heads detected — run: alembic merge heads"
+    fi
+fi
+
+# ─── Summary ──────────────────────────────────────────────────────────
+echo ""
+if [ "$ERRORS" -gt 0 ]; then
+    echo -e "${RED}${BOLD}Pre-commit failed with $ERRORS error(s).${NC}"
+    echo -e "Fix the issues above or use ${YELLOW}git commit --no-verify${NC} to bypass."
+    exit 1
+else
+    echo -e "${GREEN}${BOLD}All pre-commit checks passed.${NC}"
+    exit 0
+fi

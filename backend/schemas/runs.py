@@ -26,6 +26,7 @@ class TaskRunOut(BaseModel):
     parent_run_id: int | None = None
     workflow_template_id: int | None = None
     total_cost_usd: float | None = None
+    execution_mode: str = "structured"
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None

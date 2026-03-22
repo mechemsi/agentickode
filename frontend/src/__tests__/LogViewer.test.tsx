@@ -42,9 +42,35 @@ beforeEach(() => {
 });
 
 describe("LogViewer", () => {
-  it("shows waiting message initially when no phase filter", () => {
+  it("shows empty message initially when no phase filter", () => {
     render(<LogViewer runId={1} />);
-    expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
+    expect(screen.getByText("No logs yet")).toBeInTheDocument();
+  });
+
+  it("fetches all historical logs when no phase is set", async () => {
+    mockGetRunLogs.mockResolvedValue([
+      { id: 1, run_id: 1, timestamp: "2024-01-01T00:00:00Z", phase: "coding", level: "info", message: "All phases log" },
+    ]);
+    render(<LogViewer runId={1} />);
+    await waitFor(() => {
+      expect(mockGetRunLogs).toHaveBeenCalledWith(1, {});
+    });
+    expect(await screen.findByText("All phases log")).toBeInTheDocument();
+  });
+
+  it("deduplicates historical and live logs by id", async () => {
+    mockGetRunLogs.mockResolvedValue([
+      { id: 100, run_id: 1, timestamp: "2024-01-01T00:00:00Z", phase: "coding", level: "info", message: "Test log message" },
+    ]);
+    render(<LogViewer runId={1} />);
+    // Wait for both historical fetch and WS message (both have id=100)
+    await waitFor(() => {
+      expect(mockGetRunLogs).toHaveBeenCalled();
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    // Should only appear once despite being in both historical and live
+    const matches = screen.getAllByText("Test log message");
+    expect(matches).toHaveLength(1);
   });
 
   it("renders received log messages", async () => {

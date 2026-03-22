@@ -84,6 +84,7 @@ export default function TaskRunTable({ runs, workflowNames, sortBy, sortOrder, o
               </span>
             </th>
             <th className="py-2.5 pr-4 text-gray-500 font-medium text-xs uppercase tracking-wider">Phase</th>
+            <th className="py-2.5 pr-4 hidden lg:table-cell text-gray-500 font-medium text-xs uppercase tracking-wider">Mode</th>
             <th className="py-2.5 pr-4 hidden md:table-cell text-gray-500 font-medium text-xs uppercase tracking-wider">
               <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />Duration</span>
             </th>
@@ -127,6 +128,15 @@ export default function TaskRunTable({ runs, workflowNames, sortBy, sortOrder, o
                 </td>
                 <td className="py-2.5 pr-4 text-gray-400">
                   {r.current_phase ?? "—"}
+                </td>
+                <td className="py-2.5 pr-4 hidden lg:table-cell">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    r.execution_mode === "structured"
+                      ? "bg-gray-700/50 text-gray-400"
+                      : "bg-purple-900/30 text-purple-300 border border-purple-700/40"
+                  }`}>
+                    {r.execution_mode.replace("_", "-")}
+                  </span>
                 </td>
                 <td className="py-2.5 pr-4 text-gray-400 hidden md:table-cell font-mono text-xs">
                   {duration ?? "—"}

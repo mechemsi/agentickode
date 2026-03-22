@@ -34,7 +34,7 @@ from backend.worker.phases._context_builder import (
     read_workspace_json,
 )
 from backend.worker.phases._followup_handler import process_followup_tasks
-from backend.worker.phases._helpers import get_ssh_for_run
+from backend.worker.phases._helpers import get_ssh_for_run, get_workspace_server
 
 logger = logging.getLogger("agentickode.phases.agent_loop")
 
@@ -88,14 +88,37 @@ async def run(
     ssh = await get_ssh_for_run(task_run, session)
     workspace = task_run.workspace_path or ""
 
+    # Determine worker user for non-root execution
+    server = await get_workspace_server(task_run, session)
+    worker_user = server.worker_user or "coder"
+
     # 3. Start the Claude autonomous invocation (non-blocking via SSH background task)
-    claude_cmd = (
+    # Build agent command — runs as worker user (not root) to avoid
+    # "--dangerously-skip-permissions cannot be used with root" error.
+    agent_cmd = (
         f"cd {shlex.quote(workspace)} && "
-        f"claude --dangerously-skip-permissions --print --output-format stream-json "
+        f"claude --print --output-format stream-json "
         f"< .autodev/agent_prompt.md "
         f"> .autodev/claude_output.jsonl 2>.autodev/claude_stderr.log; "
         f"echo $? > .autodev/claude_exit_code"
     )
+
+    if ssh.username == "root":
+        # Set workspace ownership so worker user can read/write
+        await ssh.run_command(
+            f"chown -R {worker_user}:{worker_user} {shlex.quote(workspace)}",
+            timeout=60,
+        )
+        # Wrap for non-root execution via runuser
+        user_path = (
+            f"/home/{worker_user}/.local/bin"
+            f":/home/{worker_user}/.claude/bin"
+            ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        )
+        inner = f"export PATH={shlex.quote(user_path)} && {agent_cmd}"
+        claude_cmd = f"runuser -u {worker_user} -- bash -c {shlex.quote(inner)}"
+    else:
+        claude_cmd = agent_cmd
 
     await broadcaster.log(task_run.id, "Launching Claude Code autonomous agent", phase="agent_loop")
     _, _, launch_rc = await ssh.run_command(

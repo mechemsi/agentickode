@@ -104,7 +104,9 @@ async def _create_followup_runs(
             task_run, session, title=title, description=item.get("description", "")
         )
         created_count += 1
-        logger.info("Created follow-up task #%s '%s' for parent run #%s", child_run.id, title, task_run.id)
+        logger.info(
+            "Created follow-up task #%s '%s' for parent run #%s", child_run.id, title, task_run.id
+        )
 
     if created_count:
         await broadcaster.log(
@@ -212,6 +214,7 @@ async def _create_child_run(
         git_provider=parent.git_provider,
         task_source_meta={"parent_run_id": parent.id},
         workspace_config=parent.workspace_config,
+        execution_mode=parent.execution_mode,
         status="pending",
         parent_run_id=parent.id,
         workflow_template_id=parent.workflow_template_id,

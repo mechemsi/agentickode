@@ -20,6 +20,7 @@ export interface TaskRun {
   parent_run_id: number | null;
   workflow_template_id: number | null;
   total_cost_usd: number | null;
+  execution_mode: string;
   created_at: string;
   updated_at: string;
   started_at: string | null;

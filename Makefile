@@ -85,6 +85,12 @@ migrate-new:
 db-shell:
 	$(DC) exec postgres psql -U agentickode -d agentickode
 
+# ── Git hooks ────────────────────────────────────────────────
+.PHONY: hooks
+
+hooks:
+	bash scripts/setup-hooks.sh
+
 # ── CI (mirrors GitHub Actions) ──────────────────────────────
 .PHONY: ci ci-backend ci-frontend ci-push
 

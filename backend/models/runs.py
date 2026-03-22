@@ -40,6 +40,7 @@ class TaskRun(Base):
     git_provider = Column(Text, nullable=False, default="gitea")
     task_source_meta = Column(JSONB, nullable=False, default=dict)
     use_claude_api = Column(Boolean, nullable=False, default=False)
+    execution_mode = Column(Text, nullable=False, default="structured")
     workspace_config = Column(JSONB, nullable=True)
 
     # State machine

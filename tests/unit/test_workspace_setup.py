@@ -68,7 +68,7 @@ class TestWorkspaceSetup:
     async def test_existing_workspace_already_cloned(
         self, db_session, make_task_run, mock_services
     ):
-        """When repo already exists on server, reset to default branch and pull."""
+        """When base repo exists, fetch/reset then cp -a to run workspace."""
         run = make_task_run(
             workspace_path="/workspaces/ws",
             workspace_config={"workspace_type": "existing"},
@@ -77,7 +77,16 @@ class TestWorkspaceSetup:
         await db_session.commit()
 
         p_server, p_ssh, p_git, p_sandbox, p_bc, p_gitops, p_token = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_gitops, p_token:
+        with (
+            p_server,
+            p_ssh as mock_ssh_cls,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_gitops,
+            p_token,
+        ):
+            mock_ssh_instance = mock_ssh_cls.for_server.return_value
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.has_repo = AsyncMock(return_value=True)
@@ -87,15 +96,25 @@ class TestWorkspaceSetup:
 
             await workspace_setup.run(run, db_session, mock_services)
 
-            git_calls = [c.args[0] for c in mock_remote_git.run_git.call_args_list]
-            assert ["checkout", "-f", "main"] in git_calls
-            assert ["clean", "-fd"] in git_calls
-            assert ["pull", "origin", "main"] in git_calls
+            # Base repo should be fetched/reset, not cloned
+            base = "/workspaces/ws"
+            git_calls = [
+                (c.args[0], c.kwargs.get("cwd")) for c in mock_remote_git.run_git.call_args_list
+            ]
+            assert (["fetch", "origin"], base) in git_calls
+            assert (["checkout", "-f", "main"], base) in git_calls
+            assert (["reset", "--hard", "origin/main"], base) in git_calls
+            assert (["clean", "-fd"], base) in git_calls
             mock_remote_git.clone.assert_not_called()
+
+            # cp -a from base to run workspace
+            ssh_cmds = [c.args[0] for c in mock_ssh_instance.run_command.call_args_list]
+            cp_cmds = [c for c in ssh_cmds if "cp -a" in c]
+            assert len(cp_cmds) == 1
             assert run.workspace_result is not None
 
     async def test_existing_workspace_needs_clone(self, db_session, make_task_run, mock_services):
-        """When repo not on server yet, clone with credentials."""
+        """When base repo not on server yet, clone to base then cp -a to run workspace."""
         run = make_task_run(
             workspace_path="/workspaces/ws",
             workspace_config={"workspace_type": "existing"},
@@ -104,7 +123,16 @@ class TestWorkspaceSetup:
         await db_session.commit()
 
         p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token = _ws_patches()
-        with p_server, p_ssh, p_git as mock_git_cls, p_sandbox, p_bc, p_auth, p_token:
+        with (
+            p_server,
+            p_ssh as mock_ssh_cls,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+        ):
+            mock_ssh_instance = mock_ssh_cls.for_server.return_value
             mock_remote_git = mock_git_cls.return_value
             mock_remote_git.mkdir = AsyncMock()
             mock_remote_git.has_repo = AsyncMock(return_value=False)
@@ -114,8 +142,16 @@ class TestWorkspaceSetup:
 
             await workspace_setup.run(run, db_session, mock_services)
 
-            mock_remote_git.clone.assert_called_once()
+            # Clone goes to base workspace, not run workspace
+            base = "/workspaces/ws"
+            clone_call = mock_remote_git.clone.call_args
+            assert clone_call.args[1] == base
             mock_remote_git.pull.assert_not_called()
+
+            # cp -a from base to run workspace
+            ssh_cmds = [c.args[0] for c in mock_ssh_instance.run_command.call_args_list]
+            cp_cmds = [c for c in ssh_cmds if "cp -a" in c]
+            assert len(cp_cmds) == 1
             assert run.workspace_result is not None
 
     async def test_relative_path_resolved_to_absolute(
