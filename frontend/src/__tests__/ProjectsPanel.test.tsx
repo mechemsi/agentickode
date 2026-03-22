@@ -46,6 +46,8 @@ const sampleServer = {
   setup_log: null,
   agent_count: 2,
   project_count: 1,
+  server_group_id: null,
+  server_group_name: null,
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",
 };

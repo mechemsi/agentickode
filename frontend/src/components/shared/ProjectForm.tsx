@@ -144,7 +144,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
                   className="accent-blue-500 w-3.5 h-3.5"
                 />
                 <span className="text-sm text-gray-300">{s.name}</span>
-                <span className="text-xs text-gray-600">{s.host}</span>
+                <span className="text-xs text-gray-600">{s.hostname}</span>
               </label>
             ))}
           </div>
@@ -212,7 +212,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
                   className="accent-blue-500 w-3.5 h-3.5"
                 />
                 <span className="text-sm text-gray-300">{s.name}</span>
-                <span className="text-xs text-gray-600">{s.host}</span>
+                <span className="text-xs text-gray-600">{s.hostname}</span>
               </label>
             ))}
           </div>

@@ -212,7 +212,7 @@ export default function NewRun() {
                 {servers
                   .filter((s) => (selectedProject.workspace_server_ids ?? []).includes(s.id))
                   .map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} — {s.host}</option>
+                    <option key={s.id} value={s.id}>{s.name} — {s.hostname}</option>
                   ))}
               </select>
             </div>
