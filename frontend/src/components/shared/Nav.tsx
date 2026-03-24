@@ -12,6 +12,7 @@ import {
   GitBranch,
   LayoutDashboard,
   Menu,
+  MessageSquare,
   Plus,
   Server,
   Settings,
@@ -20,6 +21,7 @@ import {
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/workspace-servers", label: "Servers", icon: Server },
   { to: "/roles", label: "Roles", icon: Cpu },

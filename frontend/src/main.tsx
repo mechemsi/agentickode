@@ -17,6 +17,7 @@ import Projects from "./pages/Projects";
 import RunDetail from "./pages/RunDetail";
 import Settings from "./pages/Settings";
 import WorkflowTemplates from "./pages/WorkflowTemplates";
+import Chat from "./pages/Chat";
 import WorkspaceServers from "./pages/WorkspaceServers";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import Nav from "./components/shared/Nav";
@@ -40,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/gpu-dashboard" element={<GpuDashboard />} />
                 <Route path="/agents" element={<AgentSettingsPage />} />
                 <Route path="/workflows" element={<WorkflowTemplates />} />
+                <Route path="/chat" element={<Chat />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
               </ErrorBoundary>
