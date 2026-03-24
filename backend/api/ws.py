@@ -385,7 +385,9 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
 
     await websocket.accept()
 
-    tmux_name = f"chat-{agent_name}-{os.getpid()}"
+    import uuid as _uuid
+
+    tmux_name = f"chat-{agent_name}-{_uuid.uuid4().hex[:8]}"
     agent_path = shlex.quote(agent_name)
     env = {
         **os.environ,
@@ -393,7 +395,11 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
         "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
     }
 
-    # Create tmux session with the agent
+    # Kill any stale chat sessions for this agent, then create new one
+    await asyncio.create_subprocess_shell(
+        f"tmux kill-session -t chat-{agent_name}-{os.getpid()} 2>/dev/null || true",
+        env=env,
+    )
     tmux_create = f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {agent_path}"
     proc = await asyncio.create_subprocess_shell(
         tmux_create,
