@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from backend.api import (
     agent_control,
+    agent_query,
     agent_setup,
     agent_stream,
     agents,
@@ -307,6 +308,7 @@ app.include_router(backup.router, prefix="/api")
 app.include_router(git_connections.router, prefix="/api")
 app.include_router(agent_stream.router, prefix="/api")
 app.include_router(agent_control.router, prefix="/api")
+app.include_router(agent_query.router, prefix="/api")
 app.include_router(agent_setup.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(ws.router)

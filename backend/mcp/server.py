@@ -31,8 +31,12 @@ from backend.mcp.tools.admin import (
 )
 from backend.mcp.tools.agent_control import (
     approve_run,
+    create_run_and_wait,
     get_episodes,
+    get_run_diff,
+    get_run_plan,
     pause_agent,
+    query_run_agent,
     reject_run,
     resume_agent,
     send_message_to_agent,
@@ -79,6 +83,10 @@ mcp.add_tool(pause_agent)
 mcp.add_tool(resume_agent)
 mcp.add_tool(approve_run)
 mcp.add_tool(reject_run)
+mcp.add_tool(query_run_agent)
+mcp.add_tool(get_run_diff)
+mcp.add_tool(get_run_plan)
+mcp.add_tool(create_run_and_wait)
 
 # --- Tier 3: Administration ---
 mcp.add_tool(list_servers)

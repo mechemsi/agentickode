@@ -56,3 +56,76 @@ async def reject_run(ctx: Context, run_id: int, reason: str | None = None) -> di
     """
     body = {"reason": reason} if reason else {}
     return await _api(ctx, "post", f"/runs/{run_id}/reject", json=body)
+
+
+async def query_run_agent(ctx: Context, run_id: int, question: str, timeout: int = 120) -> dict:
+    """Send a question to a run's agent and get a response.
+
+    Uses the agent's session to continue the conversation, so the agent
+    has full context of what it did during the run. Use this to ask the
+    workspace agent about its work, what files it changed, or why it
+    made certain decisions.
+
+    Args:
+        run_id: The task run whose agent to query
+        question: The question to ask the agent
+        timeout: Max seconds to wait for response (default 120)
+    """
+    return await _api(
+        ctx,
+        "post",
+        f"/runs/{run_id}/agent/query",
+        json={"question": question, "timeout": timeout},
+    )
+
+
+async def get_run_diff(ctx: Context, run_id: int) -> dict:
+    """Get the git diff of changes made by the agent in a task run.
+
+    Returns a summary (file names and line counts) and the actual diff content.
+    Use this to review what the agent changed before approving.
+    """
+    return await _api(ctx, "get", f"/runs/{run_id}/agent/diff")
+
+
+async def get_run_plan(ctx: Context, run_id: int) -> dict:
+    """Get the agent's implementation plan for a task run.
+
+    Returns the plan from .autodev/plan.json if the agent created one.
+    """
+    return await _api(ctx, "get", f"/runs/{run_id}/agent/plan")
+
+
+async def create_run_and_wait(
+    ctx: Context,
+    project_id: str,
+    title: str,
+    description: str = "",
+    execution_mode: str | None = None,
+    timeout: int = 3600,
+) -> dict:
+    """Create a task run and wait for it to complete.
+
+    This is a blocking call — it creates the run, then polls until
+    the run completes, fails, or times out. Returns the final status
+    including PR URL if created.
+
+    Use this for orchestrating multi-step workflows where you need
+    one task to finish before starting the next.
+
+    Args:
+        project_id: Project to run the task on
+        title: Task title
+        description: Detailed task description
+        execution_mode: Override mode (structured/autonomous/hybrid)
+        timeout: Max seconds to wait (default 3600 = 1 hour)
+    """
+    body: dict = {
+        "project_id": project_id,
+        "title": title,
+        "description": description,
+        "timeout": timeout,
+    }
+    if execution_mode:
+        body["execution_mode"] = execution_mode
+    return await _api(ctx, "post", "/runs/create-and-wait", json=body)

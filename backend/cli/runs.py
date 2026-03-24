@@ -161,3 +161,33 @@ def runs_retry(ctx, run_id):
     """Retry a failed run."""
     post(f"/runs/{run_id}/retry")
     click.echo(f"Run #{run_id} retried.")
+
+
+@runs.command("create-and-wait")
+@click.option("--project", required=True, help="Project ID.")
+@click.option("--title", required=True, help="Task title.")
+@click.option("--description", default="", help="Task description.")
+@click.option("--mode", type=click.Choice(["structured", "autonomous", "hybrid"]), default=None)
+@click.option("--timeout", default=3600, type=int, help="Max seconds to wait.")
+@click.pass_context
+def runs_create_and_wait(ctx, project, title, description, mode, timeout):
+    """Create a run and wait for it to complete."""
+    body: dict = {
+        "project_id": project,
+        "title": title,
+        "description": description,
+        "timeout": timeout,
+    }
+    if mode:
+        body["execution_mode"] = mode
+    click.echo(f"Creating run and waiting (up to {timeout}s)...")
+    data = post("/runs/create-and-wait", body)
+    output(
+        data,
+        fields=[
+            ("run_id", "Run ID"),
+            ("status", "Status"),
+            ("pr_url", "PR URL"),
+        ],
+        quiet_key="run_id",
+    )
