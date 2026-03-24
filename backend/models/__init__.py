@@ -12,10 +12,12 @@ from backend.models.agents import (
     ScheduledTask,
 )
 from backend.models.base import Base
+from backend.models.episodes import Episode
 from backend.models.git_connections import GitConnection
 from backend.models.instructions import ProjectInstruction, ProjectInstructionVersion, ProjectSecret
 from backend.models.notifications import NotificationChannel
 from backend.models.ollama import OllamaServer
+from backend.models.policies import AgentPolicy
 from backend.models.projects import ProjectConfig, ProjectWorkspaceServer
 from backend.models.readiness import WorkspaceReadiness
 from backend.models.roles import RoleAssignment
@@ -29,11 +31,13 @@ from backend.models.workflows import WebhookCallback, WorkflowTemplate
 __all__ = [
     "AgentInvocation",
     "AgentLoopExecution",
+    "AgentPolicy",
     "AgentSettings",
     "AppSetting",
     "Base",
     "CliSession",
     "DiscoveredAgent",
+    "Episode",
     "GitConnection",
     "MonitoringRule",
     "NotificationChannel",

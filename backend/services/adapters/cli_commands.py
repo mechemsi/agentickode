@@ -97,4 +97,24 @@ AGENT_COMMANDS: dict[str, dict[str, str | bool]] = {
         "check": "command -v claude",
         "supports_session": True,
     },
+    # Episodic mode: bounded episodes with --max-turns, per-episode JSONL output.
+    # Each episode writes to a separate JSONL file for monitoring and recovery.
+    "claude_episodic": {
+        "task": (
+            "cd {workspace} && claude --print --verbose --output-format stream-json"
+            " --max-turns {max_turns} < {prompt_file}"
+            " > .autodev/episode_{episode_num}.jsonl"
+            " 2>.autodev/episode_{episode_num}.log;"
+            " echo $? > .autodev/episode_{episode_num}_exit_code"
+        ),
+        "task_resume": (
+            "cd {workspace} && claude --print --verbose --output-format stream-json"
+            " --max-turns {max_turns} --resume {session_id} < {prompt_file}"
+            " > .autodev/episode_{episode_num}.jsonl"
+            " 2>.autodev/episode_{episode_num}.log;"
+            " echo $? > .autodev/episode_{episode_num}_exit_code"
+        ),
+        "check": "command -v claude",
+        "supports_session": True,
+    },
 }

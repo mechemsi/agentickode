@@ -81,7 +81,11 @@ class TestAgentCommandStructure:
 
     def test_all_agents_have_required_keys(self):
         required = {"generate", "task", "check", "supports_session"}
+        # Internal-only templates (episodic) don't need all keys
+        internal_templates = {"claude_episodic"}
         for agent, cmds in AGENT_COMMANDS.items():
+            if agent in internal_templates:
+                continue
             for key in required:
                 assert key in cmds, f"{agent} missing key: {key}"
 

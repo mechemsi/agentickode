@@ -104,6 +104,8 @@ class WorkerEngine:
                 for pe in phase_result.scalars().all():
                     pe.status = "pending"
                     pe.started_at = None
+                # Mark agent_loop executions for recovery
+                await self._mark_agent_loop_for_recovery(session, run.id)
                 run.status = "pending"
                 logger.info(f"Recovered interrupted run #{run.id}, resetting to pending")
             await session.commit()
@@ -114,6 +116,24 @@ class WorkerEngine:
             )
             valid_ids = {r[0] for r in active_result.all()}
             await queue_service.cleanup_stale_entries(valid_ids)
+
+    async def _mark_agent_loop_for_recovery(self, session, run_id: int) -> None:
+        """Mark interrupted agent_loop executions for recovery on re-dispatch."""
+        from backend.models import AgentLoopExecution
+
+        ale_result = await session.execute(
+            select(AgentLoopExecution).where(
+                AgentLoopExecution.task_run_id == run_id,
+                AgentLoopExecution.status == "running",
+            )
+        )
+        for ale in ale_result.scalars().all():
+            ale.recovery_count = (ale.recovery_count or 0) + 1
+            ale.status = "recovering"
+            logger.info(
+                f"Marked agent_loop execution #{ale.id} for recovery "
+                f"(attempt {ale.recovery_count})"
+            )
 
     async def _tick(self):
         # Cleanup completed/failed tasks from active set

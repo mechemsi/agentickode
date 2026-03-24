@@ -45,6 +45,9 @@ class ProjectConfig(Base):
     notification_sources = relationship(
         "NotificationSource", back_populates="project", cascade="all, delete-orphan"
     )
+    agent_policy = relationship(
+        "AgentPolicy", back_populates="project", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class ProjectWorkspaceServer(Base):

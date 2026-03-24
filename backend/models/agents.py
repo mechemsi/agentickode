@@ -157,9 +157,18 @@ class AgentLoopExecution(Base):
     progress_snapshots = Column(JSONB, nullable=False, default=list)
     result = Column(JSONB, nullable=True)
     status = Column(Text, nullable=False, default="running")
+    # Episodic execution tracking
+    recovery_count = Column(Integer, nullable=False, default=0)
+    last_checkpoint_sha = Column(Text, nullable=True)
+    total_episodes = Column(Integer, nullable=False, default=0)
+    total_turns = Column(Integer, nullable=False, default=0)
+    total_tokens = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     task_run = relationship("TaskRun", back_populates="agent_loop_executions")
+    episodes = relationship(
+        "Episode", back_populates="agent_loop_execution", cascade="all, delete-orphan"
+    )
 
 
 class NotificationSource(Base):

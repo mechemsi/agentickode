@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from backend.api import (
+    agent_control,
+    agent_stream,
     agents,
     analytics,
     app_settings,
@@ -300,4 +302,6 @@ app.include_router(agents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 app.include_router(git_connections.router, prefix="/api")
+app.include_router(agent_stream.router, prefix="/api")
+app.include_router(agent_control.router, prefix="/api")
 app.include_router(ws.router)
