@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl docker.io && \
+    git curl docker.io nodejs npm openssh-client pipx && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -9,6 +9,16 @@ ENV PYTHONPATH=/app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install AI agents for the chat feature
+# Override with --build-arg INSTALL_AGENTS="claude codex" for selective install
+ARG INSTALL_AGENTS="claude codex gemini aider opencode"
+COPY scripts/install-agents.sh /tmp/install-agents.sh
+RUN chmod +x /tmp/install-agents.sh && \
+    /tmp/install-agents.sh $INSTALL_AGENTS || true && \
+    rm /tmp/install-agents.sh
+
+ENV PATH="/root/.local/bin:/root/.local/share/claude/bin:${PATH}"
 
 COPY alembic.ini .
 COPY alembic/ ./alembic/
