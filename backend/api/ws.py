@@ -2,11 +2,12 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""WebSocket endpoints for live log streaming, global events, and SSH terminals."""
+"""WebSocket endpoints for live log streaming, global events, SSH and local terminals."""
 
 import asyncio
 import json
 import logging
+import os
 import shlex
 from datetime import UTC, datetime
 
@@ -368,3 +369,118 @@ async def ws_session_terminal(websocket: WebSocket, session_id: str):
                 s.status = "detached"
                 s.last_activity_at = datetime.now(UTC)
                 await db.commit()
+
+
+@router.websocket("/ws/local-terminal/{agent_name}")
+async def ws_local_terminal(websocket: WebSocket, agent_name: str):
+    """Local terminal — runs an agent interactively inside the platform container.
+
+    Creates a local tmux session, launches the agent, and bridges the PTY
+    to the browser via xterm.js. No SSH needed — runs in-process.
+    """
+    import fcntl
+    import pty
+    import struct
+    import termios
+
+    await websocket.accept()
+
+    tmux_name = f"chat-{agent_name}-{os.getpid()}"
+    agent_path = shlex.quote(agent_name)
+    env = {
+        **os.environ,
+        "TERM": "xterm-256color",
+        "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+    }
+
+    # Create tmux session with the agent
+    tmux_create = f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {agent_path}"
+    proc = await asyncio.create_subprocess_shell(
+        tmux_create,
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    await proc.wait()
+
+    if proc.returncode != 0:
+        stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "type": "output",
+                    "data": f"Failed to start {agent_name}: {stderr}\r\n",
+                }
+            )
+        )
+        await websocket.close()
+        return
+
+    # Attach to tmux via a local PTY
+    master_fd, slave_fd = pty.openpty()
+
+    attach_cmd = f"tmux attach-session -t {tmux_name}"
+    attach_proc = await asyncio.create_subprocess_shell(
+        attach_cmd,
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        env=env,
+        preexec_fn=os.setsid,
+    )
+    os.close(slave_fd)
+
+    loop = asyncio.get_event_loop()
+
+    async def pty_to_ws():
+        """Read from PTY master and send to WebSocket."""
+        try:
+            while True:
+                data = await loop.run_in_executor(None, os.read, master_fd, 4096)
+                if not data:
+                    break
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "output",
+                            "data": data.decode("utf-8", errors="replace"),
+                        }
+                    )
+                )
+        except OSError:
+            pass
+        except Exception:
+            pass
+
+    async def ws_to_pty():
+        """Read from WebSocket and write to PTY master."""
+        try:
+            while True:
+                raw = await websocket.receive_text()
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    os.write(master_fd, msg["data"].encode("utf-8"))
+                elif msg.get("type") == "resize":
+                    cols = msg.get("cols", 120)
+                    rows = msg.get("rows", 40)
+                    winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                    fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                    # Also resize tmux
+                    await asyncio.create_subprocess_shell(
+                        f"tmux resize-window -t {tmux_name} -x {cols} -y {rows}",
+                        env=env,
+                    )
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+
+    read_task = asyncio.create_task(pty_to_ws())
+    write_task = asyncio.create_task(ws_to_pty())
+    try:
+        await asyncio.gather(read_task, write_task, return_exceptions=True)
+    finally:
+        os.close(master_fd)
+        attach_proc.kill()
+        # Clean up tmux session
+        await asyncio.create_subprocess_shell(f"tmux kill-session -t {tmux_name} 2>/dev/null")
