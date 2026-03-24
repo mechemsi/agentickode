@@ -48,9 +48,9 @@ def _session_to_out(s: CliSession, server_name: str | None = None) -> CliSession
     )
 
 
-def _build_session_service(server) -> SessionService:
+def _build_session_service(server, user: str | None = None) -> SessionService:
     ssh = SSHService.for_server(server)
-    return SessionService(ssh)
+    return SessionService(ssh, user=user)
 
 
 @router.post("/sessions", response_model=CliSessionOut)
@@ -62,13 +62,14 @@ async def create_session(body: CliSessionCreate, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail="Workspace server not found")
 
     session_id = str(uuid4())
-    svc = _build_session_service(server)
+    workspace_path = body.workspace_path or server.workspace_root
+    svc = _build_session_service(server, user=body.user_context)
 
     result = await svc.create_session(
         session_id=session_id,
         agent_name=body.agent_name,
         user_context=body.user_context,
-        workspace_path=body.workspace_path,
+        workspace_path=workspace_path,
         tmux_name=None,
     )
 
@@ -146,7 +147,7 @@ async def close_session(session_id: int, db: AsyncSession = Depends(get_db)):
     server_repo = WorkspaceServerRepository(db)
     server = await server_repo.get_by_id(s.workspace_server_id)
     if server:
-        svc = _build_session_service(server)
+        svc = _build_session_service(server, user=s.user_context)
         await svc.kill_session(s.tmux_session)
 
     s.status = "closed"
@@ -172,7 +173,7 @@ async def send_to_session(
     if not server:
         raise HTTPException(status_code=404, detail="Workspace server not found")
 
-    svc = _build_session_service(server)
+    svc = _build_session_service(server, user=s.user_context)
     output = await svc.send_command(s.tmux_session, body.message)
 
     s.last_activity_at = datetime.now(UTC)
@@ -194,7 +195,7 @@ async def capture_session(session_id: int, lines: int = 50, db: AsyncSession = D
     if not server:
         raise HTTPException(status_code=404, detail="Workspace server not found")
 
-    svc = _build_session_service(server)
+    svc = _build_session_service(server, user=s.user_context)
     output = await svc.capture_output(s.tmux_session, lines=lines)
 
     return SessionCaptureResponse(output=output, lines=lines)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shlex
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -229,6 +230,50 @@ class SSHService:
                 command=cmd,
                 elapsed_s=round(elapsed, 1),
             ) from None
+
+    async def fire_and_forget(self, cmd: str, timeout: int = 15) -> None:
+        """Start a command via SSH without waiting for it to finish.
+
+        Writes a launcher script, then starts it via a short-lived SSH command
+        that returns immediately while the script continues running.
+        The command should redirect its own stdout/stderr (e.g. to files).
+        """
+        wrapped = f'export PATH="{self._EXTRA_PATH}:$PATH" && {cmd}'
+        start = time.monotonic()
+        try:
+            conn = await asyncio.wait_for(self._connect_with_retry(), timeout=min(timeout, 15))
+        except (TimeoutError, OSError) as exc:
+            elapsed = time.monotonic() - start
+            raise SSHCommandError(
+                f"SSH connect for fire_and_forget failed after {elapsed:.1f}s on {self.hostname}",
+                hostname=self.hostname,
+                command=cmd,
+                elapsed_s=round(elapsed, 1),
+            ) from exc
+
+        try:
+            # Use exec channel directly — write a one-liner that starts the
+            # process detached and exits immediately.
+            # The key: `conn.run` waits for the remote *shell* to exit, so we
+            # make the shell itself exit right away after spawning the bg job.
+            detach_cmd = (
+                f"bash -c 'nohup setsid bash -c {shlex.quote(wrapped)} "
+                f"</dev/null >/dev/null 2>&1 & exit 0'"
+            )
+            await asyncio.wait_for(
+                conn.run(detach_cmd, check=False),
+                timeout=timeout,
+            )
+        except TimeoutError:
+            # Even if we time out, the remote process may have started.
+            logger.warning(
+                "fire_and_forget timed out after %.1fs on %s (cmd may still be running): %s",
+                time.monotonic() - start,
+                self.hostname,
+                cmd[:120],
+            )
+        finally:
+            conn.close()
 
     async def run_command_stream(self, cmd: str, timeout: int = 300) -> AsyncIterator[str]:
         """Run a command via SSH, yielding stdout lines as they arrive."""

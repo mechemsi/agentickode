@@ -17,6 +17,7 @@ from backend.models.instructions import ProjectInstruction, ProjectInstructionVe
 from backend.models.notifications import NotificationChannel
 from backend.models.ollama import OllamaServer
 from backend.models.projects import ProjectConfig, ProjectWorkspaceServer
+from backend.models.readiness import WorkspaceReadiness
 from backend.models.roles import RoleAssignment
 from backend.models.runs import AgentInvocation, PhaseExecution, TaskLog, TaskRun
 from backend.models.server_groups import ServerGroup
@@ -53,5 +54,6 @@ __all__ = [
     "TaskRun",
     "WebhookCallback",
     "WorkflowTemplate",
+    "WorkspaceReadiness",
     "WorkspaceServer",
 ]

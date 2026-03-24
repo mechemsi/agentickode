@@ -10,6 +10,7 @@ the FastAPI process (started from lifespan).
 
 import asyncio
 import logging
+import shlex
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -382,14 +383,19 @@ class WorkerEngine:
                     continue
 
                 ssh = SSHService.for_server(server)
-                # Get list of active tmux sessions in one SSH call
-                try:
-                    stdout, _stderr, _exit_code = await ssh.run_command(
-                        "tmux list-sessions -F '#{session_name}' 2>/dev/null || true"
-                    )
-                    active_tmux = set(stdout.strip().split("\n")) if stdout.strip() else set()
-                except Exception:
-                    active_tmux = set()
+                # Get tmux sessions per user (sessions run as non-root users)
+                users = {cs.user_context or "root" for cs in cli_sessions}
+                active_tmux: set[str] = set()
+                for user in users:
+                    try:
+                        list_cmd = "tmux list-sessions -F '#{session_name}' 2>/dev/null || true"
+                        if user and user != "root":
+                            list_cmd = f"runuser -l {user} -c {shlex.quote(list_cmd)}"
+                        stdout, _stderr, _exit_code = await ssh.run_command(list_cmd)
+                        if stdout.strip():
+                            active_tmux.update(stdout.strip().split("\n"))
+                    except Exception:
+                        pass
 
                 for cs in cli_sessions:
                     if cs.tmux_session not in active_tmux:

@@ -40,6 +40,7 @@ from backend.api.servers import (
     agent_management_router,
     docker_management_router,
     git_access_router,
+    readiness_router,
     server_groups_router,
     server_projects_router,
     sessions_router,
@@ -185,6 +186,22 @@ async def _run_migrations() -> None:
         "ALTER TABLE workspace_servers ADD COLUMN server_group_id INTEGER "
         "REFERENCES server_groups(id) ON DELETE SET NULL"
     )
+    # workspace_readiness table for dev-toolchain validation per (project, server)
+    await _run_migration_step("""
+        CREATE TABLE IF NOT EXISTS workspace_readiness (
+            id SERIAL PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES project_configs(project_id) ON DELETE CASCADE,
+            workspace_server_id INTEGER NOT NULL REFERENCES workspace_servers(id) ON DELETE CASCADE,
+            validation_status TEXT NOT NULL DEFAULT 'pending',
+            validated_at TIMESTAMPTZ,
+            expires_at TIMESTAMPTZ,
+            check_results JSONB,
+            validation_report JSONB,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE(project_id, workspace_server_id)
+        )
+    """)
     # cli_sessions table for persistent CLI agent sessions
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS cli_sessions (
@@ -277,6 +294,7 @@ app.include_router(workflow_templates.router, prefix="/api")
 app.include_router(webhook_callbacks.router, prefix="/api")
 app.include_router(worker_user_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")
+app.include_router(readiness_router, prefix="/api")
 app.include_router(app_settings.router, prefix="/api")
 app.include_router(agents.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")

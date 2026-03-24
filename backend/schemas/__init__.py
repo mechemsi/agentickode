@@ -109,6 +109,7 @@ from backend.schemas.projects import (
     TestConnectionRequest,
     TestConnectionResponse,
 )
+from backend.schemas.readiness import CheckResultOut, WorkspaceReadinessOut
 from backend.schemas.roles import (
     DEFAULT_VALID_ROLES,
     VALID_AGENT_NAMES,
@@ -196,6 +197,7 @@ __all__ = [
     "AgentSettingsOut",
     "AgentStat",
     "AnalyticsSummary",
+    "CheckResultOut",
     "CliSessionCreate",
     "CliSessionOut",
     "ConflictResolution",
@@ -309,6 +311,7 @@ __all__ = [
     "WorkflowTemplateCreate",
     "WorkflowTemplateOut",
     "WorkflowTemplateUpdate",
+    "WorkspaceReadinessOut",
     "WorkspaceServerCreate",
     "WorkspaceServerDetail",
     "WorkspaceServerOut",

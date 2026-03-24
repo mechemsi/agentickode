@@ -92,8 +92,8 @@ AGENT_COMMANDS: dict[str, dict[str, str | bool]] = {
     # The agent reads .autodev/agent_prompt.md and runs until done.
     "claude_autonomous": {
         "generate": "cat {prompt_file} | claude --print --output-format json",
-        "task": "cd {workspace} && claude --dangerously-skip-permissions --print --output-format stream-json < .autodev/agent_prompt.md",
-        "task_resume": "cd {workspace} && claude --dangerously-skip-permissions --print --output-format stream-json --resume {session_id}",
+        "task": "cd {workspace} && claude --dangerously-skip-permissions --print --verbose --output-format stream-json < .autodev/agent_prompt.md",
+        "task_resume": "cd {workspace} && claude --dangerously-skip-permissions --print --verbose --output-format stream-json --resume {session_id}",
         "check": "command -v claude",
         "supports_session": True,
     },

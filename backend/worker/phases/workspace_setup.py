@@ -14,14 +14,22 @@ import contextlib
 import logging
 import shlex
 from collections.abc import Awaitable, Callable
+from dataclasses import asdict
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import TaskRun
+from backend.repositories.readiness_repo import WorkspaceReadinessRepository
 from backend.services.container import ServiceContainer
 from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.http_client import get_http_client
+from backend.services.workspace.readiness_service import (
+    TTL_DAYS,
+    WorkspaceReadinessService,
+    format_fix_guide,
+)
 from backend.services.workspace.sandbox import RemoteSandbox
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster, make_log_metadata
@@ -67,16 +75,12 @@ async def run(
     ws_type = ws_cfg.get("workspace_type", "existing")
 
     # Resolve full workspace path: prepend workspace_root for relative paths.
-    # Keep a "base" clone at the project-level path so subsequent runs can
-    # copy from it instead of cloning fresh every time.
     raw_path = task_run.workspace_path
     if raw_path.startswith("/"):
-        base_workspace = raw_path
+        workspace = raw_path
     else:
         workspace_root = server.workspace_root or "/home/workspace"
-        base_workspace = f"{workspace_root}/{raw_path}".rstrip("/")
-    # Task-scoped workspace is a subfolder of the base
-    workspace = f"{base_workspace}/{task_run.id}"
+        workspace = f"{workspace_root}/{raw_path}".rstrip("/")
     task_run.workspace_path = workspace
 
     worker_user = server.worker_user
@@ -84,32 +88,30 @@ async def run(
 
     await _log(f"Workspace type={ws_type}, path={workspace}")
 
-    # Mark both base and run workspace safe for git to avoid
-    # "dubious ownership" errors when repo is cloned as root but
-    # operated by worker user (or vice versa)
-    for safe_dir in (base_workspace, workspace):
-        await remote_git._mark_safe_directory(safe_dir)
-        if worker_user and ssh.username == "root":
-            safe_cmd = (
-                f"runuser -l {shlex.quote(worker_user)} -c "
-                f"'git config --global --add safe.directory {shlex.quote(safe_dir)}'"
-            )
-            with contextlib.suppress(Exception):
-                await ssh.run_command(safe_cmd, timeout=10)
+    # Mark workspace safe for git to avoid "dubious ownership" errors
+    # when repo is cloned as root but operated by worker user
+    await remote_git._mark_safe_directory(workspace)
+    if worker_user and ssh.username == "root":
+        safe_cmd = (
+            f"runuser -l {shlex.quote(worker_user)} -c "
+            f"'git config --global --add safe.directory {shlex.quote(workspace)}'"
+        )
+        with contextlib.suppress(Exception):
+            await ssh.run_command(safe_cmd, timeout=10)
 
     if ws_type == "existing":
         branch = str(task_run.default_branch)
 
-        # Step 1: Ensure base clone exists and is up-to-date
-        if await remote_git.has_repo(base_workspace):
-            await _log(f"Base repo found at {base_workspace}, pulling latest")
-            await remote_git.run_git(["fetch", "origin"], cwd=base_workspace)
-            await remote_git.run_git(["checkout", "-f", branch], cwd=base_workspace)
-            await remote_git.run_git(["reset", "--hard", f"origin/{branch}"], cwd=base_workspace)
-            await remote_git.run_git(["clean", "-fd"], cwd=base_workspace)
+        # Ensure clone exists and is up-to-date
+        if await remote_git.has_repo(workspace):
+            await _log(f"Repo found at {workspace}, pulling latest")
+            await remote_git.run_git(["fetch", "origin"], cwd=workspace)
+            await remote_git.run_git(["checkout", "-f", branch], cwd=workspace)
+            await remote_git.run_git(["reset", "--hard", f"origin/{branch}"], cwd=workspace)
+            await remote_git.run_git(["clean", "-fd"], cwd=workspace)
         else:
-            await _log(f"No base repo, cloning to {base_workspace}")
-            await remote_git.mkdir(base_workspace)
+            await _log(f"No repo found, cloning to {workspace}")
+            await remote_git.mkdir(workspace)
             repo_url, branch = _resolve_single_repo(task_run, ws_cfg)
             auth_url, method = await get_auth_url(
                 repo_url, task_run.git_provider, ssh, token_override=project_token
@@ -120,16 +122,10 @@ async def run(
                     "ssh_command", command=f"git clone {repo_url}", branch=branch
                 ),
             )
-            await remote_git.clone(auth_url, base_workspace, branch=branch)
+            await remote_git.clone(auth_url, workspace, branch=branch)
             await _log("Clone complete")
 
-        # Step 2: Create run-specific workspace by copying base
-        await _log(f"Creating run workspace at {workspace}")
-        await ssh.run_command(
-            f"cp -a {shlex.quote(base_workspace)} {shlex.quote(workspace)}",
-            timeout=120,
-        )
-        # Remove any stale .autodev from base copy
+        # Clean up any stale .autodev from previous runs
         await ssh.run_command(f"rm -rf {shlex.quote(workspace)}/.autodev", timeout=10)
         repos_cloned.append(workspace)
 
@@ -174,18 +170,64 @@ async def run(
     else:
         raise ValueError(f"Unknown workspace_type: {ws_type}")
 
-    # Ensure worker user can access both base and run workspace (clone runs as root)
+    # Ensure worker user can access workspace (clone runs as root)
     if worker_user and ssh.username == "root":
         await _log(f"Setting workspace ownership to {worker_user}")
-        for owned_dir in (base_workspace, workspace):
-            owned_quoted = shlex.quote(owned_dir)
-            await ssh.run_command(
-                f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60
-            )
+        owned_quoted = shlex.quote(workspace)
+        await ssh.run_command(f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60)
 
     task_run.workspace_result = {"workspace_path": workspace, "repos_cloned": repos_cloned}
     await session.commit()
-    await _log(f"Workspace ready: {len(repos_cloned)} repo(s)")
+    await _log(f"Workspace cloned: {len(repos_cloned)} repo(s)")
+
+    # --- Workspace readiness validation ---
+    await _validate_readiness(task_run, session, ssh, workspace, worker_user, ws_cfg, _log)
+
+
+async def _validate_readiness(
+    task_run: TaskRun,
+    session: AsyncSession,
+    ssh: SSHService,
+    workspace: str,
+    worker_user: str | None,
+    ws_cfg: dict,
+    _log: LogFn,
+) -> None:
+    """Run workspace readiness checks; raise on failure with fix guide."""
+    readiness_repo = WorkspaceReadinessRepository(session)
+    server_id = task_run.workspace_server_id
+    if not server_id:
+        await _log("No workspace server assigned, skipping readiness check")
+        return
+
+    if await readiness_repo.is_valid(task_run.project_id, server_id):
+        await _log("Workspace readiness: cached validation still valid, skipping checks")
+        return
+
+    await _log("Running workspace readiness validation...")
+    dev_commands = ws_cfg.get("dev_commands")
+    svc = WorkspaceReadinessService(ssh, worker_user=worker_user)
+    result = await svc.validate(workspace, dev_commands=dev_commands)
+
+    now = datetime.now(UTC)
+    await readiness_repo.upsert(
+        task_run.project_id,
+        server_id,
+        {
+            "validation_status": "passed" if result.passed else "failed",
+            "validated_at": now,
+            "expires_at": (now + timedelta(days=TTL_DAYS)) if result.passed else None,
+            "check_results": [asdict(c) for c in result.checks],
+            "validation_report": result.report_dict(),
+        },
+    )
+
+    if not result.passed:
+        guide = format_fix_guide(result)
+        await _log(guide, level="error")
+        raise RuntimeError(f"Workspace not ready: {result.summary}\n\n{guide}")
+
+    await _log(f"Workspace readiness: all {len(result.checks)} checks passed")
 
 
 def _resolve_single_repo(task_run: TaskRun, ws_cfg: dict) -> tuple[str, str]:

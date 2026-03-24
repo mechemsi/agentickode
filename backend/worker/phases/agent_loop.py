@@ -97,7 +97,7 @@ async def run(
     # "--dangerously-skip-permissions cannot be used with root" error.
     agent_cmd = (
         f"cd {shlex.quote(workspace)} && "
-        f"claude --print --output-format stream-json "
+        f"claude --print --verbose --output-format stream-json "
         f"< .autodev/agent_prompt.md "
         f"> .autodev/claude_output.jsonl 2>.autodev/claude_stderr.log; "
         f"echo $? > .autodev/claude_exit_code"
@@ -121,12 +121,8 @@ async def run(
         claude_cmd = agent_cmd
 
     await broadcaster.log(task_run.id, "Launching Claude Code autonomous agent", phase="agent_loop")
-    _, _, launch_rc = await ssh.run_command(
-        f"nohup bash -c {shlex.quote(claude_cmd)} &",
-        timeout=10,
-    )
-    if launch_rc not in (0, 1):  # nohup returns 0 or 1 depending on shell
-        logger.warning("nohup launch returned rc=%s for run #%s", launch_rc, task_run.id)
+    # Use fire_and_forget to fully detach the agent process from SSH
+    await ssh.fire_and_forget(claude_cmd)
 
     # 4. Handle plan approval gate
     if plan_approval in ("require_approval", "show_and_continue"):
