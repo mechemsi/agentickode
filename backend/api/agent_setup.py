@@ -65,7 +65,8 @@ async def get_setup_status():
         not all(
             [
                 claude_extras.get("mcp_agentickode", False),
-                claude_extras.get("plugins_installed", False),
+                claude_extras.get("superclaude", False),
+                claude_extras.get("plugin_count", 0) >= 3,
             ]
         )
         if agents.get("claude", {}).get("installed")
