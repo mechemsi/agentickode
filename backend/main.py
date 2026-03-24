@@ -39,6 +39,7 @@ from backend.api import (
     webhooks,
     webhooks_pr,
     workflow_templates,
+    workspace_commands,
     ws,
 )
 from backend.api.servers import (
@@ -309,6 +310,7 @@ app.include_router(git_connections.router, prefix="/api")
 app.include_router(agent_stream.router, prefix="/api")
 app.include_router(agent_control.router, prefix="/api")
 app.include_router(agent_query.router, prefix="/api")
+app.include_router(workspace_commands.router, prefix="/api")
 app.include_router(agent_setup.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(ws.router)

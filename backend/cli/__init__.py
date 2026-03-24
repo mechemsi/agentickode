@@ -13,6 +13,7 @@ from backend.cli.agent import agent
 from backend.cli.projects import projects
 from backend.cli.runs import runs
 from backend.cli.servers import servers
+from backend.cli.workspace import workspace
 
 
 @click.group()
@@ -37,6 +38,7 @@ cli.add_command(projects)
 cli.add_command(runs)
 cli.add_command(agent)
 cli.add_command(servers)
+cli.add_command(workspace)
 cli.add_command(admin)
 
 

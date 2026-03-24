@@ -52,6 +52,19 @@ from backend.mcp.tools.projects import (
     list_runs,
     update_project,
 )
+from backend.mcp.tools.sessions import (
+    capture_session_output,
+    close_workspace_session,
+    create_workspace_session,
+    get_workspace_session,
+    list_workspace_sessions,
+    send_to_session,
+)
+from backend.mcp.tools.workspace import (
+    list_workspace_directory,
+    read_workspace_file,
+    run_workspace_command,
+)
 
 # Create the MCP server
 mcp = FastMCP(
@@ -97,6 +110,19 @@ mcp.add_tool(list_agents)
 mcp.add_tool(configure_agent)
 mcp.add_tool(get_analytics)
 mcp.add_tool(get_health)
+
+# --- Tier 4: Workspace Sessions ---
+mcp.add_tool(create_workspace_session)
+mcp.add_tool(send_to_session)
+mcp.add_tool(capture_session_output)
+mcp.add_tool(get_workspace_session)
+mcp.add_tool(list_workspace_sessions)
+mcp.add_tool(close_workspace_session)
+
+# --- Tier 5: Remote Workspace Commands ---
+mcp.add_tool(run_workspace_command)
+mcp.add_tool(read_workspace_file)
+mcp.add_tool(list_workspace_directory)
 
 
 def get_mcp_app():
