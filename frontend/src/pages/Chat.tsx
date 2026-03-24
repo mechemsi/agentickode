@@ -3,6 +3,7 @@
 // Commercial licensing: info@mechemsi.com
 
 import {
+  AlertCircle,
   Bot,
   Download,
   Loader2,
@@ -33,15 +34,22 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface AgentInfo {
+  agent_name: string;
+  enabled: boolean;
+}
+
 type Mode = "terminal" | "chat";
 
-const AGENTS = ["claude", "opencode", "gemini", "aider", "codex"];
+const FALLBACK_AGENTS = ["claude", "opencode", "gemini", "aider", "codex"];
 
 // ─── Component ──────────────────────────────────────────────────────
 export default function Chat() {
   const [mode, setMode] = useState<Mode>("terminal");
   const [selectedAgent, setSelectedAgent] = useState("claude");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [agents, setAgents] = useState<string[]>(FALLBACK_AGENTS);
+  const [error, setError] = useState<string | null>(null);
 
   // Terminal mode — each agent gets a live session key to force remount
   const [terminalKey, setTerminalKey] = useState(0);
@@ -56,9 +64,21 @@ export default function Chat() {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [runningSetup, setRunningSetup] = useState(false);
   const [setupLog, setSetupLog] = useState("");
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ─── Data fetching ────────────────────────────────────────────────
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents");
+      if (res.ok) {
+        const data: AgentInfo[] = await res.json();
+        const enabled = data.filter((a) => a.enabled).map((a) => a.agent_name);
+        if (enabled.length > 0) setAgents(enabled);
+      }
+    } catch { /* use fallback */ }
+  }, []);
+
   const fetchSetupStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/agent-setup/status");
@@ -95,9 +115,10 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
+    fetchAgents();
     fetchChatSessions();
     fetchSetupStatus();
-  }, [fetchChatSessions, fetchSetupStatus]);
+  }, [fetchAgents, fetchChatSessions, fetchSetupStatus]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -145,9 +166,11 @@ export default function Chat() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || !activeChatSession || loading) return;
+    if (!input.trim() || !activeChatSession || loading || sending) return;
     const msg = input.trim();
     setInput("");
+    setError(null);
+    setSending(true);
 
     const userMsg: ChatMessage = { role: "user", content: msg, timestamp: new Date().toISOString() };
     setActiveChatSession((prev) =>
@@ -165,15 +188,21 @@ export default function Chat() {
         const data = await res.json();
         const assistantMsg: ChatMessage = {
           role: "assistant",
-          content: data.response,
+          content: data.response || "(empty response)",
           timestamp: new Date().toISOString(),
         };
         setActiveChatSession((prev) =>
           prev ? { ...prev, messages: [...prev.messages, assistantMsg] } : prev,
         );
+      } else {
+        setError(`Agent error: ${res.status} ${res.statusText}`);
       }
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(`Network error: ${e instanceof Error ? e.message : "connection failed"}`);
+    } finally {
+      setLoading(false);
+      setSending(false);
+    }
   };
 
   // ─── Render ───────────────────────────────────────────────────────
@@ -214,7 +243,7 @@ export default function Chat() {
                 onChange={(e) => setSelectedAgent(e.target.value)}
                 className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200"
               >
-                {AGENTS.map((a) => (
+                {agents.map((a) => (
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
@@ -333,6 +362,17 @@ export default function Chat() {
         </div>
 
         {/* Content */}
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-900/30 border-b border-red-700/50 text-red-300 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 overflow-hidden">
           {mode === "terminal" ? (
             terminalActive ? (

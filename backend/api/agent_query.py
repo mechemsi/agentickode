@@ -28,6 +28,9 @@ from backend.services.workspace.ssh_service import SSHService
 router = APIRouter(tags=["agent-query"])
 
 
+_MAX_QUERY_TIMEOUT = 300
+
+
 class QueryRequest(BaseModel):
     question: str
     timeout: int = 120
@@ -58,16 +61,27 @@ async def query_run_agent(run_id: int, req: QueryRequest):
         if not session_id:
             raise HTTPException(400, "No agent session found for this run")
 
-        # Get workspace server + SSH
-        ssh, workspace, worker_user = await _get_ssh_context(db, run)
+        # Cap timeout to prevent abuse
+        timeout = min(req.timeout, _MAX_QUERY_TIMEOUT)
 
-        # Write question to temp file on remote
+        # Get workspace server + SSH
+        try:
+            ssh, workspace, worker_user = await _get_ssh_context(db, run)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(500, f"SSH connection failed: {exc}") from exc
+
+        # Write question to temp file on remote (avoids shell escaping issues)
         q_path = f"{workspace}/.autodev/query_prompt.txt"
         escaped = req.question.replace("'", "'\\''")
-        await ssh.run_command(
+        _, _, write_rc = await ssh.run_command(
+            f"mkdir -p {shlex.quote(workspace)}/.autodev && "
             f"echo '{escaped}' > {shlex.quote(q_path)}",
             timeout=10,
         )
+        if write_rc != 0:
+            raise HTTPException(500, "Failed to write question to workspace")
 
         # Build --resume command
         cmd = (
@@ -87,21 +101,36 @@ async def query_run_agent(run_id: int, req: QueryRequest):
             cmd = f"runuser -u {worker_user} -- bash -c {shlex.quote(inner)}"
 
         # Execute and wait for response
-        stdout, stderr, rc = await ssh.run_command(cmd, timeout=req.timeout)
+        try:
+            stdout, stderr, rc = await ssh.run_command(cmd, timeout=timeout)
+        except Exception as exc:
+            return {
+                "response": "",
+                "exit_code": -1,
+                "session_id": session_id,
+                "error": f"SSH command failed: {exc}",
+            }
 
         # Parse JSON output
         response_text = stdout.strip()
+        parse_error = False
         try:
             data = json.loads(response_text)
             if isinstance(data, dict):
                 response_text = data.get("result", data.get("content", response_text))
         except json.JSONDecodeError:
-            pass
+            parse_error = True
+
+        error_msg = None
+        if rc != 0:
+            error_msg = stderr.strip()[:500] if stderr else f"Agent exited with code {rc}"
 
         return {
             "response": response_text,
             "exit_code": rc,
             "session_id": session_id,
+            "error": error_msg,
+            "parse_error": parse_error,
         }
 
 
@@ -189,15 +218,20 @@ async def create_run_and_wait(req: RunAndWaitRequest):
     if not run_id:
         raise HTTPException(500, "Failed to create run")
 
-    # Poll until done
+    # Poll until done with exponential backoff
     deadline = time.monotonic() + req.timeout
+    poll_interval = 5
     while time.monotonic() < deadline:
-        await asyncio.sleep(10)
+        await asyncio.sleep(poll_interval)
+        poll_interval = min(poll_interval * 1.5, 30)  # 5s → 7.5s → 11s → ... → max 30s
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(f"{_BASE_URL}/api/runs/{run_id}")
-            resp.raise_for_status()
-            run = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(f"{_BASE_URL}/api/runs/{run_id}")
+                resp.raise_for_status()
+                run = resp.json()
+        except Exception:
+            continue  # Transient error, keep polling
 
         status = run.get("status", "")
         if status in ("completed", "failed", "cancelled"):

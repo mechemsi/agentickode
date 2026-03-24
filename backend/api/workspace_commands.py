@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import shlex
 
 from fastapi import APIRouter, HTTPException
@@ -15,7 +16,10 @@ from backend.database import async_session
 from backend.models.servers import WorkspaceServer
 from backend.services.workspace.ssh_service import SSHService
 
+logger = logging.getLogger("agentickode.workspace_commands")
 router = APIRouter(tags=["workspace-commands"])
+
+_MAX_TIMEOUT = 120
 
 
 class ExecRequest(BaseModel):
@@ -27,6 +31,9 @@ class ExecRequest(BaseModel):
 @router.post("/workspace-servers/{server_id}/exec")
 async def exec_command(server_id: int, req: ExecRequest):
     """Execute a shell command on a workspace server via SSH."""
+    timeout = min(req.timeout, _MAX_TIMEOUT)
+    logger.info("Exec on server #%d: %s (user=%s)", server_id, req.command[:100], req.user)
+
     ssh = await _get_ssh(server_id)
 
     if req.user:
@@ -34,7 +41,11 @@ async def exec_command(server_id: int, req: ExecRequest):
     else:
         cmd = req.command
 
-    stdout, stderr, rc = await ssh.run_command(cmd, timeout=req.timeout)
+    try:
+        stdout, stderr, rc = await ssh.run_command(cmd, timeout=timeout)
+    except Exception as exc:
+        logger.error("SSH exec failed on server #%d: %s", server_id, exc)
+        raise HTTPException(500, f"SSH command failed: {exc}") from exc
 
     return {
         "stdout": stdout,
