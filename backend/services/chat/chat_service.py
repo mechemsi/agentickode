@@ -2,11 +2,19 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Chat service — manages conversational agent sessions."""
+"""Chat service — manages conversational agent sessions.
+
+Uses one-shot-per-message invocations with --session-id / --resume
+for conversation continuity. Each message spawns a separate agent
+process that exits after responding.
+
+NOTE: --resume re-ingests the full session history, which costs tokens
+on each message. For cost-sensitive use, consider using the Claude Agent
+SDK (Python) for in-process stateful conversations in a future iteration.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
@@ -16,16 +24,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.chat import ChatSession
-from backend.services.chat.agent_process import AgentProcess, spawn_agent
+from backend.services.chat.agent_process import (
+    invoke_agent,
+    invoke_agent_streaming,
+    is_agent_available,
+)
 
 logger = logging.getLogger("agentickode.chat.service")
 
 
 class ChatService:
     """Manages conversational agent sessions with persistent history."""
-
-    def __init__(self):
-        self._active: dict[str, AgentProcess] = {}
 
     async def create_session(
         self,
@@ -35,11 +44,11 @@ class ChatService:
         display_name: str | None = None,
         platform_url: str = "http://localhost:8000",
     ) -> ChatSession:
-        """Create a new chat session and spawn a local agent.
-
-        Returns the ChatSession DB record.
-        """
+        """Create a new chat session."""
         session_id = str(uuid.uuid4())
+
+        if not is_agent_available(agent_name):
+            logger.warning("Agent %s not available locally", agent_name)
 
         chat = ChatSession(
             session_id=session_id,
@@ -48,21 +57,12 @@ class ChatService:
             display_name=display_name or f"Chat with {agent_name}",
             status="active",
             messages=[],
+            agent_session_id=session_id,
         )
         db.add(chat)
         await db.commit()
 
-        # Spawn agent process
-        try:
-            proc = await spawn_agent(agent_name, platform_url)
-            self._active[session_id] = proc
-            logger.info("Created chat session %s with %s", session_id, agent_name)
-        except (ValueError, FileNotFoundError) as exc:
-            chat.status = "error"
-            chat.messages = [{"role": "system", "content": str(exc), "timestamp": _now()}]
-            await db.commit()
-            logger.error("Failed to spawn %s: %s", agent_name, exc)
-
+        logger.info("Created chat session %s with %s", session_id, agent_name)
         return chat
 
     async def send_message(
@@ -70,45 +70,99 @@ class ChatService:
         db: AsyncSession,
         session_id: str,
         message: str,
+        platform_url: str = "http://localhost:8000",
     ) -> AsyncIterator[str]:
         """Send a message and stream the agent's response.
 
-        Yields response chunks as they arrive.
+        Each message is a separate agent invocation:
+        - First message: claude -p ... --session-id {id}
+        - Subsequent: claude -p ... --resume {id}
         """
         chat = await self._get_session(db, session_id)
         if not chat:
-            yield json.dumps({"error": "Session not found"})
+            yield "Session not found"
             return
 
         # Append user message
         msgs = list(chat.messages or [])
+        is_first = len([m for m in msgs if m.get("role") == "user"]) == 0
         msgs.append({"role": "user", "content": message, "timestamp": _now()})
         chat.messages = msgs
         chat.last_activity_at = datetime.now(UTC)
         await db.commit()
 
-        # Get or reconnect agent process
-        proc = self._active.get(session_id)
-        if not proc or not proc.alive:
-            try:
-                proc = await spawn_agent(chat.agent_name)
-                self._active[session_id] = proc
-            except (ValueError, FileNotFoundError) as exc:
-                yield json.dumps({"error": str(exc)})
-                return
+        # Invoke agent (one-shot with session resume)
+        agent_session_id = chat.agent_session_id or chat.session_id
 
-        # Send message and stream response
-        await proc.send(message)
-        response = await proc.read_output(timeout=60.0)
+        result = await invoke_agent(
+            agent_name=chat.agent_name,
+            message=message,
+            session_id=agent_session_id,
+            is_new_session=is_first,
+            platform_url=platform_url,
+        )
 
         # Append assistant response
         msgs = list(chat.messages or [])
-        msgs.append({"role": "assistant", "content": response, "timestamp": _now()})
+        msgs.append(
+            {
+                "role": "assistant",
+                "content": result.output,
+                "timestamp": _now(),
+                "exit_code": result.exit_code,
+            }
+        )
         chat.messages = msgs
         chat.last_activity_at = datetime.now(UTC)
         await db.commit()
 
-        yield response
+        yield result.output
+
+    async def send_message_streaming(
+        self,
+        db: AsyncSession,
+        session_id: str,
+        message: str,
+        platform_url: str = "http://localhost:8000",
+    ) -> AsyncIterator[str]:
+        """Send a message and stream chunks as they arrive."""
+        chat = await self._get_session(db, session_id)
+        if not chat:
+            yield "Session not found"
+            return
+
+        msgs = list(chat.messages or [])
+        is_first = len([m for m in msgs if m.get("role") == "user"]) == 0
+        msgs.append({"role": "user", "content": message, "timestamp": _now()})
+        chat.messages = msgs
+        chat.last_activity_at = datetime.now(UTC)
+        await db.commit()
+
+        agent_session_id = chat.agent_session_id or chat.session_id
+        response_parts: list[str] = []
+
+        async for chunk in invoke_agent_streaming(
+            agent_name=chat.agent_name,
+            message=message,
+            session_id=agent_session_id,
+            is_new_session=is_first,
+            platform_url=platform_url,
+        ):
+            response_parts.append(chunk)
+            yield chunk
+
+        # Store full response
+        msgs = list(chat.messages or [])
+        msgs.append(
+            {
+                "role": "assistant",
+                "content": "".join(response_parts),
+                "timestamp": _now(),
+            }
+        )
+        chat.messages = msgs
+        chat.last_activity_at = datetime.now(UTC)
+        await db.commit()
 
     async def list_sessions(self, db: AsyncSession, user_id: str = "default") -> list[ChatSession]:
         """List all sessions for a user."""
@@ -119,41 +173,12 @@ class ChatService:
         )
         return list(result.scalars().all())
 
-    async def resume_session(
-        self,
-        db: AsyncSession,
-        session_id: str,
-        platform_url: str = "http://localhost:8000",
-    ) -> ChatSession | None:
-        """Resume a persistent session — respawn agent if needed."""
-        chat = await self._get_session(db, session_id)
-        if not chat:
-            return None
-
-        chat.status = "active"
-        chat.last_activity_at = datetime.now(UTC)
-        await db.commit()
-
-        # Respawn agent if not running
-        if session_id not in self._active or not self._active[session_id].alive:
-            try:
-                proc = await spawn_agent(chat.agent_name, platform_url)
-                self._active[session_id] = proc
-            except (ValueError, FileNotFoundError):
-                logger.warning("Could not respawn agent for session %s", session_id)
-
-        return chat
-
     async def close_session(self, db: AsyncSession, session_id: str) -> None:
-        """Close a session and clean up the agent process."""
+        """Close a session."""
         chat = await self._get_session(db, session_id)
         if chat:
             chat.status = "closed"
             await db.commit()
-
-        proc = self._active.pop(session_id, None)
-        if proc:
-            await proc.kill()
             logger.info("Closed chat session %s", session_id)
 
     async def rename_session(

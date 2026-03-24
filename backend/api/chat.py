@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from backend.database import async_session
+from backend.models.chat import ChatSession
 from backend.services.chat.chat_service import chat_service
 
 router = APIRouter(tags=["chat"])
@@ -51,7 +53,8 @@ async def list_sessions(user_id: str = "default"):
 async def get_session(session_id: str):
     """Get a chat session with full message history."""
     async with async_session() as db:
-        chat = await chat_service.resume_session(db, session_id)
+        result = await db.execute(select(ChatSession).where(ChatSession.session_id == session_id))
+        chat = result.scalar_one_or_none()
         if not chat:
             return {"error": "Session not found"}
         return _session_to_dict(chat)
@@ -79,7 +82,7 @@ async def rename_session(session_id: str, req: RenameRequest):
 
 @router.delete("/chat/sessions/{session_id}")
 async def close_session(session_id: str):
-    """Close a chat session and kill the agent process."""
+    """Close a chat session."""
     async with async_session() as db:
         await chat_service.close_session(db, session_id)
     return {"status": "closed"}
@@ -87,12 +90,13 @@ async def close_session(session_id: str):
 
 @router.websocket("/ws/chat/{session_id}")
 async def chat_websocket(websocket: WebSocket, session_id: str):
-    """WebSocket for real-time chat with the agent."""
+    """WebSocket for real-time streaming chat with the agent."""
     await websocket.accept()
 
+    # Verify session exists
     async with async_session() as db:
-        chat = await chat_service.resume_session(db, session_id)
-        if not chat:
+        result = await db.execute(select(ChatSession).where(ChatSession.session_id == session_id))
+        if not result.scalar_one_or_none():
             await websocket.send_json({"type": "error", "content": "Session not found"})
             await websocket.close()
             return
@@ -105,7 +109,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             if msg_type == "message":
                 content = data.get("content", "")
                 async with async_session() as db:
-                    async for chunk in chat_service.send_message(db, session_id, content):
+                    async for chunk in chat_service.send_message_streaming(db, session_id, content):
                         await websocket.send_json({"type": "chunk", "content": chunk})
                 await websocket.send_json({"type": "done"})
 
