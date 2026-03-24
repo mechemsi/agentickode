@@ -18,6 +18,7 @@ from backend.api import (
     analytics,
     app_settings,
     backup,
+    chat,
     git_connections,
     health,
     llm_roles,
@@ -53,6 +54,7 @@ from backend.api.servers import (
     ws_ops_router,
 )
 from backend.database import engine as db_engine
+from backend.mcp.server import get_mcp_app
 from backend.seed import seed_all
 from backend.services.http_client import close_http_client
 from backend.services.notifications.dispatcher import NotificationDispatcher
@@ -304,4 +306,8 @@ app.include_router(backup.router, prefix="/api")
 app.include_router(git_connections.router, prefix="/api")
 app.include_router(agent_stream.router, prefix="/api")
 app.include_router(agent_control.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 app.include_router(ws.router)
+
+# Mount MCP server for AI agent access (SSE transport)
+app.mount("/mcp", get_mcp_app().http_app(transport="sse"))

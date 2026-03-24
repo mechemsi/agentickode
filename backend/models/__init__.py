@@ -12,6 +12,7 @@ from backend.models.agents import (
     ScheduledTask,
 )
 from backend.models.base import Base
+from backend.models.chat import ChatSession
 from backend.models.episodes import Episode
 from backend.models.git_connections import GitConnection
 from backend.models.instructions import ProjectInstruction, ProjectInstructionVersion, ProjectSecret
@@ -35,6 +36,7 @@ __all__ = [
     "AgentSettings",
     "AppSetting",
     "Base",
+    "ChatSession",
     "CliSession",
     "DiscoveredAgent",
     "Episode",
