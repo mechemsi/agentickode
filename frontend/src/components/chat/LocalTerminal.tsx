@@ -95,7 +95,7 @@ export default function LocalTerminal({ agentName }: LocalTerminalProps) {
   return (
     <div
       ref={containerRef}
-      className="rounded-lg overflow-hidden h-full"
+      className="overflow-hidden h-full w-full"
     />
   );
 }

@@ -286,7 +286,7 @@ export default function Chat() {
         <div className="flex-1 overflow-hidden">
           {mode === "terminal" ? (
             terminalActive ? (
-              <div className="h-full p-2">
+              <div className="h-full">
                 <LocalTerminal key={terminalKey} agentName={selectedAgent} />
               </div>
             ) : (
