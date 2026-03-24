@@ -1,4 +1,4 @@
-# Conversational Agent + MCP Server Design
+# Conversational Agent + CLI + MCP Server Design
 
 **Date**: 2026-03-24
 **Status**: Proposed
@@ -9,7 +9,171 @@ Users interact with the platform exclusively through the web UI or raw API calls
 
 ## Solution
 
-Add a **conversational AI manager** to the platform — a local agent (Claude, OpenCode, Gemini) that users chat with through a built-in chat UI or any external CLI tool. The agent connects to the platform via an **MCP server** that exposes all platform operations as tools.
+Three layers of programmatic access, each building on the previous:
+
+1. **CLI tool** (`agentickode`) — Immediately usable by humans and any agent via Bash. Thin wrapper over the REST API.
+2. **MCP server** — Structured tool interface for native agent integration. No text parsing needed.
+3. **Built-in chat UI** — Conversational agent with persistent sessions, powered by local agents connected to the MCP server.
+
+## CLI Tool (`agentickode`)
+
+### Why CLI First
+
+Every agent already has a Bash tool. A CLI gives you agent integration for free — no MCP configuration needed. It's also useful for humans, scripts, and CI/CD.
+
+```bash
+# Any agent can do this today via Bash tool:
+agentickode runs create --project my-app --title "Fix login bug"
+agentickode runs status 42
+agentickode runs approve 42
+```
+
+### Command Structure
+
+```bash
+agentickode <resource> <action> [options]
+```
+
+#### Projects
+```bash
+agentickode projects list [--status active|archived]
+agentickode projects get <project-id>
+agentickode projects create --repo-url <url> --provider github [--name <name>] [--mode autonomous]
+agentickode projects update <project-id> [--mode autonomous] [--episode-config '{"max_episodes":5}']
+```
+
+#### Runs
+```bash
+agentickode runs list [--project <id>] [--status running|pending|completed|failed] [--limit 20]
+agentickode runs create --project <id> --title "Task title" [--description "..."] [--mode autonomous]
+agentickode runs get <run-id>
+agentickode runs logs <run-id> [--tail 50] [--follow]
+agentickode runs cancel <run-id>
+agentickode runs approve <run-id>
+agentickode runs reject <run-id> [--reason "..."]
+```
+
+#### Agent Control
+```bash
+agentickode agent message <run-id> "Focus on auth tests first"
+agentickode agent pause <run-id>
+agentickode agent resume <run-id>
+agentickode agent episodes <run-id>
+```
+
+#### Servers
+```bash
+agentickode servers list
+agentickode servers add --hostname 10.0.1.50 --ssh-user root [--ssh-key-id 1]
+agentickode servers setup <server-id>
+agentickode servers status <server-id>
+```
+
+#### Admin
+```bash
+agentickode agents list
+agentickode agents configure <agent-name> [--timeout 3600] [--env KEY=VALUE]
+agentickode analytics [--period 7d|30d|90d]
+agentickode health
+```
+
+### Implementation
+
+**File**: `backend/cli/__init__.py` (Python package, uses `click`)
+
+The CLI is a thin wrapper over the REST API:
+
+```python
+import click
+import httpx
+
+BASE_URL = os.environ.get("AGENTICKODE_URL", "http://localhost:8000")
+
+@click.group()
+def cli():
+    """AgenticKode CLI — control your AI coding platform."""
+    pass
+
+@cli.group()
+def runs():
+    """Manage task runs."""
+    pass
+
+@runs.command("create")
+@click.option("--project", required=True)
+@click.option("--title", required=True)
+@click.option("--description", default="")
+@click.option("--mode", type=click.Choice(["structured", "autonomous", "hybrid"]))
+def runs_create(project, title, description, mode):
+    """Create a new task run."""
+    resp = httpx.post(f"{BASE_URL}/api/runs", json={
+        "project_id": project,
+        "title": title,
+        "description": description,
+        **({"execution_mode": mode} if mode else {}),
+    })
+    run = resp.json()
+    click.echo(f"Run #{run['id']} created ({run['status']})")
+
+@runs.command("logs")
+@click.argument("run_id", type=int)
+@click.option("--tail", default=50)
+@click.option("--follow", is_flag=True)
+def runs_logs(run_id, tail, follow):
+    """Show run logs, optionally following live."""
+    if follow:
+        # SSE streaming
+        with httpx.stream("GET", f"{BASE_URL}/api/runs/{run_id}/agent-stream") as resp:
+            for line in resp.iter_lines():
+                if line.startswith("data: "):
+                    click.echo(line[6:])
+    else:
+        resp = httpx.get(f"{BASE_URL}/api/runs/{run_id}/logs", params={"limit": tail})
+        for log in resp.json():
+            click.echo(f"[{log['phase']}] {log['message']}")
+```
+
+### Output Formats
+
+```bash
+# Default: human-readable
+agentickode runs list
+  #42  my-app     "Fix login bug"        running    2m ago
+  #41  backend    "Add auth endpoints"   completed  1h ago
+
+# JSON for scripting/agents
+agentickode runs list --json
+[{"id": 42, "project_id": "my-app", "title": "Fix login bug", ...}]
+
+# Quiet for scripts
+agentickode runs create --project my-app --title "Fix bug" --quiet
+42
+```
+
+### Installation
+
+Ships inside the Docker container. Can also be installed standalone:
+
+```bash
+pip install agentickode-cli
+# or
+pipx install agentickode-cli
+```
+
+### Config
+
+```bash
+# Set platform URL
+export AGENTICKODE_URL=http://localhost:8000
+
+# Or use config file
+cat ~/.agentickode.yaml
+url: http://localhost:8000
+default_project: my-app
+output: table  # table, json, quiet
+```
+
+---
 
 ## Architecture
 
@@ -220,7 +384,18 @@ Any agent supporting MCP SSE transport can connect to the same endpoint.
 
 ## Implementation Phases
 
-### Phase 1: MCP Server (foundation)
+### Phase 1: CLI Tool (immediate agent access)
+- `backend/cli/__init__.py` — Click CLI app
+- `backend/cli/projects.py` — Project commands
+- `backend/cli/runs.py` — Run commands (create, list, get, logs, approve, cancel)
+- `backend/cli/agent.py` — Agent control commands (message, pause, resume, episodes)
+- `backend/cli/servers.py` — Server commands
+- `backend/cli/admin.py` — Admin commands (agents, analytics, health)
+- `backend/cli/output.py` — Output formatters (table, json, quiet)
+- `pyproject.toml` entry point: `agentickode = "backend.cli:cli"`
+- Tests for each command group
+
+### Phase 2: MCP Server (structured tools)
 - `backend/mcp/__init__.py`
 - `backend/mcp/server.py` — FastMCP server setup
 - `backend/mcp/tools/projects.py` — Tier 1 tools
@@ -229,19 +404,19 @@ Any agent supporting MCP SSE transport can connect to the same endpoint.
 - SSE transport endpoint on FastAPI
 - Tests for each tool
 
-### Phase 2: Chat Service (core)
+### Phase 3: Chat Service (core)
 - `backend/services/chat/chat_service.py` — Session management
 - `backend/services/chat/agent_process.py` — Local process spawning
 - `backend/models/chat.py` — ChatSession model + migration
 - `backend/api/chat.py` — WebSocket endpoint
 - Tests
 
-### Phase 3: Chat UI (frontend)
+### Phase 4: Chat UI (frontend)
 - `frontend/src/pages/Chat.tsx` — Main chat page
 - `frontend/src/components/chat/` — Sidebar, thread, tool cards, agent selector
 - Route and navigation
 
-### Phase 4: Session Persistence and Polish
+### Phase 5: Session Persistence and Polish
 - Conversation history in DB
 - Resume sessions with context
 - Agent switching mid-session
@@ -251,25 +426,33 @@ Any agent supporting MCP SSE transport can connect to the same endpoint.
 
 ```
 backend/
-  mcp/
+  cli/                         # Phase 1: CLI tool
+    __init__.py                # Click app entry point
+    projects.py                # project commands
+    runs.py                    # run commands
+    agent.py                   # agent control commands
+    servers.py                 # server commands
+    admin.py                   # admin commands
+    output.py                  # table/json/quiet formatters
+  mcp/                         # Phase 2: MCP server
     __init__.py
-    server.py
+    server.py                  # FastMCP server setup
     tools/
       __init__.py
-      projects.py
-      agent_control.py
-      admin.py
+      projects.py              # Tier 1 tools
+      agent_control.py         # Tier 2 tools
+      admin.py                 # Tier 3 tools
   services/
-    chat/
+    chat/                      # Phase 3: Chat service
       __init__.py
-      chat_service.py
-      agent_process.py
+      chat_service.py          # Session lifecycle
+      agent_process.py         # Local agent spawning
   models/
-    chat.py
+    chat.py                    # ChatSession model
   api/
-    chat.py
+    chat.py                    # WebSocket + REST
 
-frontend/src/
+frontend/src/                  # Phase 4: Chat UI
   pages/
     Chat.tsx
   components/
@@ -282,7 +465,21 @@ frontend/src/
 
 ## Example Interactions
 
-### Simple task
+### Via CLI (any agent using Bash tool)
+```
+Agent thinks: "I need to fix failing tests in backend-api"
+Agent runs:   agentickode runs create --project backend-api --title "Fix failing tests"
+Output:       Run #47 created (pending)
+Agent runs:   agentickode runs logs 47 --follow
+Output:       [agent_loop] Starting episode 1/5...
+              [agent_loop] Episode 1 done: completed=true, turns=24
+Agent runs:   agentickode runs get 47
+Output:       Run #47  backend-api  "Fix failing tests"  completed  PR #123
+```
+
+### Via Chat UI (MCP tools)
+
+#### Simple task
 ```
 User: "Fix the failing tests in project backend-api"
 Agent: [calls get_project("backend-api")] Got it — backend-api on GitHub.
