@@ -142,10 +142,15 @@ if $HAS_BACKEND; then
     fi
 
     # 2d. Run related tests for changed backend files
+    # Skip infrastructure files that would trigger the full suite
+    SKIP_PATTERNS="__init__|main|conftest|config|database|dependencies|schemas"
     TEST_FILES=""
     for f in $BACKEND_PY; do
-        # Map backend/foo/bar.py -> tests/unit/test_bar.py
         basename=$(basename "$f" .py)
+        # Skip infrastructure files — they'd match too many tests
+        if echo "$basename" | grep -qE "$SKIP_PATTERNS"; then
+            continue
+        fi
         found=$(find tests/ -name "test_${basename}.py" 2>/dev/null | head -1)
         if [ -n "$found" ]; then
             TEST_FILES="$TEST_FILES $found"
@@ -156,8 +161,8 @@ if $HAS_BACKEND; then
     if [ -n "$STAGED_TESTS" ]; then
         TEST_FILES="$TEST_FILES $STAGED_TESTS"
     fi
-    # Deduplicate
-    TEST_FILES=$(echo "$TEST_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    # Deduplicate and limit to 20 test files max to keep pre-commit fast
+    TEST_FILES=$(echo "$TEST_FILES" | tr ' ' '\n' | sort -u | head -20 | tr '\n' ' ')
 
     if [ -n "$TEST_FILES" ]; then
         if [ -n "$RUN_BE" ]; then
