@@ -34,7 +34,7 @@ jobs:
             frontend:
               - 'frontend/**'
 
-  # ── Always runs ────────────────────────────────────────────────
+  # ── PR size with human-readable breakdown ────────────────────────
   pr-size:
     name: PR Size Check
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check PR size
+      - name: Analyze PR size
         id: size
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -57,14 +57,35 @@ jobs:
           DELETIONS=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" | awk '{ s += $2 } END { print s+0 }')
           TOTAL_LINES=$((INSERTIONS + DELETIONS))
 
+          # T-shirt size
+          if [ "$TOTAL_LINES" -le 100 ] && [ "$FILES" -le 5 ]; then
+            SIZE="S"
+          elif [ "$TOTAL_LINES" -le 500 ] && [ "$FILES" -le 15 ]; then
+            SIZE="M"
+          elif [ "$TOTAL_LINES" -le 1500 ] && [ "$FILES" -le 30 ]; then
+            SIZE="L"
+          else
+            SIZE="XL"
+          fi
+
+          # Per-directory breakdown (top 8 directories by lines changed)
+          BREAKDOWN=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" | \
+            awk '{ dir=$3; sub(/\/[^\/]*$/, "", dir); ins+=$1; del+=$2; d[dir]+=$1+$2 } END { for (k in d) print d[k], k }' | \
+            sort -rn | head -8 | \
+            awk '{ printf "%s | %s\\n", $2, $1 }')
+
           echo "files=$FILES" >> "$GITHUB_OUTPUT"
           echo "insertions=$INSERTIONS" >> "$GITHUB_OUTPUT"
           echo "deletions=$DELETIONS" >> "$GITHUB_OUTPUT"
           echo "lines=$TOTAL_LINES" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "breakdown<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BREAKDOWN" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
           STATUS="pass"
           if [ "$FILES" -gt 20 ] || [ "$TOTAL_LINES" -gt 1500 ]; then
-            STATUS="fail"
+            STATUS="warn"
           fi
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
@@ -75,14 +96,18 @@ jobs:
           PR_INSERTIONS: ${{ steps.size.outputs.insertions }}
           PR_DELETIONS: ${{ steps.size.outputs.deletions }}
           PR_LINES: ${{ steps.size.outputs.lines }}
+          PR_SIZE: ${{ steps.size.outputs.size }}
           PR_STATUS: ${{ steps.size.outputs.status }}
+          PR_BREAKDOWN: ${{ steps.size.outputs.breakdown }}
         with:
           script: |
             const files = parseInt(process.env.PR_FILES, 10);
             const insertions = parseInt(process.env.PR_INSERTIONS, 10);
             const deletions = parseInt(process.env.PR_DELETIONS, 10);
             const lines = parseInt(process.env.PR_LINES, 10);
+            const size = process.env.PR_SIZE;
             const status = process.env.PR_STATUS;
+            const breakdown = process.env.PR_BREAKDOWN;
             const marker = '<!-- pr-size-check -->';
 
             // If under limits, remove existing comment if any
@@ -103,20 +128,42 @@ jobs:
               return;
             }
 
+            const sizeEmoji = { S: ':white_check_mark:', M: ':yellow_circle:', L: ':orange_circle:', XL: ':red_circle:' }[size] || ':question:';
             const filesIcon = files > 20 ? ':x:' : ':white_check_mark:';
             const linesIcon = lines > 1500 ? ':x:' : ':white_check_mark:';
 
-            const body = [
+            const bodyLines = [
               marker,
-              '### :warning: PR Size Check',
+              `### ${sizeEmoji} PR Size: **${size}**`,
               '',
               '| Metric | Value | Limit | Status |',
               '|--------|------:|------:|--------|',
               `| Files changed | ${files} | 20 | ${filesIcon} |`,
               `| Lines changed | +${insertions} -${deletions} = ${lines} | 1,500 | ${linesIcon} |`,
               '',
-              '> Consider splitting this PR into smaller, focused changes.',
-            ].join('\n');
+            ];
+
+            // Add per-directory breakdown
+            if (breakdown && breakdown.trim()) {
+              bodyLines.push(
+                '<details>',
+                '<summary>Lines changed by directory</summary>',
+                '',
+                '| Directory | Lines |',
+                '|-----------|------:|',
+              );
+              for (const line of breakdown.trim().split('\n')) {
+                if (line.trim()) {
+                  const [dir, count] = line.split(' | ');
+                  bodyLines.push(`| \`${dir.trim()}\` | ${count.trim()} |`);
+                }
+              }
+              bodyLines.push('', '</details>', '');
+            }
+
+            bodyLines.push('> Consider splitting this PR into smaller, focused changes.');
+
+            const body = bodyLines.join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -262,6 +309,202 @@ jobs:
       - name: Fail on multiple heads
         if: steps.heads.outputs.exit_code != '0'
         run: exit 1
+
+  # ── Copy-paste detection (comment-only, never blocks merge) ────
+  duplication:
+    name: Copy-Paste Detection
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install jscpd
+        run: npm install -g jscpd@4
+
+      - name: Run copy-paste detection
+        id: cpd
+        env:
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
+        run: |
+          set +e
+
+          # Run jscpd on backend + tests (Python)
+          BACKEND_OUTPUT=""
+          if [ "$BACKEND_CHANGED" = "true" ]; then
+            BACKEND_OUTPUT=$(jscpd backend/ tests/ \
+              --min-lines 10 \
+              --min-tokens 50 \
+              --threshold 5 \
+              --reporters consoleFull \
+              --ignore "**/__pycache__/**,**/.pytest_cache/**" \
+              --format "python" \
+              2>&1) || true
+          fi
+
+          # Run jscpd on frontend (TypeScript)
+          FRONTEND_OUTPUT=""
+          if [ "$FRONTEND_CHANGED" = "true" ]; then
+            FRONTEND_OUTPUT=$(jscpd frontend/src/ \
+              --min-lines 8 \
+              --min-tokens 40 \
+              --threshold 5 \
+              --reporters consoleFull \
+              --ignore "**/node_modules/**,**/__tests__/**,**/types/**" \
+              --format "typescript,tsx" \
+              2>&1) || true
+          fi
+
+          # Extract duplication percentages
+          BACKEND_PCT=$(echo "$BACKEND_OUTPUT" | grep -oP '[\d.]+(?=% \()' | tail -1 || echo "0")
+          FRONTEND_PCT=$(echo "$FRONTEND_OUTPUT" | grep -oP '[\d.]+(?=% \()' | tail -1 || echo "0")
+          BACKEND_CLONES=$(echo "$BACKEND_OUTPUT" | grep -oP '\d+(?= clone)' | head -1 || echo "0")
+          FRONTEND_CLONES=$(echo "$FRONTEND_OUTPUT" | grep -oP '\d+(?= clone)' | head -1 || echo "0")
+
+          # Extract clone details (file pairs)
+          BACKEND_DETAILS=$(echo "$BACKEND_OUTPUT" | grep -A2 "Clone found" | head -60 || echo "")
+          FRONTEND_DETAILS=$(echo "$FRONTEND_OUTPUT" | grep -A2 "Clone found" | head -60 || echo "")
+
+          {
+            echo "backend_pct=${BACKEND_PCT:-0}"
+            echo "frontend_pct=${FRONTEND_PCT:-0}"
+            echo "backend_clones=${BACKEND_CLONES:-0}"
+            echo "frontend_clones=${FRONTEND_CLONES:-0}"
+          } >> "$GITHUB_OUTPUT"
+
+          HAS_ISSUES="false"
+          if [ "${BACKEND_CLONES:-0}" -gt 0 ] 2>/dev/null || [ "${FRONTEND_CLONES:-0}" -gt 0 ] 2>/dev/null; then
+            HAS_ISSUES="true"
+          fi
+          echo "has_issues=$HAS_ISSUES" >> "$GITHUB_OUTPUT"
+
+          # Save full output for comment
+          {
+            echo "backend_details<<EOF"
+            echo "$BACKEND_DETAILS"
+            echo "EOF"
+            echo "frontend_details<<EOF"
+            echo "$FRONTEND_DETAILS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          HAS_ISSUES: ${{ steps.cpd.outputs.has_issues }}
+          BACKEND_PCT: ${{ steps.cpd.outputs.backend_pct }}
+          FRONTEND_PCT: ${{ steps.cpd.outputs.frontend_pct }}
+          BACKEND_CLONES: ${{ steps.cpd.outputs.backend_clones }}
+          FRONTEND_CLONES: ${{ steps.cpd.outputs.frontend_clones }}
+          BACKEND_DETAILS: ${{ steps.cpd.outputs.backend_details }}
+          FRONTEND_DETAILS: ${{ steps.cpd.outputs.frontend_details }}
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
+        with:
+          script: |
+            const marker = '<!-- cpd-check -->';
+            const hasIssues = process.env.HAS_ISSUES === 'true';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (!hasIssues) {
+              if (existing) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                });
+              }
+              return;
+            }
+
+            const backendClones = parseInt(process.env.BACKEND_CLONES || '0', 10);
+            const frontendClones = parseInt(process.env.FRONTEND_CLONES || '0', 10);
+            const backendPct = process.env.BACKEND_PCT || '0';
+            const frontendPct = process.env.FRONTEND_PCT || '0';
+            const backendDetails = process.env.BACKEND_DETAILS || '';
+            const frontendDetails = process.env.FRONTEND_DETAILS || '';
+
+            const lines = [marker, '### :scissors: Copy-Paste Detection (jscpd)', ''];
+
+            lines.push(
+              '| Area | Clones | Duplication |',
+              '|------|-------:|------------:|',
+            );
+            if (process.env.BACKEND_CHANGED === 'true') {
+              const icon = backendClones > 0 ? ':warning:' : ':white_check_mark:';
+              lines.push(`| Backend (Python) | ${backendClones} | ${backendPct}% ${icon} |`);
+            }
+            if (process.env.FRONTEND_CHANGED === 'true') {
+              const icon = frontendClones > 0 ? ':warning:' : ':white_check_mark:';
+              lines.push(`| Frontend (TypeScript) | ${frontendClones} | ${frontendPct}% ${icon} |`);
+            }
+            lines.push('');
+
+            if (backendClones > 0 && backendDetails.trim()) {
+              lines.push(
+                '<details>',
+                '<summary>Backend duplicates</summary>',
+                '',
+                '```',
+                backendDetails.trim(),
+                '```',
+                '',
+                '</details>',
+                '',
+              );
+            }
+
+            if (frontendClones > 0 && frontendDetails.trim()) {
+              lines.push(
+                '<details>',
+                '<summary>Frontend duplicates</summary>',
+                '',
+                '```',
+                frontendDetails.trim(),
+                '```',
+                '',
+                '</details>',
+                '',
+              );
+            }
+
+            lines.push(
+              '---',
+              '> **Tip:** Extract duplicated code into shared helpers or utilities. This check is informational and does not block merging.',
+            );
+
+            const body = lines.join('\n');
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
   # ── Complexity checks (comment-only, never blocks merge) ───────
   complexity:
