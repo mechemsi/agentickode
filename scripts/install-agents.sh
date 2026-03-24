@@ -26,7 +26,11 @@ install_claude() {
     curl -fsSL https://claude.ai/install.sh | bash
     grep -q '$HOME/.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
     export PATH="$HOME/.local/bin:$PATH"
+    # Register the AgenticKode platform MCP server
+    AGENTICKODE_MCP_URL="${AGENTICKODE_URL:-http://localhost:8000}/mcp/sse"
+    claude mcp add agentickode --transport sse "$AGENTICKODE_MCP_URL" 2>/dev/null || true
     echo "  Claude CLI installed: $(command -v claude || echo 'not found')"
+    echo "  MCP server registered: $AGENTICKODE_MCP_URL"
 }
 
 install_codex() {

@@ -65,6 +65,11 @@ _CLAUDE_POST_INSTALL = [
     "pipx install superclaude || true",
     "superclaude install || true",
     "superclaude mcp --servers sequential-thinking || true",
+    # Register the AgenticKode platform MCP server so Claude can control the platform
+    (
+        'AGENTICKODE_MCP_URL="${AGENTICKODE_URL:-http://localhost:8000}/mcp/sse" && '
+        'claude mcp add agentickode --transport sse "$AGENTICKODE_MCP_URL" || true'
+    ),
 ]
 
 # Phase 1: Binary install only (no auth needed)
