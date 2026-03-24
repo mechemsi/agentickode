@@ -17,8 +17,6 @@ Usage:
 
 from __future__ import annotations
 
-import os
-
 from fastmcp import FastMCP
 
 from backend.mcp.tools.admin import (
@@ -62,8 +60,6 @@ mcp = FastMCP(
     ),
 )
 
-# Store the platform URL on the server for tools to access
-mcp._agentickode_url = os.environ.get("AGENTICKODE_URL", "http://localhost:8000")  # type: ignore[attr-defined]
 
 # --- Tier 1: Project & Task Management ---
 mcp.add_tool(list_projects)

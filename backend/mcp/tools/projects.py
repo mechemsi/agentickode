@@ -6,17 +6,18 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
+import httpx
 from fastmcp import Context
+
+_BASE_URL = os.environ.get("AGENTICKODE_URL", "http://localhost:8000")
 
 
 async def _api(ctx: Context, method: str, path: str, **kwargs) -> Any:
-    """Call the platform REST API via the shared httpx client."""
-    import httpx
-
-    base = ctx.session.server._agentickode_url  # type: ignore[attr-defined]
-    url = f"{base}/api{path}"
+    """Call the platform REST API."""
+    url = f"{_BASE_URL}/api{path}"
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await getattr(client, method)(url, **kwargs)
         resp.raise_for_status()

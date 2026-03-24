@@ -4,6 +4,7 @@
 
 import {
   Bot,
+  Download,
   Loader2,
   MessageSquare,
   Plus,
@@ -52,9 +53,40 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [setupNeeded, setSetupNeeded] = useState(false);
+  const [runningSetup, setRunningSetup] = useState(false);
+  const [setupLog, setSetupLog] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ─── Data fetching ────────────────────────────────────────────────
+  const fetchSetupStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agent-setup/status");
+      if (res.ok) {
+        const data = await res.json();
+        setSetupNeeded(data.needs_setup);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const runPostInstall = async () => {
+    setRunningSetup(true);
+    setSetupLog("Running post-install (plugins, marketplaces, skills)...\nThis may take several minutes.\n");
+    try {
+      const res = await fetch("/api/agent-setup/run-post-install", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setSetupLog((prev) => prev + "\n" + data.stdout + (data.stderr ? `\nErrors:\n${data.stderr}` : "") + `\nExit code: ${data.exit_code}`);
+        if (data.exit_code === 0) setSetupNeeded(false);
+      }
+    } catch (e) {
+      setSetupLog((prev) => prev + `\nFailed: ${e}`);
+    } finally {
+      setRunningSetup(false);
+      fetchSetupStatus();
+    }
+  };
+
   const fetchChatSessions = useCallback(async () => {
     try {
       const res = await fetch("/api/chat/sessions");
@@ -64,7 +96,8 @@ export default function Chat() {
 
   useEffect(() => {
     fetchChatSessions();
-  }, [fetchChatSessions]);
+    fetchSetupStatus();
+  }, [fetchChatSessions, fetchSetupStatus]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -195,6 +228,17 @@ export default function Chat() {
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               {mode === "terminal" ? `Launch ${selectedAgent}` : "New Chat"}
             </button>
+
+            {mode === "terminal" && setupNeeded && (
+              <button
+                onClick={runPostInstall}
+                disabled={runningSetup}
+                className="w-full flex items-center justify-center gap-2 py-1.5 rounded bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 disabled:opacity-50 text-sm mt-2"
+              >
+                {runningSetup ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {runningSetup ? "Installing..." : "Setup Plugins & Skills"}
+              </button>
+            )}
           </div>
 
           {/* Session list (chat mode only) */}
@@ -232,11 +276,17 @@ export default function Chat() {
           {/* Info panel (terminal mode) */}
           {mode === "terminal" && (
             <div className="flex-1 overflow-y-auto p-3">
-              <div className="text-xs text-gray-500 space-y-2">
-                <p>Terminal mode runs the agent <strong>locally</strong> inside the platform container.</p>
-                <p>You get the full interactive experience — see tool calls, file edits, thinking in real-time.</p>
-                <p className="text-gray-600">The agent has access to platform MCP tools for managing projects, runs, and servers.</p>
-              </div>
+              {setupLog ? (
+                <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-gray-900 rounded p-2 max-h-60 overflow-y-auto">
+                  {setupLog}
+                </pre>
+              ) : (
+                <div className="text-xs text-gray-500 space-y-2">
+                  <p>Terminal mode runs the agent <strong>locally</strong> inside the platform container.</p>
+                  <p>You get the full interactive experience — see tool calls, file edits, thinking in real-time.</p>
+                  <p className="text-gray-600">The agent has access to platform MCP tools for managing projects, runs, and servers.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
