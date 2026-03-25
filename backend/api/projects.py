@@ -153,7 +153,7 @@ async def test_connection_endpoint(
 
 
 @router.get(
-    "/projects/{project_id}/workspace-readiness",
+    "/projects/{project_id:path}/workspace-readiness",
     response_model=WorkspaceReadinessResponse,
 )
 async def check_workspace_readiness(
