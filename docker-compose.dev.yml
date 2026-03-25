@@ -47,6 +47,8 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./alembic:/app/alembic
       - ./.ssh:/app/.ssh
+      - ./CLAUDE.md:/app/CLAUDE.md:ro
+      - ./.claude/skills:/app/.claude/skills:ro
       # Persist agent binaries and credentials across rebuilds
       - agent-binaries:/root/.local
       - agent-config-claude:/root/.claude
