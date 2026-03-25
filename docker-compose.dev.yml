@@ -34,6 +34,7 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+asyncpg://agentickode:agentickode@postgres:5432/agentickode
+      UVICORN_RELOAD: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,6 +47,11 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./alembic:/app/alembic
       - ./.ssh:/app/.ssh
+      # Persist agent binaries and credentials across rebuilds
+      - agent-binaries:/root/.local
+      - agent-config-claude:/root/.claude
+      - agent-config-codex:/root/.codex
+      - agent-config-gemini:/root/.gemini
     restart: unless-stopped
 
   frontend:
@@ -72,3 +78,11 @@ volumes:
     name: agentickode-app_pgdata
   redisdata:
     name: agentickode-app_redisdata
+  agent-binaries:
+    name: agentickode-app_agent-binaries
+  agent-config-claude:
+    name: agentickode-app_agent-config-claude
+  agent-config-codex:
+    name: agentickode-app_agent-config-codex
+  agent-config-gemini:
+    name: agentickode-app_agent-config-gemini

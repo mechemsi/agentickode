@@ -355,3 +355,6 @@ After making changes, always verify they work end-to-end rather than assuming su
 - `docs/WORKER_PIPELINE.md` — complete worker pipeline technical reference
 - `docs/guides/09-webhook-setup.md` — webhook setup for GitHub, GitLab, Gitea, Plane
 - `docs/guides/decisions/` — architecture decision records
+
+
+After any comments from me add this entry to tasks/lessons.md date, what went wrong, rule for next time read this eveyrtime before doing anything.

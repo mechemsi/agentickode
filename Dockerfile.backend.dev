@@ -21,6 +21,9 @@ RUN chmod +x /tmp/install-agents.sh && \
     /tmp/install-agents.sh $INSTALL_AGENTS || true && \
     rm /tmp/install-agents.sh
 
+# Stash installed agents so entrypoint can seed an empty volume
+RUN cp -a /root/.local /root/.local-seed
+
 ENV PATH="/root/.local/bin:/root/.local/share/claude/bin:/root/.bun/bin:${PATH}"
 
 # Copy source as fallback; docker-compose.dev.yml overrides with volume mounts
