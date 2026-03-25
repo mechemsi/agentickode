@@ -1,6 +1,6 @@
 ---
 name: autodev-project
-description: Manage projects — list, create, update, and check workspace readiness. Triggers on /autodev-project or "list projects", "add project", "create project", "project settings".
+description: Use when the user wants to manage projects on the platform — listing configured projects, adding a new repo, updating project settings, or checking if a project is cloned on its workspace. Use this for "show my projects", "add this repo", "register a new project", "which projects do I have", "is this project ready on the workspace", or any project configuration task.
 ---
 
 # Project Management

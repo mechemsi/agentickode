@@ -1,6 +1,6 @@
 ---
 name: autodev-launch
-description: Launch an AI agent (Claude, Codex, etc.) on a project's workspace server. Checks workspace readiness, handles multi-workspace selection, and creates an interactive session. Triggers on /autodev-launch or "launch claude on", "start agent on", "open session on project".
+description: Use when the user wants to start an AI agent (Claude, Codex, Gemini, Aider) on a remote workspace server for a project. Use this even if they just say "launch claude on myproject", "start an agent", "open a session on the server", "connect to workspace", or "I want to work on project X remotely".
 ---
 
 # Launch Agent on Workspace

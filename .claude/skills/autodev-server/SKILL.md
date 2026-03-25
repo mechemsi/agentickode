@@ -1,6 +1,6 @@
 ---
 name: autodev-server
-description: Manage workspace servers — list, test connectivity, check health, view agents, and setup servers. Triggers on /autodev-server or "list servers", "check server", "server status", "add server", "setup server".
+description: Use when the user asks about workspace servers — listing them, testing SSH connectivity, checking what agents are installed, viewing server details, or troubleshooting server issues. Use this for "show me my servers", "is the server reachable", "what agents are on server X", "test connection to workspace", or any infrastructure-level question about the remote machines.
 ---
 
 # Server Administration

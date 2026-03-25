@@ -1,6 +1,6 @@
 ---
 name: autodev-run
-description: Create and monitor a coding task run on the AgenticKode platform. Use when the user wants to run a task, fix a bug, implement a feature on a project, or create a pipeline run. Triggers on /autodev-run or "run task", "create run", "fix this on project".
+description: Use when the user wants to dispatch a coding task to a remote workspace — fixing bugs, implementing features, running the 8-phase pipeline, or creating a PR automatically. Use this even if the user just says "fix the login bug on myproject" or "run this task" or "create a run" or "implement X on Y". Also use when the user asks to approve or reject a pending run.
 ---
 
 # Create & Monitor Run

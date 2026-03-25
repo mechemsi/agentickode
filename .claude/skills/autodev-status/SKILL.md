@@ -1,6 +1,6 @@
 ---
 name: autodev-status
-description: Check platform status — list runs, see running/pending/failed tasks, system health, and analytics. Triggers on /autodev-status or "what's running", "check status", "show runs", "platform health".
+description: Use when the user asks about what's happening on the platform — active runs, failed tasks, pending approvals, system health, or analytics. Use this for "what's running", "any failures", "show me the status", "is everything healthy", "how many runs today", or any question about current platform state.
 ---
 
 # Platform Status

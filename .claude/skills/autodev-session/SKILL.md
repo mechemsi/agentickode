@@ -1,6 +1,6 @@
 ---
 name: autodev-session
-description: Manage workspace sessions — create, list, send commands, capture output, and close sessions on remote workspace servers. Triggers on /autodev-session or "send to session", "check session", "list sessions", "close session".
+description: Use when the user wants to interact with a running agent session on a workspace server — sending commands, reading output, listing active sessions, or closing them. Use this for "send this to the agent", "what's the agent doing", "check session output", "close that session", "list my sessions", or any tmux-based agent interaction.
 ---
 
 # Session Management
