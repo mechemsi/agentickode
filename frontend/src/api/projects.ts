@@ -2,7 +2,7 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-import type { GitIssue, GitUrlParseResponse, ProjectConfig, TestConnectionResponse } from "../types";
+import type { GitIssue, GitUrlParseResponse, ProjectConfig, TestConnectionResponse, WorkspaceReadinessResponse } from "../types";
 import { BASE, get, post, put, httpDelete } from "./client";
 
 export const getProjects = () => get<ProjectConfig[]>("/projects");
@@ -24,6 +24,9 @@ export const parseGitUrl = (git_url: string, workspace_server_id?: number | null
 
 export const testConnection = (workspace_server_id: number, git_url: string) =>
   post<TestConnectionResponse>("/projects/test-connection", { workspace_server_id, git_url });
+
+export const getProjectWorkspaceReadiness = (projectId: string) =>
+  get<WorkspaceReadinessResponse>(`/projects/${encodeURIComponent(projectId)}/workspace-readiness`);
 
 export async function getProjectIssues(projectId: string): Promise<GitIssue[]> {
   const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/issues`);

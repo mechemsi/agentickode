@@ -119,6 +119,19 @@ class TestConnectionResponse(BaseModel):
     error: str | None = None
 
 
+class WorkspaceReadinessItem(BaseModel):
+    server_id: int
+    server_name: str
+    status: str  # "ready", "not_cloned", "error", "unreachable"
+    path: str | None = None
+    error: str | None = None
+
+
+class WorkspaceReadinessResponse(BaseModel):
+    project_id: str
+    workspaces: list[WorkspaceReadinessItem]
+
+
 class GitIssueOut(BaseModel):
     number: int
     title: str

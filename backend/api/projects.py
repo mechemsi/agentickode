@@ -22,6 +22,8 @@ from backend.schemas.projects import (
     GitUrlParseResponse,
     TestConnectionRequest,
     TestConnectionResponse,
+    WorkspaceReadinessItem,
+    WorkspaceReadinessResponse,
 )
 from backend.services.encryption import encrypt_value
 from backend.services.git.repo_info import get_default_branch, get_default_branch_via_ssh
@@ -148,6 +150,73 @@ async def test_connection_endpoint(
         return TestConnectionResponse(success=False, error=error_detail)
     except Exception as exc:
         return TestConnectionResponse(success=False, error=str(exc))
+
+
+@router.get(
+    "/projects/{project_id}/workspace-readiness",
+    response_model=WorkspaceReadinessResponse,
+)
+async def check_workspace_readiness(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if a project is cloned and ready on each assigned workspace."""
+    repo = ProjectConfigRepository(db)
+    project = await repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    server_repo = WorkspaceServerRepository(db)
+    items: list[WorkspaceReadinessItem] = []
+
+    for pws in project.workspace_servers:
+        server = await server_repo.get_by_id(pws.workspace_server_id)
+        if not server:
+            continue
+
+        # Resolve expected project path on workspace
+        raw_path = project.workspace_path or project.repo_name
+        if raw_path.startswith("/"):
+            expected_path = raw_path
+        else:
+            root = server.workspace_root or "/home/workspace"
+            expected_path = f"{root}/{raw_path}".rstrip("/")
+
+        ssh = SSHService.for_server(server)
+        try:
+            stdout, _stderr, rc = await ssh.run_command(
+                f"test -d {expected_path}/.git && echo 'exists' || echo 'missing'",
+                timeout=10,
+            )
+            if "exists" in stdout:
+                items.append(
+                    WorkspaceReadinessItem(
+                        server_id=server.id,
+                        server_name=server.name,
+                        status="ready",
+                        path=expected_path,
+                    )
+                )
+            else:
+                items.append(
+                    WorkspaceReadinessItem(
+                        server_id=server.id,
+                        server_name=server.name,
+                        status="not_cloned",
+                        path=expected_path,
+                    )
+                )
+        except Exception as exc:
+            items.append(
+                WorkspaceReadinessItem(
+                    server_id=server.id,
+                    server_name=server.name,
+                    status="unreachable",
+                    error=str(exc)[:200],
+                )
+            )
+
+    return WorkspaceReadinessResponse(project_id=project_id, workspaces=items)
 
 
 @router.get("/projects/{project_id:path}", response_model=ProjectConfigOut)

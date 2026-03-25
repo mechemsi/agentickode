@@ -3,11 +3,12 @@
 // Commercial licensing: info@mechemsi.com
 
 import { useEffect, useState } from "react";
-import { Bot, FileText, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, FileText, FolderKanban, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { createProject, deleteProject, getProjects, getWorkspaceServers, updateProject } from "../api";
 import ProjectForm from "../components/shared/ProjectForm";
 import ProjectInstructionsTab from "../components/settings/ProjectInstructionsTab";
 import AutonomyConfigPanel from "../components/settings/AutonomyConfigPanel";
+import LaunchAgentModal from "../components/projects/LaunchAgentModal";
 import type { ProjectConfig, WorkspaceServer } from "../types";
 
 export default function Projects() {
@@ -16,6 +17,7 @@ export default function Projects() {
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [instructionsFor, setInstructionsFor] = useState<string | null>(null);
   const [autonomyFor, setAutonomyFor] = useState<string | null>(null);
+  const [launchFor, setLaunchFor] = useState<ProjectConfig | null>(null);
 
   const load = async () => setProjects(await getProjects());
   useEffect(() => { load(); getWorkspaceServers().then(setServers); }, []);
@@ -86,6 +88,15 @@ export default function Projects() {
                   </span>
                 </div>
                 <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                  {p.workspace_server_ids.length > 0 && (
+                    <button
+                      onClick={() => setLaunchFor(p)}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-cyan-900/20 transition-colors"
+                    >
+                      <Play className="w-3 h-3" />
+                      Launch
+                    </button>
+                  )}
                   <button
                     onClick={() => setInstructionsFor(instructionsFor === p.project_id ? null : p.project_id)}
                     className="text-xs text-purple-400 hover:text-purple-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-purple-900/20 transition-colors"
@@ -144,6 +155,13 @@ export default function Projects() {
           </div>
         )}
       </div>
+
+      {launchFor && (
+        <LaunchAgentModal
+          project={launchFor}
+          onClose={() => setLaunchFor(null)}
+        />
+      )}
     </>
   );
 }

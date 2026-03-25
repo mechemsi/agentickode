@@ -55,6 +55,19 @@ export interface TestConnectionResponse {
   error?: string;
 }
 
+export interface WorkspaceReadinessItem {
+  server_id: number;
+  server_name: string;
+  status: "ready" | "not_cloned" | "error" | "unreachable";
+  path: string | null;
+  error: string | null;
+}
+
+export interface WorkspaceReadinessResponse {
+  project_id: string;
+  workspaces: WorkspaceReadinessItem[];
+}
+
 export interface GitIssue {
   number: number;
   title: string;
