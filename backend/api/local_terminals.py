@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -33,8 +34,8 @@ class SessionOut(BaseModel):
     tmux_name: str
     display_name: str | None
     status: str
-    created_at: str
-    last_activity_at: str
+    created_at: datetime
+    last_activity_at: datetime
 
     model_config = {"from_attributes": True}
 
