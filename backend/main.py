@@ -19,12 +19,15 @@ from backend.api import (
     agents,
     analytics,
     app_settings,
+    automation_rules,
     backup,
     chat,
     git_connections,
     health,
     llm_roles,
     logs,
+    memory,
+    monitoring_rules,
     notification_channels,
     ollama_servers,
     project_instructions,
@@ -34,10 +37,16 @@ from backend.api import (
     runs,
     runs_actions,
     runs_phases,
+    scheduled_tasks,
     sse,
     webhook_callbacks,
     webhooks,
+    webhooks_discord,
+    webhooks_linear,
+    webhooks_monitoring,
     webhooks_pr,
+    webhooks_pr_comment,
+    webhooks_slack,
     workflow_templates,
     workspace_commands,
     ws,
@@ -62,12 +71,17 @@ from backend.seed import seed_all
 from backend.services.http_client import close_http_client
 from backend.services.notifications.dispatcher import NotificationDispatcher
 from backend.services.queue_service import queue_service
+from backend.services.rules_dispatcher import RulesDispatcher
+from backend.services.task_management.status_sync import StatusSyncer
 from backend.worker.engine import WorkerEngine
+from backend.worker.scheduler import TaskScheduler
 
 logger = logging.getLogger("agentickode")
 
 worker_engine = WorkerEngine()
 notification_dispatcher = NotificationDispatcher()
+rules_dispatcher = RulesDispatcher()
+status_syncer = StatusSyncer()
 
 
 async def _run_migration_step(sql: str) -> None:
@@ -251,13 +265,22 @@ async def lifespan(app: FastAPI):
         await seed_all(db)
     worker_task = asyncio.create_task(worker_engine.run())
     notification_dispatcher.start()
+    rules_dispatcher.start()
+    status_syncer.start()
+    scheduler = TaskScheduler(async_session)
+    scheduler_task = asyncio.create_task(scheduler.run())
     yield
     logger.info("Shutting down worker")
     notification_dispatcher.stop()
+    rules_dispatcher.stop()
+    status_syncer.stop()
+    scheduler.stop()
     worker_engine.stop()
+    scheduler_task.cancel()
     worker_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await worker_task
+        await scheduler_task
     await close_http_client()
     await queue_service.close()
 
@@ -313,6 +336,15 @@ app.include_router(agent_query.router, prefix="/api")
 app.include_router(workspace_commands.router, prefix="/api")
 app.include_router(agent_setup.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(scheduled_tasks.router, prefix="/api")
+app.include_router(automation_rules.router, prefix="/api")
+app.include_router(monitoring_rules.router, prefix="/api")
+app.include_router(webhooks_monitoring.router, prefix="/api")
+app.include_router(webhooks_linear.router, prefix="/api")
+app.include_router(webhooks_pr_comment.router, prefix="/api")
+app.include_router(memory.router, prefix="/api")
+app.include_router(webhooks_slack.router, prefix="/api")
+app.include_router(webhooks_discord.router, prefix="/api")
 app.include_router(ws.router)
 
 # Mount MCP server for AI agent access (SSE transport)

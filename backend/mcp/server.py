@@ -41,6 +41,16 @@ from backend.mcp.tools.agent_control import (
     resume_agent,
     send_message_to_agent,
 )
+from backend.mcp.tools.automation import (
+    create_automation_rule,
+    list_automation_rules,
+    update_automation_rule,
+)
+from backend.mcp.tools.memory import (
+    query_org_memory,
+    store_knowledge,
+    sync_obsidian_vault,
+)
 from backend.mcp.tools.projects import (
     cancel_run,
     create_project,
@@ -51,6 +61,12 @@ from backend.mcp.tools.projects import (
     list_projects,
     list_runs,
     update_project,
+)
+from backend.mcp.tools.scheduling import (
+    create_scheduled_task,
+    list_scheduled_tasks,
+    trigger_scheduled_task,
+    update_scheduled_task,
 )
 from backend.mcp.tools.sessions import (
     capture_session_output,
@@ -135,6 +151,22 @@ mcp.add_tool(close_workspace_session)
 mcp.add_tool(run_workspace_command)
 mcp.add_tool(read_workspace_file)
 mcp.add_tool(list_workspace_directory)
+
+# --- Tier 6: Scheduling ---
+mcp.add_tool(list_scheduled_tasks)
+mcp.add_tool(create_scheduled_task)
+mcp.add_tool(update_scheduled_task)
+mcp.add_tool(trigger_scheduled_task)
+
+# --- Tier 7: Automation Rules ---
+mcp.add_tool(list_automation_rules)
+mcp.add_tool(create_automation_rule)
+mcp.add_tool(update_automation_rule)
+
+# --- Tier 8: Memory & Knowledge ---
+mcp.add_tool(query_org_memory)
+mcp.add_tool(store_knowledge)
+mcp.add_tool(sync_obsidian_vault)
 
 
 def get_mcp_app():

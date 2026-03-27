@@ -14,8 +14,8 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import ProjectConfig, TaskRun
 from backend.repositories.project_config_repo import ProjectConfigRepository
+from backend.services.run_factory import create_task_run, resolve_workspace_path
 
 logger = logging.getLogger("agentickode.webhooks")
 router = APIRouter(tags=["webhooks"])
@@ -25,46 +25,9 @@ def _get_repo(db: AsyncSession = Depends(get_db)) -> ProjectConfigRepository:
     return ProjectConfigRepository(db)
 
 
-def _resolve_workspace_path(project: ProjectConfig, task_id: str) -> str:
-    ws_cfg = project.workspace_config or {}
-    ws_type = ws_cfg.get("workspace_type", "existing")
-    if ws_type == "cluster":
-        return f"/workspaces/{task_id}"
-    if project.workspace_path:
-        return str(project.workspace_path)
-    return f"/workspaces/{project.project_id}"
-
-
-def _create_task_run(
-    task_id: str,
-    project: ProjectConfig,
-    title: str,
-    description: str,
-    task_source: str,
-    task_source_meta: dict,
-    use_claude: bool,
-) -> TaskRun:
-    execution_mode = "structured"
-    if project.autonomy_config and isinstance(project.autonomy_config, dict):
-        execution_mode = project.autonomy_config.get("execution_mode", "structured")
-
-    return TaskRun(
-        task_id=task_id,
-        project_id=project.project_id,
-        title=title,
-        description=description,
-        branch_name=f"feature/ai-{task_id}",
-        workspace_path=_resolve_workspace_path(project, task_id),
-        repo_owner=project.repo_owner,
-        repo_name=project.repo_name,
-        default_branch=project.default_branch,
-        task_source=task_source,
-        git_provider=project.git_provider,
-        task_source_meta=task_source_meta,
-        use_claude_api=use_claude,
-        workspace_config=project.workspace_config,
-        execution_mode=execution_mode,
-    )
+# Re-export for backwards compatibility with webhooks_pr.py and tests
+_create_task_run = create_task_run
+_resolve_workspace_path = resolve_workspace_path
 
 
 @router.post("/webhooks/plane")

@@ -35,6 +35,22 @@ class Settings(BaseSettings):
     gitlab_token: str = ""
     gitlab_api_url: str = "https://gitlab.com"
 
+    # Linear
+    linear_api_key: str = ""
+    linear_webhook_secret: str = ""
+
+    # Plane
+    plane_api_url: str = ""
+    plane_api_key: str = ""
+
+    # Slack (bidirectional messaging)
+    slack_signing_secret: str = ""
+    slack_bot_token: str = ""
+
+    # Discord (bidirectional messaging)
+    discord_public_key: str = ""
+    discord_bot_token: str = ""
+
     # Workspace
     workspace_root: str = "/workspaces"
     default_ssh_key_path: str = "/app/.ssh/id_ed25519"
