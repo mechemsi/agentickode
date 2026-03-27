@@ -358,3 +358,15 @@ After making changes, always verify they work end-to-end rather than assuming su
 
 
 After any comments from me add this entry to tasks/lessons.md date, what went wrong, rule for next time read this eveyrtime before doing anything.
+
+## Implementation Log
+
+After completing any significant feature, integration, or phase of work, append an entry to `docs/IMPLEMENTATION_LOG.md` with:
+- **Date** (YYYY-MM-DD)
+- **Version** (tag if applicable)
+- **What was implemented** (brief summary)
+- **Files created/modified** (count or list)
+- **Tests** (count added, total passing)
+- **Commit hash**
+
+This creates a persistent record of what was built and when, independent of git log.
