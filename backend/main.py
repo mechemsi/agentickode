@@ -25,6 +25,7 @@ from backend.api import (
     git_connections,
     health,
     llm_roles,
+    local_terminals,
     logs,
     memory,
     monitoring_rules,
@@ -336,6 +337,7 @@ app.include_router(agent_query.router, prefix="/api")
 app.include_router(workspace_commands.router, prefix="/api")
 app.include_router(agent_setup.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(local_terminals.router, prefix="/api")
 app.include_router(scheduled_tasks.router, prefix="/api")
 app.include_router(automation_rules.router, prefix="/api")
 app.include_router(monitoring_rules.router, prefix="/api")

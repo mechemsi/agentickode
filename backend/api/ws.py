@@ -373,10 +373,28 @@ async def ws_session_terminal(websocket: WebSocket, session_id: str):
 
 @router.websocket("/ws/local-terminal/{agent_name}")
 async def ws_local_terminal(websocket: WebSocket, agent_name: str):
-    """Local terminal — runs an agent interactively inside the platform container.
+    """Legacy endpoint — creates a new ephemeral terminal. Use /ws/local-terminal-attach instead."""
+    await _attach_to_tmux(
+        websocket, f"chat-{agent_name}-ephemeral", agent_name, cleanup_on_close=True
+    )
 
-    Creates a local tmux session, launches the agent, and bridges the PTY
-    to the browser via xterm.js. No SSH needed — runs in-process.
+
+@router.websocket("/ws/local-terminal-attach/{tmux_name}")
+async def ws_local_terminal_attach(websocket: WebSocket, tmux_name: str):
+    """Attach to an existing local terminal tmux session. Session persists after disconnect."""
+    await _attach_to_tmux(websocket, tmux_name, agent_name=None, cleanup_on_close=False)
+
+
+async def _attach_to_tmux(
+    websocket: WebSocket,
+    tmux_name: str,
+    agent_name: str | None,
+    cleanup_on_close: bool,
+) -> None:
+    """Bridge a WebSocket to a tmux session via PTY.
+
+    If tmux_name doesn't exist and agent_name is provided, creates it.
+    If cleanup_on_close is False, tmux survives browser disconnect.
     """
     import fcntl
     import pty
@@ -385,39 +403,40 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
 
     await websocket.accept()
 
-    import uuid as _uuid
-
-    tmux_name = f"chat-{agent_name}-{_uuid.uuid4().hex[:8]}"
-    agent_path = shlex.quote(agent_name)
     env = {
         **os.environ,
         "TERM": "xterm-256color",
         "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
     }
 
-    # Kill any stale chat sessions for this agent, then create new one
-    await asyncio.create_subprocess_shell(
-        f"tmux kill-session -t chat-{agent_name}-{os.getpid()} 2>/dev/null || true",
-        env=env,
-    )
-    tmux_create = f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {agent_path}"
-    proc = await asyncio.create_subprocess_shell(
-        tmux_create,
-        env=env,
+    # Check if tmux session exists
+    check = await asyncio.create_subprocess_shell(
+        f"tmux has-session -t {tmux_name} 2>/dev/null",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    await proc.wait()
+    await check.wait()
+    tmux_exists = check.returncode == 0
 
-    if proc.returncode != 0:
-        stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
-        await websocket.send_text(
-            json.dumps(
-                {
-                    "type": "output",
-                    "data": f"Failed to start {agent_name}: {stderr}\r\n",
-                }
+    if not tmux_exists and agent_name:
+        # Create new tmux with the agent
+        proc = await asyncio.create_subprocess_shell(
+            f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {shlex.quote(agent_name)}",
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.wait()
+        if proc.returncode != 0:
+            stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
+            await websocket.send_text(
+                json.dumps({"type": "output", "data": f"Failed to start: {stderr}\r\n"})
             )
+            await websocket.close()
+            return
+    elif not tmux_exists:
+        await websocket.send_text(
+            json.dumps({"type": "output", "data": f"Session {tmux_name} not found.\r\n"})
         )
         await websocket.close()
         return
@@ -425,9 +444,8 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
     # Attach to tmux via a local PTY
     master_fd, slave_fd = pty.openpty()
 
-    attach_cmd = f"tmux attach-session -t {tmux_name}"
     attach_proc = await asyncio.create_subprocess_shell(
-        attach_cmd,
+        f"tmux attach-session -t {tmux_name}",
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,
@@ -439,27 +457,18 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
     loop = asyncio.get_event_loop()
 
     async def pty_to_ws():
-        """Read from PTY master and send to WebSocket."""
         try:
             while True:
                 data = await loop.run_in_executor(None, os.read, master_fd, 4096)
                 if not data:
                     break
                 await websocket.send_text(
-                    json.dumps(
-                        {
-                            "type": "output",
-                            "data": data.decode("utf-8", errors="replace"),
-                        }
-                    )
+                    json.dumps({"type": "output", "data": data.decode("utf-8", errors="replace")})
                 )
-        except OSError:
-            pass
-        except Exception:
+        except (OSError, Exception):
             pass
 
     async def ws_to_pty():
-        """Read from WebSocket and write to PTY master."""
         try:
             while True:
                 raw = await websocket.receive_text()
@@ -471,7 +480,6 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
                     rows = msg.get("rows", 40)
                     winsize = struct.pack("HHHH", rows, cols, 0, 0)
                     fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
-                    # Also resize tmux
                     await asyncio.create_subprocess_shell(
                         f"tmux resize-window -t {tmux_name} -x {cols} -y {rows}",
                         env=env,
@@ -488,5 +496,5 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
     finally:
         os.close(master_fd)
         attach_proc.kill()
-        # Clean up tmux session
-        await asyncio.create_subprocess_shell(f"tmux kill-session -t {tmux_name} 2>/dev/null")
+        if cleanup_on_close:
+            await asyncio.create_subprocess_shell(f"tmux kill-session -t {tmux_name} 2>/dev/null")

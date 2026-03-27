@@ -11,13 +11,16 @@ import "@xterm/xterm/css/xterm.css";
 
 interface LocalTerminalProps {
   agentName: string;
+  /** If provided, attach to this existing tmux session instead of creating a new one. */
+  tmuxName?: string;
 }
 
 /**
  * Local terminal — connects to a local agent running inside the platform container.
- * No workspace server or SSH needed. Uses /ws/local-terminal/{agent} WebSocket.
+ * If tmuxName is provided, re-attaches to an existing persistent session.
+ * Otherwise falls back to the legacy ephemeral /ws/local-terminal/{agent} endpoint.
  */
-export default function LocalTerminal({ agentName }: LocalTerminalProps) {
+export default function LocalTerminal({ agentName, tmuxName }: LocalTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
 
@@ -45,7 +48,10 @@ export default function LocalTerminal({ agentName }: LocalTerminalProps) {
     fitAddon.fit();
 
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${proto}//${window.location.host}/ws/local-terminal/${agentName}`;
+    // Use persistent attach endpoint if we have a tmux name, otherwise legacy
+    const wsUrl = tmuxName
+      ? `${proto}//${window.location.host}/ws/local-terminal-attach/${tmuxName}`
+      : `${proto}//${window.location.host}/ws/local-terminal/${agentName}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -66,7 +72,7 @@ export default function LocalTerminal({ agentName }: LocalTerminalProps) {
     };
 
     ws.onclose = () => {
-      term.write("\r\n\x1b[33m[Session ended]\x1b[0m\r\n");
+      term.write("\r\n\x1b[33m[Disconnected — session is still running]\x1b[0m\r\n");
     };
 
     term.onData((data) => {
@@ -90,7 +96,7 @@ export default function LocalTerminal({ agentName }: LocalTerminalProps) {
       ws.close();
       term.dispose();
     };
-  }, [agentName]);
+  }, [agentName, tmuxName]);
 
   return (
     <div

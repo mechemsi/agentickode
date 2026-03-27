@@ -40,6 +40,17 @@ interface AgentInfo {
   enabled: boolean;
 }
 
+interface TerminalSession {
+  id: number;
+  session_id: string;
+  agent_name: string;
+  tmux_name: string;
+  display_name: string | null;
+  status: string;
+  created_at: string;
+  last_activity_at: string;
+}
+
 type Mode = "terminal" | "chat";
 
 const FALLBACK_AGENTS = ["claude", "opencode", "gemini", "aider", "codex"];
@@ -56,9 +67,10 @@ export default function Chat() {
   const [agents, setAgents] = useState<string[]>(FALLBACK_AGENTS);
   const [error, setError] = useState<string | null>(null);
 
-  // Terminal mode — each agent gets a live session key to force remount
+  // Terminal mode — persistent sessions
+  const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([]);
+  const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalKey, setTerminalKey] = useState(0);
-  const [terminalActive, setTerminalActive] = useState(false);
 
   // Chat mode state
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -119,11 +131,19 @@ export default function Chat() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchTerminalSessions = useCallback(async () => {
+    try {
+      const res = await fetch("/api/local-terminals");
+      if (res.ok) setTerminalSessions(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     fetchAgents();
     fetchChatSessions();
+    fetchTerminalSessions();
     fetchSetupStatus();
-  }, [fetchAgents, fetchChatSessions, fetchSetupStatus]);
+  }, [fetchAgents, fetchChatSessions, fetchTerminalSessions, fetchSetupStatus]);
 
   // Auto-restore session from URL param or window.localStorage
   useEffect(() => {
@@ -140,13 +160,35 @@ export default function Chat() {
   }, [activeChatSession?.messages]);
 
   // ─── Terminal mode actions ────────────────────────────────────────
-  const launchTerminal = () => {
-    setTerminalKey((k) => k + 1);
-    setTerminalActive(true);
+  const launchTerminal = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/local-terminals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_name: selectedAgent }),
+      });
+      if (res.ok) {
+        const session: TerminalSession = await res.json();
+        setTerminalSessions((prev) => [session, ...prev]);
+        setActiveTerminal(session);
+        setTerminalKey((k) => k + 1);
+      }
+    } catch { /* ignore */ }
+    finally { setCreating(false); }
   };
 
-  const closeTerminal = () => {
-    setTerminalActive(false);
+  const resumeTerminal = (session: TerminalSession) => {
+    setActiveTerminal(session);
+    setTerminalKey((k) => k + 1);
+  };
+
+  const closeTerminal = async (sessionId: string) => {
+    await fetch(`/api/local-terminals/${sessionId}`, { method: "DELETE" });
+    setTerminalSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+    if (activeTerminal?.session_id === sessionId) {
+      setActiveTerminal(null);
+    }
   };
 
   // ─── Chat mode actions ────────────────────────────────────────────
@@ -328,18 +370,41 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Info panel (terminal mode) */}
+          {/* Terminal session list */}
           {mode === "terminal" && (
-            <div className="flex-1 overflow-y-auto p-3">
-              {setupLog ? (
-                <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-gray-900 rounded p-2 max-h-60 overflow-y-auto">
-                  {setupLog}
-                </pre>
-              ) : (
-                <div className="text-xs text-gray-500 space-y-2">
+            <div className="flex-1 overflow-y-auto">
+              {setupLog && (
+                <div className="p-3 border-b border-gray-800">
+                  <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-gray-900 rounded p-2 max-h-40 overflow-y-auto">
+                    {setupLog}
+                  </pre>
+                </div>
+              )}
+              {terminalSessions.filter((s) => s.status === "active").map((s) => (
+                <div
+                  key={s.session_id}
+                  className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-800/50 border-b border-gray-800/50 ${
+                    activeTerminal?.session_id === s.session_id ? "bg-gray-800/70" : ""
+                  }`}
+                  onClick={() => resumeTerminal(s)}
+                >
+                  <SquareTerminal className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-300 truncate">{s.display_name || s.agent_name}</p>
+                    <p className="text-xs text-gray-500">{s.agent_name}</p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeTerminal(s.session_id); }}
+                    className="p-1 rounded hover:bg-red-900/30 text-gray-600 hover:text-red-400"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {terminalSessions.filter((s) => s.status === "active").length === 0 && !setupLog && (
+                <div className="text-xs text-gray-500 space-y-2 p-3">
                   <p>Terminal mode runs the agent <strong>locally</strong> inside the platform container.</p>
-                  <p>You get the full interactive experience — see tool calls, file edits, thinking in real-time.</p>
-                  <p className="text-gray-600">The agent has access to platform MCP tools for managing projects, runs, and servers.</p>
+                  <p>Sessions persist — you can close the browser and resume later.</p>
                 </div>
               )}
             </div>
@@ -362,11 +427,11 @@ export default function Chat() {
             <>
               <SquareTerminal className="w-5 h-5 text-cyan-400" />
               <span className="text-sm font-medium text-gray-200">
-                {terminalActive ? `${selectedAgent} (interactive)` : "Interactive Agent Terminal"}
+                {activeTerminal ? `${activeTerminal.display_name || activeTerminal.agent_name} (interactive)` : "Interactive Agent Terminal"}
               </span>
-              {terminalActive && (
+              {activeTerminal && (
                 <button
-                  onClick={closeTerminal}
+                  onClick={() => closeTerminal(activeTerminal.session_id)}
                   className="ml-auto text-xs px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30"
                 >
                   End Session
@@ -401,9 +466,13 @@ export default function Chat() {
 
         <div className="flex-1 overflow-hidden">
           {mode === "terminal" ? (
-            terminalActive ? (
+            activeTerminal ? (
               <div className="h-full">
-                <LocalTerminal key={terminalKey} agentName={selectedAgent} />
+                <LocalTerminal
+                  key={terminalKey}
+                  agentName={activeTerminal.agent_name}
+                  tmuxName={activeTerminal.tmux_name}
+                />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -411,8 +480,8 @@ export default function Chat() {
                 <p className="text-lg font-medium">Interactive Agent Terminal</p>
                 <p className="text-sm mt-1">Full Claude Code experience in the browser</p>
                 <p className="text-xs mt-3 text-gray-600 max-w-md text-center">
-                  Select an agent and click Launch to start an interactive session.
-                  See everything — tool calls, file edits, thinking — live.
+                  Select an agent and click Launch to start a persistent session.
+                  Sessions survive page refresh — resume anytime from the sidebar.
                 </p>
               </div>
             )
