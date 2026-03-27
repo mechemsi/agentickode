@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import LocalTerminal from "../components/chat/LocalTerminal";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -44,8 +45,12 @@ type Mode = "terminal" | "chat";
 const FALLBACK_AGENTS = ["claude", "opencode", "gemini", "aider", "codex"];
 
 // ─── Component ──────────────────────────────────────────────────────
+const LAST_SESSION_KEY = "agentickode_last_chat_session";
+
 export default function Chat() {
-  const [mode, setMode] = useState<Mode>("terminal");
+  const { sessionId: urlSessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<Mode>(urlSessionId ? "chat" : "terminal");
   const [selectedAgent, setSelectedAgent] = useState("claude");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [agents, setAgents] = useState<string[]>(FALLBACK_AGENTS);
@@ -120,6 +125,16 @@ export default function Chat() {
     fetchSetupStatus();
   }, [fetchAgents, fetchChatSessions, fetchSetupStatus]);
 
+  // Auto-restore session from URL param or window.localStorage
+  useEffect(() => {
+    if (activeChatSession) return; // already have one
+    const restoreId = urlSessionId || window.localStorage.getItem(LAST_SESSION_KEY);
+    if (restoreId) {
+      setMode("chat");
+      loadChatSession(restoreId);
+    }
+  }, [urlSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeChatSession?.messages]);
@@ -147,6 +162,8 @@ export default function Chat() {
         const session = await res.json();
         setChatSessions((prev) => [session, ...prev]);
         setActiveChatSession(session);
+        navigate(`/chat/${session.session_id}`, { replace: true });
+        window.localStorage.setItem(LAST_SESSION_KEY, session.session_id);
       }
     } catch { /* ignore */ }
     finally { setCreating(false); }
@@ -155,14 +172,23 @@ export default function Chat() {
   const loadChatSession = async (sessionId: string) => {
     try {
       const res = await fetch(`/api/chat/sessions/${sessionId}`);
-      if (res.ok) setActiveChatSession(await res.json());
+      if (res.ok) {
+        const session = await res.json();
+        setActiveChatSession(session);
+        navigate(`/chat/${sessionId}`, { replace: true });
+        window.localStorage.setItem(LAST_SESSION_KEY, sessionId);
+      }
     } catch { /* ignore */ }
   };
 
   const deleteChatSession = async (sessionId: string) => {
     await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" });
     setChatSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
-    if (activeChatSession?.session_id === sessionId) setActiveChatSession(null);
+    if (activeChatSession?.session_id === sessionId) {
+      setActiveChatSession(null);
+      navigate("/chat", { replace: true });
+      window.localStorage.removeItem(LAST_SESSION_KEY);
+    }
   };
 
   const sendMessage = async () => {

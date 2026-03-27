@@ -42,6 +42,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/agents" element={<AgentSettingsPage />} />
                 <Route path="/workflows" element={<WorkflowTemplates />} />
                 <Route path="/chat" element={<Chat />} />
+                <Route path="/chat/:sessionId" element={<Chat />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
               </ErrorBoundary>
