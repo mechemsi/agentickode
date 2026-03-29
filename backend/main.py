@@ -277,7 +277,7 @@ async def _run_migrations() -> None:
 
 
 async def _cleanup_orphaned_sessions() -> None:
-    """Mark active local terminal sessions as closed if their tmux is gone."""
+    """Delete local terminal sessions whose tmux is gone (container restart)."""
     from backend.database import async_session
 
     async with async_session() as db:
@@ -297,7 +297,7 @@ async def _cleanup_orphaned_sessions() -> None:
             await proc.wait()
             if proc.returncode != 0:
                 await db.execute(
-                    text("UPDATE local_terminal_sessions SET status = 'closed' WHERE id = :id"),
+                    text("DELETE FROM local_terminal_sessions WHERE id = :id"),
                     {"id": row.id},
                 )
         await db.commit()

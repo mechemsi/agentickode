@@ -222,12 +222,11 @@ async def close_local_session(
         f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true"
     )
 
-    session.status = "closed"
-    session.closed_at = datetime.now(UTC)
+    await db.delete(session)
     await db.commit()
 
-    logger.info("Closed local terminal session %s", session_id)
-    return {"status": "closed"}
+    logger.info("Deleted local terminal session %s", session_id)
+    return {"status": "deleted"}
 
 
 async def _tmux_exists(tmux_name: str) -> bool:
