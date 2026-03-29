@@ -503,11 +503,9 @@ export default function Chat() {
                         <Play className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          setTerminalSessions((prev) => prev.filter((t) => t.session_id !== s.session_id));
-                        }}
+                        onClick={() => closeTerminal(s.session_id)}
                         className="p-1 rounded hover:bg-red-900/30 text-gray-600 hover:text-red-400"
-                        title="Remove from list"
+                        title="Remove session"
                       >
                         <X className="w-3 h-3" />
                       </button>

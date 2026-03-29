@@ -252,6 +252,9 @@ async def _run_migrations() -> None:
         )
     """)
     await _run_migration_step("ALTER TABLE local_terminal_sessions ADD COLUMN last_command TEXT")
+    await _run_migration_step(
+        "ALTER TABLE local_terminal_sessions ADD COLUMN agent_session_id TEXT"
+    )
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS platform_crons (
             id SERIAL PRIMARY KEY,

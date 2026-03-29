@@ -115,7 +115,10 @@ class PlatformCronExecutor:
         if proc.returncode != 0:
             return None
 
-        agent_cmd = session.last_command or session.agent_name
+        if session.agent_session_id and session.agent_name == "claude":
+            agent_cmd = f"claude --permission-mode auto --resume {session.agent_session_id}"
+        else:
+            agent_cmd = session.last_command or str(session.agent_name)
         await asyncio.create_subprocess_shell(
             f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter",
             env=_ENV,

@@ -38,6 +38,7 @@ class SessionOut(BaseModel):
     tmux_name: str
     display_name: str | None
     last_command: str | None
+    agent_session_id: str | None
     status: str
     created_at: datetime
     last_activity_at: datetime
@@ -83,9 +84,10 @@ async def create_local_session(
     }
 
     # Create tmux with a shell, then launch agent inside it.
-    # Claude needs a proper shell env — direct exec as tmux command fails.
+    # Claude uses --session-id so we can --resume later.
+    claude_session_id = uuid.uuid4().hex
     if body.agent_name == "claude":
-        agent_launch = "claude --permission-mode auto"
+        agent_launch = f"claude --permission-mode auto --session-id {claude_session_id}"
     else:
         agent_launch = body.agent_name
 
@@ -112,6 +114,7 @@ async def create_local_session(
         tmux_name=tmux_name,
         display_name=display_name,
         last_command=agent_launch,
+        agent_session_id=claude_session_id if body.agent_name == "claude" else None,
         status="active",
     )
     db.add(session)
@@ -181,8 +184,11 @@ async def resume_local_session(
         stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
         raise HTTPException(500, f"Failed to create tmux session: {stderr}")
 
-    # Re-launch the agent command
-    agent_cmd = session.last_command or session.agent_name
+    # Re-launch the agent — use --resume if we have a Claude session ID
+    if session.agent_session_id and session.agent_name == "claude":
+        agent_cmd = f"claude --permission-mode auto --resume {session.agent_session_id}"
+    else:
+        agent_cmd = session.last_command or session.agent_name
     await asyncio.create_subprocess_shell(
         f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter",
         env=env,
