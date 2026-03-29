@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -25,6 +26,10 @@ from backend.services.workspace.session_service import SessionService
 from backend.services.workspace.ssh_service import SSHService
 
 router = APIRouter(tags=["sessions"])
+
+
+class SessionRenameRequest(BaseModel):
+    display_name: str
 
 
 def _session_to_out(s: CliSession, server_name: str | None = None) -> CliSessionOut:
@@ -129,6 +134,26 @@ async def get_session(session_id: int, db: AsyncSession = Depends(get_db)):
     s = await repo.get_by_id(session_id)
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    server_repo = WorkspaceServerRepository(db)
+    server = await server_repo.get_by_id(s.workspace_server_id)
+    server_name = server.name if server else None
+    return _session_to_out(s, server_name=server_name)
+
+
+@router.post("/sessions/{session_id}/rename", response_model=CliSessionOut)
+async def rename_session(
+    session_id: int, body: SessionRenameRequest, db: AsyncSession = Depends(get_db)
+):
+    """Rename a CLI session."""
+    repo = CliSessionRepository(db)
+    s = await repo.get_by_id(session_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    s.display_name = body.display_name
+    await db.commit()
+    await db.refresh(s)
 
     server_repo = WorkspaceServerRepository(db)
     server = await server_repo.get_by_id(s.workspace_server_id)

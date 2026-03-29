@@ -5,9 +5,12 @@
 import {
   AlertCircle,
   Bot,
+  Check,
   Download,
   Loader2,
   MessageSquare,
+  Pencil,
+  Play,
   Plus,
   Send,
   SquareTerminal,
@@ -71,6 +74,8 @@ export default function Chat() {
   const [terminalSessions, setTerminalSessions] = useState<TerminalSession[]>([]);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalKey, setTerminalKey] = useState(0);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   // Chat mode state
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -189,6 +194,42 @@ export default function Chat() {
     if (activeTerminal?.session_id === sessionId) {
       setActiveTerminal(null);
     }
+  };
+
+  const renameTerminal = async (sessionId: string, displayName: string) => {
+    const res = await fetch(`/api/local-terminals/${sessionId}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name: displayName }),
+    });
+    if (res.ok) {
+      const updated: TerminalSession = await res.json();
+      setTerminalSessions((prev) =>
+        prev.map((s) => (s.session_id === sessionId ? updated : s)),
+      );
+      if (activeTerminal?.session_id === sessionId) {
+        setActiveTerminal(updated);
+      }
+    }
+    setRenamingId(null);
+  };
+
+  const resumeClosedTerminal = async (session: TerminalSession) => {
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/local-terminals/${session.session_id}/resume`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const resumed: TerminalSession = await res.json();
+        setTerminalSessions((prev) =>
+          prev.map((s) => (s.session_id === session.session_id ? resumed : s)),
+        );
+        setActiveTerminal(resumed);
+        setTerminalKey((k) => k + 1);
+      }
+    } catch { /* ignore */ }
+    finally { setCreating(false); }
   };
 
   // ─── Chat mode actions ────────────────────────────────────────────
@@ -380,6 +421,12 @@ export default function Chat() {
                   </pre>
                 </div>
               )}
+              {/* Active sessions */}
+              {terminalSessions.filter((s) => s.status === "active").length > 0 && (
+                <div className="px-3 pt-2 pb-1">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Active</span>
+                </div>
+              )}
               {terminalSessions.filter((s) => s.status === "active").map((s) => (
                 <div
                   key={s.session_id}
@@ -390,18 +437,85 @@ export default function Chat() {
                 >
                   <SquareTerminal className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-300 truncate">{s.display_name || s.agent_name}</p>
-                    <p className="text-xs text-gray-500">{s.agent_name}</p>
+                    {renamingId === s.session_id ? (
+                      <form
+                        onSubmit={(e) => { e.preventDefault(); renameTerminal(s.session_id, renameValue); }}
+                        className="flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onBlur={() => setRenamingId(null)}
+                          onKeyDown={(e) => e.key === "Escape" && setRenamingId(null)}
+                          className="bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-xs text-gray-200 w-full"
+                        />
+                        <button type="submit" className="p-0.5 text-green-400 hover:text-green-300">
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-300 truncate">{s.display_name || s.agent_name}</p>
+                        <p className="text-xs text-gray-500">{s.agent_name}</p>
+                      </>
+                    )}
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setRenamingId(s.session_id); setRenameValue(s.display_name || s.agent_name); }}
+                    className="p-1 rounded hover:bg-gray-700 text-gray-600 hover:text-gray-300"
+                    title="Rename"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); closeTerminal(s.session_id); }}
                     className="p-1 rounded hover:bg-red-900/30 text-gray-600 hover:text-red-400"
+                    title="End session"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
-              {terminalSessions.filter((s) => s.status === "active").length === 0 && !setupLog && (
+              {/* Closed sessions (resumable) */}
+              {terminalSessions.filter((s) => s.status === "closed").length > 0 && (
+                <>
+                  <div className="px-3 pt-3 pb-1">
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Closed (resumable)</span>
+                  </div>
+                  {terminalSessions.filter((s) => s.status === "closed").map((s) => (
+                    <div
+                      key={s.session_id}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/30 border-b border-gray-800/30"
+                    >
+                      <SquareTerminal className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-500 truncate">{s.display_name || s.agent_name}</p>
+                        <p className="text-xs text-gray-600">{s.agent_name}</p>
+                      </div>
+                      <button
+                        onClick={() => resumeClosedTerminal(s)}
+                        disabled={creating}
+                        className="p-1 rounded hover:bg-cyan-900/30 text-gray-500 hover:text-cyan-400 disabled:opacity-50"
+                        title="Resume session"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTerminalSessions((prev) => prev.filter((t) => t.session_id !== s.session_id));
+                        }}
+                        className="p-1 rounded hover:bg-red-900/30 text-gray-600 hover:text-red-400"
+                        title="Remove from list"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+              {terminalSessions.length === 0 && !setupLog && (
                 <div className="text-xs text-gray-500 space-y-2 p-3">
                   <p>Terminal mode runs the agent <strong>locally</strong> inside the platform container.</p>
                   <p>Sessions persist — you can close the browser and resume later.</p>
@@ -427,15 +541,24 @@ export default function Chat() {
             <>
               <SquareTerminal className="w-5 h-5 text-cyan-400" />
               <span className="text-sm font-medium text-gray-200">
-                {activeTerminal ? `${activeTerminal.display_name || activeTerminal.agent_name} (interactive)` : "Interactive Agent Terminal"}
+                {activeTerminal ? (activeTerminal.display_name || activeTerminal.agent_name) : "Interactive Agent Terminal"}
               </span>
               {activeTerminal && (
-                <button
-                  onClick={() => closeTerminal(activeTerminal.session_id)}
-                  className="ml-auto text-xs px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30"
-                >
-                  End Session
-                </button>
+                <>
+                  <button
+                    onClick={() => { setRenamingId(activeTerminal.session_id); setRenameValue(activeTerminal.display_name || activeTerminal.agent_name); }}
+                    className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                    title="Rename session"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => closeTerminal(activeTerminal.session_id)}
+                    className="ml-auto text-xs px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  >
+                    End Session
+                  </button>
+                </>
               )}
             </>
           ) : activeChatSession ? (

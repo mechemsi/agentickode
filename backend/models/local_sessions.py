@@ -17,6 +17,7 @@ class LocalTerminalSession(Base):
     agent_name = Column(Text, nullable=False)
     tmux_name = Column(Text, unique=True, nullable=False)
     display_name = Column(Text, nullable=True)
+    last_command = Column(Text, nullable=True)
     status = Column(Text, nullable=False, default="active")  # active, closed
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_activity_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

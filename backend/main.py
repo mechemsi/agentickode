@@ -31,6 +31,7 @@ from backend.api import (
     monitoring_rules,
     notification_channels,
     ollama_servers,
+    platform_crons,
     project_instructions,
     project_issues,
     projects,
@@ -75,6 +76,7 @@ from backend.services.queue_service import queue_service
 from backend.services.rules_dispatcher import RulesDispatcher
 from backend.services.task_management.status_sync import StatusSyncer
 from backend.worker.engine import WorkerEngine
+from backend.worker.platform_cron_scheduler import PlatformCronScheduler
 from backend.worker.scheduler import TaskScheduler
 
 logger = logging.getLogger("agentickode")
@@ -249,6 +251,54 @@ async def _run_migrations() -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
+    await _run_migration_step("ALTER TABLE local_terminal_sessions ADD COLUMN last_command TEXT")
+    await _run_migration_step("""
+        CREATE TABLE IF NOT EXISTS platform_crons (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            schedule TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            session_id TEXT,
+            agent_name TEXT NOT NULL DEFAULT 'claude',
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            next_run_at TIMESTAMPTZ,
+            last_run_at TIMESTAMPTZ,
+            last_result TEXT,
+            run_count INTEGER NOT NULL DEFAULT 0,
+            execution_log JSONB NOT NULL DEFAULT '[]',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ
+        )
+    """)
+
+
+async def _cleanup_orphaned_sessions() -> None:
+    """Mark active local terminal sessions as closed if their tmux is gone."""
+    from backend.database import async_session
+
+    async with async_session() as db:
+        result = await db.execute(
+            text("SELECT id, tmux_name FROM local_terminal_sessions WHERE status = 'active'")
+        )
+        rows = result.fetchall()
+        if not rows:
+            return
+
+        for row in rows:
+            proc = await asyncio.create_subprocess_shell(
+                f"tmux has-session -t {row.tmux_name} 2>/dev/null",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.wait()
+            if proc.returncode != 0:
+                await db.execute(
+                    text("UPDATE local_terminal_sessions SET status = 'closed' WHERE id = :id"),
+                    {"id": row.id},
+                )
+        await db.commit()
+        logger.info("Cleaned up orphaned local terminal sessions")
 
 
 @asynccontextmanager
@@ -264,24 +314,33 @@ async def lifespan(app: FastAPI):
 
     async with async_session() as db:
         await seed_all(db)
+
+    # Mark orphaned local terminal sessions as closed (tmux died on restart)
+    await _cleanup_orphaned_sessions()
+
     worker_task = asyncio.create_task(worker_engine.run())
     notification_dispatcher.start()
     rules_dispatcher.start()
     status_syncer.start()
     scheduler = TaskScheduler(async_session)
     scheduler_task = asyncio.create_task(scheduler.run())
+    cron_scheduler = PlatformCronScheduler(async_session)
+    cron_scheduler_task = asyncio.create_task(cron_scheduler.run())
     yield
     logger.info("Shutting down worker")
     notification_dispatcher.stop()
     rules_dispatcher.stop()
     status_syncer.stop()
     scheduler.stop()
+    cron_scheduler.stop()
     worker_engine.stop()
     scheduler_task.cancel()
+    cron_scheduler_task.cancel()
     worker_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await worker_task
         await scheduler_task
+        await cron_scheduler_task
     await close_http_client()
     await queue_service.close()
 
@@ -338,6 +397,7 @@ app.include_router(workspace_commands.router, prefix="/api")
 app.include_router(agent_setup.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(local_terminals.router, prefix="/api")
+app.include_router(platform_crons.router, prefix="/api")
 app.include_router(scheduled_tasks.router, prefix="/api")
 app.include_router(automation_rules.router, prefix="/api")
 app.include_router(monitoring_rules.router, prefix="/api")

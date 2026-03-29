@@ -32,6 +32,7 @@ import BackupExport from "../components/settings/BackupExport";
 import BackupImport from "../components/settings/BackupImport";
 import NotificationSettings from "../components/settings/NotificationSettings";
 import OllamaServerForm from "../components/settings/OllamaServerForm";
+import PlatformCrons from "../components/settings/PlatformCrons";
 import QueueSchedule from "../components/settings/QueueSchedule";
 
 const serviceIcons: Record<string, ElementType> = {
@@ -274,6 +275,11 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* Platform Crons */}
+      <div className="mt-8">
+        <PlatformCrons />
+      </div>
 
       {/* Default Agents for New Servers */}
       <div className="mt-8">

@@ -419,9 +419,10 @@ async def _attach_to_tmux(
     tmux_exists = check.returncode == 0
 
     if not tmux_exists and agent_name:
-        # Create new tmux with the agent
+        # Create tmux with shell, then launch agent inside
+        agent_launch = "claude --permission-mode auto" if agent_name == "claude" else agent_name
         proc = await asyncio.create_subprocess_shell(
-            f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {shlex.quote(agent_name)}",
+            f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
             env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -434,6 +435,11 @@ async def _attach_to_tmux(
             )
             await websocket.close()
             return
+        # Send the agent launch command into the shell
+        await asyncio.create_subprocess_shell(
+            f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
+            env=env,
+        )
     elif not tmux_exists:
         await websocket.send_text(
             json.dumps({"type": "output", "data": f"Session {tmux_name} not found.\r\n"})

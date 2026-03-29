@@ -4,7 +4,9 @@
 
 """Rules engine — evaluate automation rules against events and execute actions."""
 
+import asyncio
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -55,6 +57,8 @@ class RulesEngine:
         try:
             if rule.action_type == "create_run":
                 await self._action_create_run(rule, event, session)
+            elif rule.action_type == "send_to_session":
+                await self._action_send_to_session(rule, event, session)
             elif rule.action_type == "notify":
                 logger.info("Rule %d: notify action (not yet implemented)", rule.id)
             elif rule.action_type == "send_message":
@@ -135,3 +139,47 @@ class RulesEngine:
         )
         session.add(run)
         logger.info("Rule %d dispatched run for '%s'", rule.id, title)
+
+    async def _action_send_to_session(
+        self, rule: AutomationRule, event: AutomationEvent, session: AsyncSession
+    ) -> None:
+        """Send a command to a local terminal tmux session."""
+        config = rule.action_config or {}
+        tmux_name = config.get("tmux_name")
+        message = config.get("message", "")
+
+        if not tmux_name or not message:
+            logger.warning("Rule %d: send_to_session needs tmux_name and message", rule.id)
+            return
+
+        # Inject event data into message
+        if "{event_type}" in message:
+            message = message.replace("{event_type}", event.event_type)
+        if "{run_id}" in message:
+            message = message.replace("{run_id}", str(event.run_id or ""))
+        if "{project_id}" in message:
+            message = message.replace("{project_id}", event.project_id or "")
+
+        env = {
+            **os.environ,
+            "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+        }
+
+        # Check tmux session exists
+        check = await asyncio.create_subprocess_shell(
+            f"tmux has-session -t {tmux_name} 2>/dev/null",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await check.wait()
+        if check.returncode != 0:
+            logger.warning("Rule %d: tmux session %s not found", rule.id, tmux_name)
+            return
+
+        # Send keys to tmux
+        escaped = message.replace("'", "'\\''")
+        await asyncio.create_subprocess_shell(
+            f"tmux send-keys -t {tmux_name} '{escaped}' Enter",
+            env=env,
+        )
+        logger.info("Rule %d: sent message to session %s", rule.id, tmux_name)

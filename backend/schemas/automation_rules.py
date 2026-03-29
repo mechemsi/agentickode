@@ -9,7 +9,13 @@ from datetime import datetime
 from pydantic import BaseModel
 
 VALID_EVENT_SOURCES = {"run_event", "webhook", "monitoring", "schedule", "notification"}
-VALID_ACTION_TYPES = {"create_run", "notify", "send_message", "update_issue"}
+VALID_ACTION_TYPES = {
+    "create_run",
+    "notify",
+    "send_message",
+    "update_issue",
+    "send_to_session",
+}
 
 
 class AutomationRuleCreate(BaseModel):

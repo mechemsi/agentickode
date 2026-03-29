@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -27,12 +27,17 @@ class CreateSessionRequest(BaseModel):
     display_name: str | None = None
 
 
+class RenameRequest(BaseModel):
+    display_name: str
+
+
 class SessionOut(BaseModel):
     id: int
     session_id: str
     agent_name: str
     tmux_name: str
     display_name: str | None
+    last_command: str | None
     status: str
     created_at: datetime
     last_activity_at: datetime
@@ -77,27 +82,36 @@ async def create_local_session(
         "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
     }
 
-    # Create tmux session with agent
-    import shlex
+    # Create tmux with a shell, then launch agent inside it.
+    # Claude needs a proper shell env — direct exec as tmux command fails.
+    if body.agent_name == "claude":
+        agent_launch = "claude --permission-mode auto"
+    else:
+        agent_launch = body.agent_name
 
-    agent_path = shlex.quote(body.agent_name)
     proc = await asyncio.create_subprocess_shell(
-        f"tmux new-session -d -s {tmux_name} -x 120 -y 40 {agent_path}",
+        f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     await proc.wait()
-
     if proc.returncode != 0:
         stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
-        raise HTTPException(500, f"Failed to start {body.agent_name}: {stderr}")
+        raise HTTPException(500, f"Failed to create tmux session: {stderr}")
+
+    # Send the agent launch command into the shell
+    await asyncio.create_subprocess_shell(
+        f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
+        env=env,
+    )
 
     session = LocalTerminalSession(
         session_id=session_id,
         agent_name=body.agent_name,
         tmux_name=tmux_name,
         display_name=display_name,
+        last_command=agent_launch,
         status="active",
     )
     db.add(session)
@@ -108,10 +122,10 @@ async def create_local_session(
     return session
 
 
-@router.post("/local-terminals/{session_id}/rename")
+@router.post("/local-terminals/{session_id}/rename", response_model=SessionOut)
 async def rename_session(
     session_id: str,
-    body: dict,
+    body: RenameRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Rename a local terminal session."""
@@ -122,9 +136,66 @@ async def rename_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    session.display_name = body.get("display_name", session.display_name)
+    session.display_name = body.display_name
     await db.commit()
-    return {"status": "ok"}
+    await db.refresh(session)
+    return session
+
+
+@router.post("/local-terminals/{session_id}/resume", response_model=SessionOut)
+async def resume_local_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Resume a closed/orphaned local terminal session by re-creating its tmux."""
+    result = await db.execute(
+        select(LocalTerminalSession).where(LocalTerminalSession.session_id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    # If tmux is already running, just mark active
+    if await _tmux_exists(session.tmux_name):
+        session.status = "active"
+        session.last_activity_at = datetime.now(UTC)
+        await db.commit()
+        await db.refresh(session)
+        return session
+
+    env = {
+        **os.environ,
+        "TERM": "xterm-256color",
+        "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+    }
+
+    # Re-create tmux session with the same name
+    proc = await asyncio.create_subprocess_shell(
+        f"tmux new-session -d -s {session.tmux_name} -x 120 -y 40",
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    await proc.wait()
+    if proc.returncode != 0:
+        stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
+        raise HTTPException(500, f"Failed to create tmux session: {stderr}")
+
+    # Re-launch the agent command
+    agent_cmd = session.last_command or session.agent_name
+    await asyncio.create_subprocess_shell(
+        f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter",
+        env=env,
+    )
+
+    session.status = "active"
+    session.closed_at = None
+    session.last_activity_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info("Resumed local terminal session %s (%s)", session_id, session.tmux_name)
+    return session
 
 
 @router.delete("/local-terminals/{session_id}")
@@ -144,8 +215,6 @@ async def close_local_session(
     await asyncio.create_subprocess_shell(
         f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true"
     )
-
-    from datetime import UTC, datetime
 
     session.status = "closed"
     session.closed_at = datetime.now(UTC)
