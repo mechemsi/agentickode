@@ -247,7 +247,7 @@ async def unload_model(
                 "prompt": "",
                 "stream": False,
             },
-            timeout=30.0,
+            timeout=120.0,
         )
         resp.raise_for_status()
         return {"success": True, "model": body.model, "error": None}
