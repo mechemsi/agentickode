@@ -12,6 +12,7 @@ definitions live here.
 
 from __future__ import annotations
 
+import json
 import shlex
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -74,6 +75,9 @@ class AgentStatus:
     installed: bool
     version: str | None = None
     path: str | None = None
+    authenticated: bool | None = None
+    auth_email: str | None = None
+    auth_method: str | None = None
 
 
 @dataclass
@@ -83,6 +87,11 @@ class InstallResult:
     message: str | None = None
     error: str | None = None
     output: str | None = None
+
+
+_AUTH_CHECK_COMMANDS: dict[str, str] = {
+    "claude": "claude auth status --json",
+}
 
 
 class AgentInstallService:
@@ -133,7 +142,39 @@ class AgentInstallService:
                         installed=False,
                     )
                 )
+        # Enrich installed agents with auth status
+        for r in results:
+            if r.installed:
+                auth = await self.check_agent_auth(r.agent_name, as_user=as_user)
+                r.authenticated = auth["authenticated"]
+                r.auth_email = auth["auth_email"]
+                r.auth_method = auth["auth_method"]
+
         return results
+
+    async def check_agent_auth(
+        self,
+        agent_name: str,
+        as_user: str | None = None,
+    ) -> dict[str, str | bool | None]:
+        """Check authentication status for a specific agent."""
+        cmd = _AUTH_CHECK_COMMANDS.get(agent_name)
+        if not cmd:
+            return {"authenticated": None, "auth_email": None, "auth_method": None}
+
+        wrapped = _wrap_as_user(cmd, as_user) if as_user else cmd
+        try:
+            stdout, _stderr, rc = await self._ssh.run_command(wrapped, timeout=15)
+            if rc != 0:
+                return {"authenticated": False, "auth_email": None, "auth_method": None}
+            data = json.loads(stdout.strip())
+            return {
+                "authenticated": data.get("loggedIn", False),
+                "auth_email": data.get("email"),
+                "auth_method": data.get("authMethod"),
+            }
+        except Exception:
+            return {"authenticated": None, "auth_email": None, "auth_method": None}
 
     async def _resync_credentials(self, username: str) -> None:
         """Re-copy auth config from root to worker user after install.

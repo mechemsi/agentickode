@@ -1,7 +1,7 @@
 {
   "name": "agentickode-frontend",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "dompurify": "^3.3.1",
     "lucide-react": "^0.574.0",
     "marked": "^17.0.3",
+    "pixi.js": "^8.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",

@@ -8,6 +8,10 @@
 *.swo
 *~
 
+# Claude Code personal overrides
+CLAUDE.local.md
+.claude/settings.local.json
+
 # Python
 __pycache__/
 **/__pycache__/

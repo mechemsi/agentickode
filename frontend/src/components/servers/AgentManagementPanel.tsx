@@ -2,9 +2,14 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
+/* global ResizeObserver */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Loader2, RefreshCw, RotateCcw, X } from "lucide-react";
-import { getAgentStatus, installAgentStream } from "../../api";
+import { Download, Loader2, LogIn, RefreshCw, RotateCcw, X } from "lucide-react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import "@xterm/xterm/css/xterm.css";
+import { getAgentStatus, installAgentStream, startAgentAuthLogin, stopAgentAuthLogin } from "../../api";
 import type { AgentInstallStatus, AgentManagementStatus } from "../../types";
 
 function StatusBadge({ installed }: { installed: boolean }) {
@@ -18,6 +23,23 @@ function StatusBadge({ installed }: { installed: boolean }) {
     >
       <span className={`w-1.5 h-1.5 rounded-full ${installed ? "bg-green-400" : "bg-gray-500"}`} />
       {installed ? "Installed" : "Not Installed"}
+    </span>
+  );
+}
+
+function AuthBadge({ status, email }: { status: boolean | null; email: string | null }) {
+  if (status === null) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+        status
+          ? "bg-blue-500/10 text-blue-400 border border-blue-800/40"
+          : "bg-amber-500/10 text-amber-400 border border-amber-800/40"
+      }`}
+      title={status && email ? `Authenticated as ${email}` : "Not authenticated"}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${status ? "bg-blue-400" : "bg-amber-400"}`} />
+      {status ? "Authenticated" : "Not Authenticated"}
     </span>
   );
 }
@@ -103,13 +125,118 @@ function InstallDialog({ progress, onClose }: { progress: InstallProgress; onClo
   );
 }
 
+function AuthTerminalModal({
+  serverId,
+  tmuxName,
+  agentName,
+  onClose,
+  onComplete,
+}: {
+  serverId: number;
+  tmuxName: string;
+  agentName: string;
+  onClose: () => void;
+  onComplete: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 13,
+      fontFamily: "ui-monospace, Menlo, Monaco, 'Cascadia Code', monospace",
+      theme: {
+        background: "#0d1117",
+        foreground: "#c9d1d9",
+        cursor: "#58a6ff",
+        selectionBackground: "#264f78",
+      },
+    });
+
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    term.loadAddon(new WebLinksAddon());
+    term.open(el);
+    fitAddon.fit();
+
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${proto}//${window.location.host}/ws/servers/${serverId}/auth-terminal/${encodeURIComponent(tmuxName)}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+    };
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "output") term.write(msg.data);
+    };
+    ws.onclose = () => {
+      term.write("\r\n\x1b[90m[Connection closed]\x1b[0m\r\n");
+    };
+    term.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "input", data }));
+      }
+    });
+
+    const resizeObs = new ResizeObserver(() => {
+      fitAddon.fit();
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      }
+    });
+    resizeObs.observe(el);
+
+    return () => {
+      resizeObs.disconnect();
+      ws.close();
+      term.dispose();
+    };
+  }, [serverId, tmuxName]);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-5xl mx-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-white">
+            Authenticate {agentName} — complete the login flow below
+          </h3>
+          <button
+            onClick={() => { onComplete(); onClose(); }}
+            className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700/50"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          Complete the authentication flow in the terminal below. Close this dialog when done.
+        </p>
+        <div ref={containerRef} className="h-96 rounded-lg overflow-hidden border border-gray-800" />
+        <div className="flex justify-end mt-3 gap-2">
+          <button
+            onClick={() => { onComplete(); onClose(); }}
+            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgentRow({
   agent,
   onInstall,
+  onAuthenticate,
   installing,
 }: {
   agent: AgentInstallStatus;
   onInstall: (name: string, reinstall?: boolean) => void;
+  onAuthenticate: (name: string) => void;
   installing: string | null;
 }) {
   const isInstalling = installing === agent.agent_name;
@@ -130,6 +257,16 @@ function AgentRow({
           <span className="text-xs text-gray-500 font-mono">{agent.version}</span>
         )}
         <StatusBadge installed={agent.installed} />
+        {agent.installed && <AuthBadge status={agent.authenticated} email={agent.auth_email} />}
+        {agent.installed && agent.authenticated === false && (
+          <button
+            onClick={() => onAuthenticate(agent.agent_name)}
+            className="text-xs px-2 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-700/40 rounded transition-colors inline-flex items-center gap-1"
+          >
+            <LogIn className="w-3 h-3" />
+            Authenticate
+          </button>
+        )}
         {agent.installed ? (
           <button
             onClick={() => onInstall(agent.agent_name, true)}
@@ -174,6 +311,10 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
   const [installing, setInstalling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<InstallProgress | null>(null);
+  const [authModal, setAuthModal] = useState<{
+    tmuxName: string;
+    agentName: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -234,6 +375,15 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
     }
   };
 
+  const handleAuthenticate = async (agentName: string) => {
+    try {
+      const result = await startAgentAuthLogin(serverId, agentName);
+      setAuthModal({ tmuxName: result.tmux_session, agentName });
+    } catch {
+      setError(`Failed to start auth flow for ${agentName}`);
+    }
+  };
+
   if (loading && !status) {
     return (
       <div className="flex items-center gap-2 text-gray-500 text-xs py-2">
@@ -268,6 +418,7 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
             key={agent.agent_name}
             agent={agent}
             onInstall={handleInstall}
+            onAuthenticate={handleAuthenticate}
             installing={installing}
           />
         ))}
@@ -277,6 +428,19 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
         <InstallDialog
           progress={progress}
           onClose={() => setProgress(null)}
+        />
+      )}
+
+      {authModal && (
+        <AuthTerminalModal
+          serverId={serverId}
+          tmuxName={authModal.tmuxName}
+          agentName={authModal.agentName}
+          onClose={() => {
+            stopAgentAuthLogin(serverId, authModal.agentName).catch(() => {});
+            setAuthModal(null);
+          }}
+          onComplete={() => load()}
         />
       )}
     </div>

@@ -6,6 +6,7 @@
 
 import json
 import logging
+import shlex
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -90,6 +91,9 @@ async def get_agent_status(
             installed=a.installed,
             version=a.version,
             path=a.path,
+            authenticated=a.authenticated,
+            auth_email=a.auth_email,
+            auth_method=a.auth_method,
         )
         for a in worker_agents
     ]
@@ -216,3 +220,91 @@ async def install_agent_for_worker(
 ):
     """Deprecated: use /install which now does combined install+copy."""
     return await install_agent(server_id, body, repo, db)
+
+
+@router.post("/workspace-servers/{server_id}/agents/{agent_name}/auth-login")
+async def start_agent_auth_login(
+    server_id: int,
+    agent_name: str,
+    repo: WorkspaceServerRepository = Depends(_get_repo),
+):
+    """Start an interactive auth login flow for an agent in a tmux session."""
+    server = await repo.get_by_id(server_id)
+    if not server:
+        raise HTTPException(404, "Workspace server not found")
+
+    login_commands = {
+        "claude": "claude",
+    }
+    login_cmd = login_commands.get(agent_name)
+    if not login_cmd:
+        raise HTTPException(400, f"Agent '{agent_name}' does not support interactive auth login")
+
+    username = server.worker_user or "coder"
+    ssh = SSHService.for_server(server)
+
+    # Ensure tmux is installed
+    _out, _err, rc_check = await ssh.run_command("command -v tmux")
+    if rc_check != 0:
+        await ssh.run_command(
+            "apt-get update -qq && apt-get install -y -qq tmux >/dev/null 2>&1 "
+            "|| yum install -y -q tmux 2>/dev/null "
+            "|| apk add --no-cache tmux 2>/dev/null",
+            timeout=60,
+        )
+
+    tmux_name = f"auth-{agent_name}-{server_id}"
+
+    # Kill any existing auth session
+    kill_cmd = f"tmux kill-session -t {shlex.quote(tmux_name)} 2>/dev/null || true"
+    await ssh.run_command(kill_cmd, timeout=5)
+
+    # Create tmux session as worker user (shell stays alive if command exits)
+    def _as_user(cmd: str) -> str:
+        return f"runuser -l {shlex.quote(username)} -c {shlex.quote(cmd)}"
+
+    create_cmd = f"tmux new-session -d -s {shlex.quote(tmux_name)} -x 200 -y 50"
+    await ssh.run_command(_as_user(create_cmd), timeout=10)
+
+    # Enable mouse scrolling and increase scrollback
+    await ssh.run_command(
+        _as_user(
+            f"tmux set-option -t {shlex.quote(tmux_name)} mouse on && "
+            f"tmux set-option -t {shlex.quote(tmux_name)} history-limit 10000"
+        ),
+        timeout=5,
+    )
+
+    # Send the login command into the tmux session
+    await ssh.run_command(
+        _as_user(f"tmux send-keys -t {shlex.quote(tmux_name)} {shlex.quote(login_cmd)} Enter"),
+        timeout=5,
+    )
+
+    return {
+        "tmux_session": tmux_name,
+        "server_id": server_id,
+        "agent_name": agent_name,
+    }
+
+
+@router.delete("/workspace-servers/{server_id}/agents/{agent_name}/auth-login")
+async def stop_agent_auth_login(
+    server_id: int,
+    agent_name: str,
+    repo: WorkspaceServerRepository = Depends(_get_repo),
+):
+    """Kill the auth login tmux session for an agent."""
+    server = await repo.get_by_id(server_id)
+    if not server:
+        raise HTTPException(404, "Workspace server not found")
+
+    username = server.worker_user or "coder"
+    ssh = SSHService.for_server(server)
+    tmux_name = f"auth-{agent_name}-{server_id}"
+
+    kill_cmd = f"tmux kill-session -t {shlex.quote(tmux_name)} 2>/dev/null || true"
+    wrapped = f"runuser -l {shlex.quote(username)} -c {shlex.quote(kill_cmd)}"
+    await ssh.run_command(wrapped, timeout=5)
+
+    return {"success": True}

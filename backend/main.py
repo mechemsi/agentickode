@@ -52,6 +52,7 @@ from backend.api import (
     workflow_templates,
     workspace_commands,
     ws,
+    ws_office,
 )
 from backend.api.servers import (
     agent_management_router,
@@ -411,6 +412,7 @@ app.include_router(memory.router, prefix="/api")
 app.include_router(webhooks_slack.router, prefix="/api")
 app.include_router(webhooks_discord.router, prefix="/api")
 app.include_router(ws.router)
+app.include_router(ws_office.router)
 
 # Mount MCP server for AI agent access (SSE transport)
 app.mount("/mcp", get_mcp_app().http_app(transport="sse"))

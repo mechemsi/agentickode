@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "permissions": {
+    "allow": [
+      "Bash(docker compose -f docker-compose.dev.yml exec *)",
+      "Bash(docker compose exec *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(gh *)",
+      "Read(*)",
+      "Write(backend/**)",
+      "Write(frontend/src/**)",
+      "Write(tests/**)",
+      "Write(alembic/**)",
+      "Write(claudedocs/**)",
+      "Write(docs/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Write(.env*)",
+      "Write(*.secret*)",
+      "Write(.ssh/*)"
+    ]
+  },
+  "rules": [
+    ".claude/rules/code-style.md",
+    ".claude/rules/testing.md",
+    ".claude/rules/api-conventions.md",
+    ".claude/rules/documentation.md"
+  ]
+}

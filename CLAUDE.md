@@ -1,8 +1,23 @@
 # CLAUDE.md
 
-## Project Overview
+## Overview
 
 Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. The backend runs an 8-phase worker pipeline (workspace_setup → init → planning → coding → testing → reviewing → approval → finalization) that dispatches AI coding tasks to remote workspace servers, creates PRs, and gates on human approval.
+
+## Tech Stack
+- **Backend**: Python 3.12, FastAPI, SQLAlchemy (async), Pydantic, Alembic
+- **Frontend**: TypeScript, React 18, Vite, React Router
+- **Database**: SQLite (dev) / PostgreSQL (prod)
+- **Testing**: pytest (backend), Vitest + React Testing Library (frontend)
+- **Linting**: ruff (Python), ESLint (TypeScript)
+- **Type checking**: pyright (Python), TypeScript compiler
+- **Infrastructure**: Docker Compose, SSH-based remote workspaces
+
+## Code Style
+- Follow rules in `.claude/rules/code-style.md`
+- Follow API conventions in `.claude/rules/api-conventions.md`
+- All new features must have tests per `.claude/rules/testing.md`
+- Follow documentation conventions in `.claude/rules/documentation.md`
 
 ## Key Features
 
@@ -20,151 +35,58 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 - **GPU dashboard**: Ollama server GPU monitoring and model management
 - **Role configs**: Customizable roles (planner, coder, reviewer) with per-agent prompt overrides
 - **Comparison mode**: Run multiple agents in parallel, pick winner
+- **Platform crons**: Self-scheduling agent loop for autonomous monitoring
+- **Session resume**: Claude conversation state resumption with `--resume` flag
 
 ## Project Structure
 
 ```
 ├── backend/
 │   ├── api/                    # FastAPI route handlers
-│   │   ├── runs.py             # Task run CRUD, approve/reject/retry/restart
-│   │   ├── projects.py         # Project config CRUD, git URL parsing
-│   │   ├── project_instructions.py # Per-project instructions & secrets
-│   │   ├── webhooks.py         # Inbound webhooks (Plane, GitHub, Gitea, GitLab)
-│   │   ├── webhooks_pr.py      # PR-related webhooks
-│   │   ├── workflow_templates.py # Workflow template CRUD
-│   │   ├── role_configs.py     # Role config CRUD with prompt overrides
-│   │   ├── agents.py           # Agent settings & availability
-│   │   ├── ollama_servers.py   # Ollama server management & GPU status
-│   │   ├── notification_channels.py # Notification channel CRUD
-│   │   ├── backup.py           # Export/import with encryption
-│   │   ├── analytics.py        # Run analytics summary
-│   │   ├── health.py           # System health checks
-│   │   ├── ws.py               # WebSocket endpoints (logs, terminal, events)
-│   │   ├── sse.py              # Server-Sent Events for run streaming
-│   │   └── servers/            # Workspace server endpoints
-│   │       ├── workspace_servers.py  # Server CRUD, test, setup
-│   │       ├── agent_management.py   # Agent install/sync on servers
-│   │       ├── worker_user.py        # Non-root worker user management
-│   │       ├── git_access.py         # Git SSH key deploy & verification
-│   │       ├── ssh_keys.py           # SSH key pair management
-│   │       └── projects.py           # Discovered projects on server
 │   ├── repositories/           # Repository pattern for DB access
-│   ├── services/
-│   │   ├── container.py        # ServiceContainer dataclass (DI)
-│   │   ├── http_client.py      # Shared httpx.AsyncClient singleton
-│   │   ├── role_resolver.py    # Role → provider → adapter resolution
-│   │   ├── encryption.py       # AES encryption for secrets
-│   │   ├── schedule.py         # Queue scheduling
-│   │   ├── ollama_service.py   # Ollama LLM server integration
-│   │   ├── openhands_service.py # OpenHands agent integration
-│   │   ├── chromadb_service.py # ChromaDB vector storage (RAG)
-│   │   ├── task_source_updater.py # Update issue trackers post-completion
-│   │   ├── webhook_callback_service.py # Outbound webhook callbacks
-│   │   ├── html_to_text.py     # HTML → plain text for issue descriptions
-│   │   ├── json_extract.py     # JSON extraction from AI responses
-│   │   ├── git/                # Git provider implementations
-│   │   │   ├── protocol.py     # GitProvider Protocol definition
-│   │   │   ├── github.py       # GitHub provider
-│   │   │   ├── gitea.py        # Gitea provider
-│   │   │   ├── gitlab.py       # GitLab provider
-│   │   │   ├── bitbucket.py    # Bitbucket provider
-│   │   │   ├── ops.py          # Git subprocess operations
-│   │   │   ├── remote_ops.py   # Remote git operations via SSH
-│   │   │   ├── access_service.py # Git SSH access configuration
-│   │   │   ├── repo_info.py    # Repository info helpers
-│   │   │   └── url_parser.py   # Git URL parsing
-│   │   ├── adapters/           # AI agent adapters
-│   │   │   ├── protocol.py     # RoleAdapter Protocol definition
-│   │   │   ├── cli_adapter.py  # CLI agent adapter (Claude, etc.)
-│   │   │   ├── cli_commands.py # CLI command builders
-│   │   │   ├── cli_wrappers.py # CLI execution wrappers
-│   │   │   ├── ollama_adapter.py # Ollama adapter
-│   │   │   ├── openhands_adapter.py # OpenHands adapter
-│   │   │   └── factory.py      # Adapter factory
-│   │   ├── workspace/          # Workspace server management
-│   │   │   ├── ssh_service.py  # SSH command execution
-│   │   │   ├── setup_service.py # Async server setup
-│   │   │   ├── agent_discovery.py # Discover agents on server
-│   │   │   ├── agent_install_service.py # Install agents on server
-│   │   │   ├── project_discovery.py # Discover projects on server
-│   │   │   ├── worker_user_service.py # Non-root worker user setup
-│   │   │   └── sandbox.py      # Sandbox management
+│   ├── services/               # Business logic, integrations
+│   │   ├── git/                # Git provider implementations (Protocol)
+│   │   ├── adapters/           # AI agent adapters (Protocol)
+│   │   ├── workspace/          # SSH workspace server management
 │   │   ├── notifications/      # Notification dispatching
-│   │   │   ├── dispatcher.py   # Route notifications to channels
-│   │   │   ├── formatter.py    # Format notification messages
-│   │   │   ├── slack.py        # Slack integration
-│   │   │   ├── discord.py      # Discord integration
-│   │   │   ├── telegram.py     # Telegram integration
-│   │   │   └── webhook.py      # Generic webhook notifications
 │   │   └── backup/             # Backup & export/import
-│   │       ├── export_service.py # Export config to JSON
-│   │       ├── import_service.py # Import config from JSON
-│   │       ├── entity_registry.py # Entity serialization registry
-│   │       ├── secret_handler.py # Encrypted backup handling
-│   │       ├── serializers.py  # Entity serializers
-│   │       └── schema_version.py # Backup schema versioning
-│   ├── worker/
-│   │   ├── engine.py           # WorkerEngine polling loop
-│   │   ├── pipeline.py         # 8-phase pipeline sequencer
-│   │   ├── broadcaster.py      # WebSocket/DB log broadcaster
+│   ├── worker/                 # Worker engine + 8-phase pipeline
 │   │   └── phases/             # Individual phase implementations
-│   │       ├── workspace_setup.py # Clone repo, create branch
-│   │       ├── init_phase.py   # Analyze project, gather context
-│   │       ├── planning.py     # Decompose task into subtasks
-│   │       ├── coding.py       # Execute subtasks via AI agent
-│   │       ├── testing.py      # Run test suite, report coverage
-│   │       ├── reviewing.py    # AI code review
-│   │       ├── approval.py     # Push branch, create PR, approval gate
-│   │       ├── finalization.py # Notifications, cleanup, mark complete
-│   │       ├── _helpers.py     # Shared phase utilities
-│   │       ├── _prompt_resolver.py # Resolve prompts with instructions/secrets
-│   │       ├── _comparison.py  # Multi-agent comparison logic
-│   │       ├── _review_helpers.py # Review phase utilities
-│   │       └── registry.py     # Phase registration
 │   ├── config.py               # Pydantic Settings
 │   ├── database.py             # SQLAlchemy async session
-│   ├── dependencies.py         # FastAPI Depends() factories
 │   ├── models.py               # SQLAlchemy models
 │   ├── schemas.py              # Pydantic schemas
 │   └── main.py                 # FastAPI app + lifespan
 ├── frontend/
 │   └── src/
-│       ├── pages/              # 10 page components
-│       │   ├── Dashboard.tsx   # Run listing, stats, analytics charts, SSE updates
-│       │   ├── NewRun.tsx      # Create run with per-phase agent overrides
-│       │   ├── RunDetail.tsx   # Phase timeline, logs, approval, cost, terminal
-│       │   ├── Projects.tsx    # Project CRUD with instructions tab
-│       │   ├── WorkspaceServers.tsx # Server management, setup progress, agents
-│       │   ├── AgentSettings.tsx # Agent configuration with env vars & CLI flags
-│       │   ├── RoleConfigs.tsx # Role management with prompt overrides
-│       │   ├── WorkflowTemplates.tsx # Workflow template management
-│       │   ├── Settings.tsx    # Health, SSH keys, Ollama, backup, notifications
-│       │   └── GpuDashboard.tsx # GPU monitoring, model management
-│       ├── components/
-│       │   ├── runs/           # Run-specific components (PhaseTimeline, LogViewer, ApprovalButtons, CostSummary, etc.)
-│       │   ├── servers/        # Server components (GitAccessPanel, AgentManagementPanel, etc.)
-│       │   ├── settings/       # Settings components (OllamaServerForm, BackupExport, NotificationSettings, etc.)
-│       │   └── shared/         # Shared UI (Nav, StatusBadge, StatsBar, AnalyticsCharts, etc.)
-│       ├── api/                # API client modules (runs, projects, servers, agents, workflows, health)
+│       ├── pages/              # Page components (Dashboard, RunDetail, etc.)
+│       ├── components/         # Shared + domain-specific components
+│       ├── api/                # API client modules
 │       ├── types/              # TypeScript type definitions
-│       └── __tests__/          # All frontend tests (Vitest + React Testing Library)
+│       └── __tests__/          # Frontend tests
 ├── tests/
-│   ├── conftest.py             # Shared fixtures (in-memory SQLite, mock services)
-│   ├── unit/                   # Unit tests (88 files)
-│   └── integration/            # Integration tests (17 files)
-├── alembic/                    # Database migrations (17 versions)
+│   ├── unit/                   # Backend unit tests
+│   └── integration/            # Backend integration tests
+├── alembic/                    # Database migrations
+├── claudedocs/                 # Project documentation (see below)
+│   ├── INDEX.md                # Master index — read this first
+│   ├── plans/                  # Feature specs before implementation
+│   ├── implementations/       # What was built and how it works
+│   ├── decisions/              # Architecture Decision Records (ADRs)
+│   └── runbooks/               # Step-by-step operational guides
+├── .claude/                    # Claude Code configuration
+│   ├── settings.json           # Shared permissions and rules
+│   ├── rules/                  # Modular coding standards
+│   ├── commands/               # Custom slash commands (/review, /deploy, /fix-issue)
+│   ├── agents/                 # Subagent personas (code-reviewer, security-analyst)
+│   └── skills/                 # Auto-invoked workflows (deploy, security-review)
 ├── .github/workflows/          # CI + dependency audit
-└── docs/
-    ├── WORKER_PIPELINE.md      # Complete worker pipeline technical reference
-    ├── guides/                 # Architecture & operations guides
-    │   ├── 09-webhook-setup.md # Webhook setup for GitHub, GitLab, Gitea, Plane
-    │   └── decisions/          # Architecture decision records
-    └── plans/                  # Feature implementation plans
+└── docs/                       # Legacy docs + implementation log
 ```
 
 ## Development Environment
 
-**All commands must run inside Docker containers.** Never run tests, lints, type checks, or build commands on the host machine. Use `docker compose -f docker-compose.dev.yml` for the dev environment.
+**All commands must run inside Docker containers.** Never run tests, lints, type checks, or build commands on the host machine.
 
 ```bash
 # Start dev environment
@@ -176,7 +98,7 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ## Commands
 
-All commands below use `docker compose -f docker-compose.dev.yml exec`. If the dev containers are already running, you may use the short form `docker compose exec`.
+All commands below use `docker compose -f docker-compose.dev.yml exec`.
 
 ### Backend
 
@@ -219,25 +141,20 @@ docker compose -f docker-compose.dev.yml exec frontend npm run lint
 docker compose -f docker-compose.dev.yml exec frontend npm run lint:fix
 ```
 
-## Architecture
-
-Workspace servers are REMOTE machines accessed via SSH, not local subprocesses. Never use local subprocess calls for workspace operations. All workspace interactions go through `SSHService`.
-
 ## Architecture Rules
 
 ### SOLID Principles
 
-1. **GitProvider Protocol**: Always use the `GitProvider` Protocol for git operations (create_repo, create_pr, merge_pr). Never call Gitea/GitHub APIs directly. Use `get_git_provider(provider_name, client)` factory.
+1. **GitProvider Protocol**: Use `get_git_provider(provider_name, client)` factory. Never call git APIs directly.
+2. **RoleAdapter Protocol**: Use `RoleResolver` to map roles to providers. Never call agent APIs directly.
+3. **Service Classes**: Injectable via constructor (`OllamaService`, `OpenHandsService`, `ChromaDBService`). Never create `httpx.AsyncClient()` in service functions.
+4. **ServiceContainer**: Worker phases receive `services: ServiceContainer`. Never import service modules directly in phases.
+5. **Repository Pattern**: Use `TaskRunRepository`, `ProjectConfigRepository` for DB access. No inline SQLAlchemy in route handlers.
+6. **Shared HTTP Client**: Use `get_http_client()` from `backend/services/http_client.py`.
 
-2. **RoleAdapter Protocol**: Always use the `RoleAdapter` Protocol for AI agent interactions. Never call agent APIs directly. Use `RoleResolver` to map roles to providers.
+### Remote Architecture
 
-3. **Service Classes**: Always use injectable service classes (`OllamaService`, `OpenHandsService`, `ChromaDBService`). Never create `httpx.AsyncClient()` in service functions. Services receive their client via constructor.
-
-4. **ServiceContainer**: Worker phases receive `services: ServiceContainer` parameter. Never import service modules directly in phases.
-
-5. **Repository Pattern**: Always use `TaskRunRepository` and `ProjectConfigRepository` for DB access. No inline SQLAlchemy queries in route handlers.
-
-6. **Shared HTTP Client**: Use `get_http_client()` from `backend/services/http_client.py`. Never create standalone httpx clients.
+Workspace servers are REMOTE machines accessed via SSH, not local subprocesses. All workspace interactions go through `SSHService`.
 
 ### Code Quality
 
@@ -248,125 +165,106 @@ Workspace servers are REMOTE machines accessed via SSH, not local subprocesses. 
 
 ### License Headers
 
-All source files **must** include the license header as the first lines. CI enforces this on every PR and push to main.
+All source files **must** include the license header. CI enforces this.
 
-**Python files** (`.py` in `backend/` and `tests/`):
+**Python** (`.py` in `backend/` and `tests/`):
 ```python
 # Copyright (c) 2026 Mechemsi. All rights reserved.
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 ```
 
-**TypeScript files** (`.ts`/`.tsx` in `frontend/src/`):
+**TypeScript** (`.ts`/`.tsx` in `frontend/src/`):
 ```typescript
 // Copyright (c) 2026 Mechemsi. All rights reserved.
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 ```
 
-When creating new files, always add the appropriate header before any imports or code.
-
 ### After Every Backend Edit
 
-**Default: targeted runs on edited files only** to save context and time.
+**Default: targeted runs on edited files only.**
 
 ```bash
-# Lint/format ONLY the edited files
 docker compose -f docker-compose.dev.yml exec backend ruff check backend/path/to/edited_file.py --fix
 docker compose -f docker-compose.dev.yml exec backend ruff format backend/path/to/edited_file.py
-
-# Type check the edited file
 docker compose -f docker-compose.dev.yml exec backend pyright backend/path/to/edited_file.py
-
-# Run ONLY the related test file(s)
 docker compose -f docker-compose.dev.yml exec backend pytest tests/unit/test_edited_module.py -x -v
 ```
 
-**Full suite — only run when:**
-- Changing models, schemas, or shared utilities that affect many modules
-- Editing conftest.py, config.py, database.py, or dependencies.py
-- Before committing / finishing a task
-- Refactoring imports or moving files
-
-```bash
-docker compose -f docker-compose.dev.yml exec backend ruff check backend/ tests/ --fix
-docker compose -f docker-compose.dev.yml exec backend ruff format backend/ tests/
-docker compose -f docker-compose.dev.yml exec backend pyright backend/
-docker compose -f docker-compose.dev.yml exec backend pytest tests/ -x -v
-```
+**Full suite — only when:** changing models/schemas/shared utils, editing conftest/config/database/dependencies, before committing.
 
 ### After Every Frontend Edit
 
 **Default: targeted runs on edited files only.**
 
 ```bash
-# Lint only the edited file
 docker compose -f docker-compose.dev.yml exec frontend npx eslint src/path/to/EditedFile.tsx --fix
-
-# Run only the related test
 docker compose -f docker-compose.dev.yml exec frontend npx vitest run src/__tests__/EditedFile.test.tsx
 ```
 
-**Full suite — only run when:**
-- Changing types.ts, api.ts, or shared components used across pages
-- Before committing / finishing a task
-
-```bash
-docker compose -f docker-compose.dev.yml exec frontend npm run lint
-docker compose -f docker-compose.dev.yml exec frontend npm test
-```
+**Full suite — only when:** changing types/api/shared components, before committing.
 
 ### Testing Conventions
 
-- Backend tests use in-memory SQLite with JSONB→JSON mapping (see `conftest.py`)
+- Backend: in-memory SQLite with JSONB→JSON mapping (see `conftest.py`)
 - Use `mock_services` fixture for mocked `ServiceContainer`
-- Use `make_task_run` factory fixture for creating test `TaskRun` records
-- Frontend tests use Vitest + React Testing Library
-- Mock API calls with `vi.mock("../api", ...)`
+- Use `make_task_run` factory for test `TaskRun` records
+- Frontend: Vitest + React Testing Library, mock API with `vi.mock("../api", ...)`
 - Wrap routed components in `<MemoryRouter>`
 
 ### Worker Pipeline
 
-- 8 phases execute sequentially: workspace_setup → init → planning → coding → testing → reviewing → approval → finalization
-- The approval phase returns `"awaiting"` to park the run for human review
-- After approval, the engine resumes from the finalization phase
-- Phase functions signature: `async def run(task_run, session, services) -> None | str`
-- Trigger modes: `auto` (default), `wait_for_trigger` (manual advance), `wait_for_approval`
+- 8 phases: workspace_setup → init → planning → coding → testing → reviewing → approval → finalization
+- Approval phase returns `"awaiting"` to park run for human review
+- Phase signature: `async def run(task_run, session, services) -> None | str`
+- Trigger modes: `auto`, `wait_for_trigger`, `wait_for_approval`
 - Comparison mode: run multiple agents in parallel, user picks winner
 
-## Workflow Rules
+## Documentation Workflow
 
-When asked to create a plan, write it to a file immediately and do NOT attempt to exit plan mode or wait for approval before starting implementation unless explicitly told to only plan. Bias toward action over planning.
+Claude must keep `claudedocs/` up to date as part of the development process:
+
+### Before starting a feature
+1. Check `claudedocs/INDEX.md` for existing context
+2. Create a plan doc in `claudedocs/plans/` if one doesn't exist
+3. If a significant technical choice is being made, create an ADR in `claudedocs/decisions/`
+
+### After completing a feature
+1. Create or update an implementation doc in `claudedocs/implementations/`
+2. Update the plan doc status from `planned` to `implemented`
+3. Update `claudedocs/INDEX.md` with any new or changed docs
+
+### When a process is repeated
+1. If you explain the same steps twice, create a runbook in `claudedocs/runbooks/`
+2. Add it to `claudedocs/INDEX.md`
+
+### Rules
+- Always read `claudedocs/INDEX.md` first when starting work on a feature
+- Never leave INDEX.md out of sync — update it whenever a doc is added or changes status
+- Use YAML frontmatter in every doc (`title`, `status`, `date`, `related`)
+
+## Git Conventions
+- Branch naming: `feat/`, `fix/`, `chore/`, `docs/`
+- Commit style: Conventional Commits (`feat: add login page`)
+- Never commit directly to `main` — always open a PR (unless explicitly told otherwise)
 
 ## CI/CD
 
-GitHub Actions workflow files must be placed at the REPOSITORY ROOT under `.github/workflows/`, not inside subdirectories like `agentickode-app/.github/workflows/`.
+GitHub Actions workflow files at `.github/workflows/` (repository root).
 
 ## Docker & Infrastructure
 
-When migrating or restructuring projects (e.g., promoting subdirectory to root), always preserve: 1) `.env` files (copy or recreate), 2) Docker volume names/references to avoid losing database data, 3) Verify existing services still connect after network changes.
+When migrating or restructuring, preserve: 1) `.env` files, 2) Docker volume names, 3) Verify services connect after network changes.
 
 ## Development Practices
 
-After making changes, always verify they work end-to-end rather than assuming success. For long debugging chains, check the actual logs at each step rather than making multiple speculative fixes.
-
-## Documentation
-
-- `docs/WORKER_PIPELINE.md` — complete worker pipeline technical reference
-- `docs/guides/09-webhook-setup.md` — webhook setup for GitHub, GitLab, Gitea, Plane
-- `docs/guides/decisions/` — architecture decision records
-
-
-After any comments from me add this entry to tasks/lessons.md date, what went wrong, rule for next time read this eveyrtime before doing anything.
+After making changes, always verify end-to-end. For long debugging chains, check actual logs at each step.
 
 ## Implementation Log
 
-After completing any significant feature, integration, or phase of work, append an entry to `docs/IMPLEMENTATION_LOG.md` with:
-- **Date** (YYYY-MM-DD)
-- **Version** (tag if applicable)
-- **What was implemented** (brief summary)
-- **Files created/modified** (count or list)
-- **Tests** (count added, total passing)
-- **Commit hash**
+After completing significant work, append to `docs/IMPLEMENTATION_LOG.md` with: date, version, summary, files changed, tests, commit hash.
 
-This creates a persistent record of what was built and when, independent of git log.
+## Lessons
+
+After any comments from me, add entry to `tasks/lessons.md`: date, what went wrong, rule for next time. Read this before doing anything.

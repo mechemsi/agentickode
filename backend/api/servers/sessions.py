@@ -24,6 +24,7 @@ from backend.schemas.sessions import (
 )
 from backend.services.workspace.session_service import SessionService
 from backend.services.workspace.ssh_service import SSHService
+from backend.worker.broadcaster import broadcaster
 
 router = APIRouter(tags=["sessions"])
 
@@ -96,6 +97,24 @@ async def create_session(body: CliSessionCreate, db: AsyncSession = Depends(get_
     await repo.create(cli_session)
     await db.commit()
     await db.refresh(cli_session)
+
+    # Notify office view
+    await broadcaster.office_event(
+        {
+            "type": "agent_spawned",
+            "agent": {
+                "id": f"session-{session_id}",
+                "agent_type": body.agent_name,
+                "status": "active",
+                "activity": "coding",
+                "project": "",
+                "phase": "session",
+                "run_id": None,
+                "display_name": cli_session.display_name,
+            },
+            "room_id": body.workspace_server_id,
+        }
+    )
 
     return _session_to_out(cli_session, server_name=server.name)
 
@@ -178,6 +197,15 @@ async def close_session(session_id: int, db: AsyncSession = Depends(get_db)):
     s.status = "closed"
     s.closed_at = datetime.now(UTC)
     await db.commit()
+
+    # Notify office view
+    await broadcaster.office_event(
+        {
+            "type": "agent_left",
+            "agent_id": f"session-{s.session_id}",
+        }
+    )
+
     return {"detail": "Session closed"}
 
 

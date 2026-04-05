@@ -135,6 +135,9 @@ export interface AgentInstallStatus {
   installed: boolean;
   version: string | null;
   path: string | null;
+  authenticated: boolean | null;
+  auth_email: string | null;
+  auth_method: string | null;
 }
 
 export interface UserAgentStatus {

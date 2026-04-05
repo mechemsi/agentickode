@@ -9,7 +9,7 @@ import type {
   WorkerUserSetupResult,
   WorkerUserStatus,
 } from "../types";
-import { get, post, put } from "./client";
+import { get, httpDelete, post, put } from "./client";
 
 export const getAgents = () => get<AgentSettings[]>("/agents");
 
@@ -89,4 +89,14 @@ export const setWorkerUserPassword = (id: number, password: string) =>
   post<{ success: boolean; error: string | null }>(
     `/workspace-servers/${id}/worker-user/set-password`,
     { password },
+  );
+
+export const startAgentAuthLogin = (serverId: number, agentName: string) =>
+  post<{ tmux_session: string; server_id: number; agent_name: string }>(
+    `/workspace-servers/${serverId}/agents/${encodeURIComponent(agentName)}/auth-login`,
+  );
+
+export const stopAgentAuthLogin = (serverId: number, agentName: string) =>
+  httpDelete(
+    `/workspace-servers/${serverId}/agents/${encodeURIComponent(agentName)}/auth-login`,
   );

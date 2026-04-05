@@ -51,6 +51,7 @@ class Broadcaster:
     def __init__(self):
         self._run_subs: dict[int, list[asyncio.Queue]] = {}
         self._global_subs: list[asyncio.Queue] = []
+        self._office_subs: list[asyncio.Queue] = []
 
     # --- subscription management ---
 
@@ -68,6 +69,12 @@ class Broadcaster:
 
     def unsubscribe_global(self, queue: asyncio.Queue):
         self._global_subs = [q for q in self._global_subs if q is not queue]
+
+    def subscribe_office(self, queue: asyncio.Queue):
+        self._office_subs.append(queue)
+
+    def unsubscribe_office(self, queue: asyncio.Queue):
+        self._office_subs = [q for q in self._office_subs if q is not queue]
 
     # --- emitting ---
 
@@ -119,6 +126,16 @@ class Broadcaster:
             **(data or {}),
         }
         for q in self._global_subs:
+            with contextlib.suppress(asyncio.QueueFull):
+                q.put_nowait(payload)
+        for q in self._office_subs:
+            with contextlib.suppress(asyncio.QueueFull):
+                q.put_nowait(payload)
+
+    async def office_event(self, payload: dict[str, Any]):
+        """Broadcast an event only to office subscribers (session lifecycle)."""
+        payload.setdefault("timestamp", datetime.now(UTC).isoformat())
+        for q in self._office_subs:
             with contextlib.suppress(asyncio.QueueFull):
                 q.put_nowait(payload)
 

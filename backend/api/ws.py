@@ -136,6 +136,65 @@ async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = N
         conn.close()
 
 
+@router.websocket("/ws/servers/{server_id}/auth-terminal/{tmux_name}")
+async def ws_auth_terminal(websocket: WebSocket, server_id: int, tmux_name: str):
+    """Attach to an auth login tmux session on a workspace server."""
+    await websocket.accept()
+    async with async_session() as db:
+        server = (
+            await db.execute(select(WorkspaceServer).where(WorkspaceServer.id == server_id))
+        ).scalar_one_or_none()
+    if not server:
+        await websocket.close(code=1008, reason="Server not found")
+        return
+
+    ssh = SSHService.for_server(server)
+    username = server.worker_user or "coder"
+
+    # tmux session was created as worker user, so attach as that user
+    attach_cmd = f"tmux attach-session -t {shlex.quote(tmux_name)}"
+    if username and username != "root" and server.username == "root":
+        attach_cmd = f"runuser -l {shlex.quote(username)} -c {shlex.quote(attach_cmd)}"
+
+    conn = await ssh._connect()
+    try:
+        process = await conn.create_process(
+            attach_cmd,
+            term_type="xterm-256color",
+            term_size=(200, 50),
+        )
+
+        async def ssh_to_ws():
+            try:
+                while not process.stdout.at_eof():
+                    data = await process.stdout.read(4096)
+                    if data:
+                        await websocket.send_text(json.dumps({"type": "output", "data": data}))
+            except (asyncssh.BreakReceived, asyncssh.SignalReceived):
+                pass
+
+        async def ws_to_ssh():
+            try:
+                while True:
+                    raw = await websocket.receive_text()
+                    msg = json.loads(raw)
+                    if msg.get("type") == "input":
+                        process.stdin.write(msg["data"])
+                    elif msg.get("type") == "resize":
+                        process.change_terminal_size(msg.get("cols", 200), msg.get("rows", 50))
+            except WebSocketDisconnect:
+                pass
+
+        done, pending = await asyncio.wait(
+            [asyncio.ensure_future(ssh_to_ws()), asyncio.ensure_future(ws_to_ssh())],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for t in pending:
+            t.cancel()
+    finally:
+        conn.close()
+
+
 @router.websocket("/ws/runs/{run_id}/terminal")
 async def ws_run_terminal(websocket: WebSocket, run_id: int):
     """Bridge xterm.js to SSH PTY in the run's workspace, optionally resuming a Claude session."""

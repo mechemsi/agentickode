@@ -126,6 +126,9 @@ class AgentInstallStatus(BaseModel):
     installed: bool
     version: str | None = None
     path: str | None = None
+    authenticated: bool | None = None
+    auth_email: str | None = None
+    auth_method: str | None = None
 
 
 class AgentInstallRequest(BaseModel):

@@ -66,10 +66,19 @@ class SessionService:
         if rc != 0:
             raise RuntimeError(f"Failed to create tmux session: {stderr.strip()}")
 
+        # Enable mouse scrolling and increase scrollback
+        await self._ssh.run_command(
+            self._as_user(
+                f"tmux set-option -t {shlex.quote(tmux_name)} mouse on && "
+                f"tmux set-option -t {shlex.quote(tmux_name)} history-limit 10000"
+            )
+        )
+
         # Build the agent launch command (tmux already in workspace dir)
         if agent_name == "claude":
-            # No --dangerously-skip-permissions needed: permissions pre-configured in settings
-            agent_cmd = f"claude --session-id {shlex.quote(session_id)}"
+            agent_cmd = (
+                f"claude --dangerously-skip-permissions --session-id {shlex.quote(session_id)}"
+            )
         elif agent_name == "codex":
             agent_cmd = "codex"
         else:

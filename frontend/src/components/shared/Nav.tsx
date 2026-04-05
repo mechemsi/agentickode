@@ -18,6 +18,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
+import OfficeIcon from '../office/OfficeIcon';
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -65,7 +66,8 @@ export default function Nav() {
         </div>
 
         {/* New Run CTA */}
-        <div className="hidden md:flex ml-auto">
+        <div className="hidden md:flex ml-auto items-center gap-2">
+          <OfficeIcon />
           <Link
             to="/runs/new"
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-blue-900/30 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40"

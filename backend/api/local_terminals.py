@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models.local_sessions import LocalTerminalSession
+from backend.worker.broadcaster import broadcaster
 
 logger = logging.getLogger("agentickode.api.local_terminals")
 router = APIRouter(tags=["local-terminals"])
@@ -85,7 +86,7 @@ async def create_local_session(
 
     # Create tmux with a shell, then launch agent inside it.
     # Claude uses --session-id so we can --resume later.
-    claude_session_id = uuid.uuid4().hex
+    claude_session_id = str(uuid.uuid4())
     if body.agent_name == "claude":
         agent_launch = f"claude --permission-mode auto --session-id {claude_session_id}"
     else:
@@ -101,6 +102,13 @@ async def create_local_session(
     if proc.returncode != 0:
         stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
         raise HTTPException(500, f"Failed to create tmux session: {stderr}")
+
+    # Enable mouse scrolling and increase scrollback
+    await asyncio.create_subprocess_shell(
+        f"tmux set-option -t {tmux_name} mouse on && "
+        f"tmux set-option -t {tmux_name} history-limit 10000",
+        env=env,
+    )
 
     # Send the agent launch command into the shell
     await asyncio.create_subprocess_shell(
@@ -122,6 +130,25 @@ async def create_local_session(
     await db.refresh(session)
 
     logger.info("Created local terminal session %s (%s)", session_id, tmux_name)
+
+    # Notify office view
+    await broadcaster.office_event(
+        {
+            "type": "agent_spawned",
+            "agent": {
+                "id": f"local-{session_id}",
+                "agent_type": body.agent_name,
+                "status": "active",
+                "activity": "coding",
+                "project": "",
+                "phase": "chat",
+                "run_id": None,
+                "display_name": display_name,
+            },
+            "room_id": "platform",
+        }
+    )
+
     return session
 
 
@@ -184,6 +211,13 @@ async def resume_local_session(
         stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
         raise HTTPException(500, f"Failed to create tmux session: {stderr}")
 
+    # Enable mouse scrolling and increase scrollback
+    await asyncio.create_subprocess_shell(
+        f"tmux set-option -t {session.tmux_name} mouse on && "
+        f"tmux set-option -t {session.tmux_name} history-limit 10000",
+        env=env,
+    )
+
     # Re-launch the agent — use --resume if we have a Claude session ID
     if session.agent_session_id and session.agent_name == "claude":
         agent_cmd = f"claude --permission-mode auto --resume {session.agent_session_id}"
@@ -226,6 +260,15 @@ async def close_local_session(
     await db.commit()
 
     logger.info("Deleted local terminal session %s", session_id)
+
+    # Notify office view
+    await broadcaster.office_event(
+        {
+            "type": "agent_left",
+            "agent_id": f"local-{session_id}",
+        }
+    )
+
     return {"status": "deleted"}
 
 
