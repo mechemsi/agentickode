@@ -25,6 +25,7 @@ _CLAUDE_MARKETPLACES = [
     "affaan-m/everything-claude-code",
     "obra/superpowers-marketplace",
     "thedotmack/claude-mem",
+    "forrestchang/andrej-karpathy-skills",
 ]
 
 _CLAUDE_PLUGINS = [
@@ -57,6 +58,8 @@ _CLAUDE_PLUGINS = [
     "example-skills@anthropic-agent-skills",
     # everything-claude-code
     "everything-claude-code@everything-claude-code",
+    # karpathy-skills
+    "andrej-karpathy-skills@karpathy-skills",
 ]
 
 # Extra tools installed after Claude plugins
