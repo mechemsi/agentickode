@@ -31,10 +31,9 @@ def mock_setup_service():
 @pytest.fixture
 def mock_ssh_service():
     """Mock SSH that succeeds for connection test."""
-    with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
+    with patch("backend.api.servers.workspace_servers_ops.executor_for_server") as mock_factory:
         instance = AsyncMock()
-        mock_cls.return_value = instance
-        mock_cls.for_server = lambda server: instance
+        mock_factory.return_value = instance
         instance.test_connection = AsyncMock(
             return_value=SSHTestResultData(success=True, latency_ms=5.0)
         )
@@ -45,7 +44,9 @@ def mock_ssh_service():
 def mock_ssh_with_discovery():
     """Mock SSH + AgentDiscovery + ProjectDiscovery for scan endpoints."""
     with (
-        patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+        patch(
+            "backend.api.servers.workspace_servers_discovery.executor_for_server"
+        ) as mock_factory,
         patch(
             "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
         ) as mock_agent_cls,
@@ -54,8 +55,7 @@ def mock_ssh_with_discovery():
         ) as mock_proj_cls,
     ):
         instance = AsyncMock()
-        mock_cls.return_value = instance
-        mock_cls.for_server = lambda server: instance
+        mock_factory.return_value = instance
         instance.test_connection = AsyncMock(
             return_value=SSHTestResultData(success=True, latency_ms=5.0)
         )
@@ -383,9 +383,9 @@ class TestSSHTest:
         server_id = create_resp.json()["id"]
 
         # Make SSH fail for the test call
-        with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
+        with patch("backend.api.servers.workspace_servers_ops.executor_for_server") as mock_factory:
             fail_instance = AsyncMock()
-            mock_cls.for_server = lambda server: fail_instance
+            mock_factory.return_value = fail_instance
             fail_instance.test_connection = AsyncMock(
                 return_value=SSHTestResultData(
                     success=False, latency_ms=100.0, error="Connection timed out"
@@ -418,9 +418,9 @@ class TestSSHTest:
         assert create_resp.json()["status"] == "setting_up"
 
         # SSH test succeeds
-        with patch("backend.api.servers.workspace_servers_ops.SSHService") as mock_cls:
+        with patch("backend.api.servers.workspace_servers_ops.executor_for_server") as mock_factory:
             ok_instance = AsyncMock()
-            mock_cls.for_server = lambda server: ok_instance
+            mock_factory.return_value = ok_instance
             ok_instance.test_connection = AsyncMock(
                 return_value=SSHTestResultData(success=True, latency_ms=2.0)
             )
@@ -482,7 +482,9 @@ class TestScan:
             ),
         ]
         with (
-            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.executor_for_server"
+            ) as mock_factory,
             patch(
                 "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
             ) as mock_agent_cls,
@@ -491,7 +493,7 @@ class TestScan:
             ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
-            mock_cls.for_server = lambda server: scan_ssh
+            mock_factory.return_value = scan_ssh
             scan_ssh.test_connection = AsyncMock(
                 return_value=SSHTestResultData(success=True, latency_ms=5.0)
             )
@@ -524,7 +526,9 @@ class TestScan:
 
         # First scan: imports projects
         with (
-            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.executor_for_server"
+            ) as mock_factory,
             patch(
                 "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
             ) as mock_agent_cls,
@@ -533,7 +537,7 @@ class TestScan:
             ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
-            mock_cls.for_server = lambda server: scan_ssh
+            mock_factory.return_value = scan_ssh
             scan_ssh.test_connection = AsyncMock(
                 return_value=SSHTestResultData(success=True, latency_ms=5.0)
             )
@@ -571,7 +575,9 @@ class TestScan:
             ),
         ]
         with (
-            patch("backend.api.servers.workspace_servers_discovery.SSHService") as mock_cls,
+            patch(
+                "backend.api.servers.workspace_servers_discovery.executor_for_server"
+            ) as mock_factory,
             patch(
                 "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"
             ) as mock_agent_cls,
@@ -580,7 +586,7 @@ class TestScan:
             ) as mock_proj_cls,
         ):
             scan_ssh = AsyncMock()
-            mock_cls.for_server = lambda server: scan_ssh
+            mock_factory.return_value = scan_ssh
             scan_ssh.test_connection = AsyncMock(
                 return_value=SSHTestResultData(success=True, latency_ms=5.0)
             )

@@ -24,7 +24,7 @@ from backend.services.adapters.cli_wrappers import (
 )
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.adapters.cli")
 
@@ -41,7 +41,7 @@ class CLIAdapter:
 
     def __init__(
         self,
-        ssh_service: SSHService,
+        ssh_service: CommandExecutor,
         agent_name: str,
         server_name: str = "",
         worker_user: str | None = None,
@@ -79,7 +79,7 @@ class CLIAdapter:
         return self._agent
 
     @property
-    def ssh(self) -> SSHService:
+    def ssh(self) -> CommandExecutor:
         return self._ssh
 
     @property

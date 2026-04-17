@@ -22,7 +22,7 @@ from backend.services.workspace.agent_discovery import AgentDiscoveryService
 
 if TYPE_CHECKING:
     from backend.models.agents import AgentSettings
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 
 def _cfg_from_settings(s: AgentSettings) -> dict[str, str | bool]:
@@ -103,7 +103,7 @@ class AgentInstallService:
 
     def __init__(
         self,
-        ssh: SSHService,
+        ssh: CommandExecutor,
         agent_settings: list[AgentSettings],
     ):
         self._ssh = ssh

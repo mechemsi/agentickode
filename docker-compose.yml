@@ -46,6 +46,10 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./alembic:/app/alembic
       - ./.ssh:/app/.ssh
+      # Host Docker access for local sandbox execution
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persist workspaces (project clones) across rebuilds
+      - workspaces:/workspaces
       # Persist agent binaries and credentials across rebuilds
       - agent-binaries:/root/.local
       - agent-config-claude:/root/.claude
@@ -77,6 +81,8 @@ volumes:
     name: agentickode-app_pgdata
   redisdata:
     name: agentickode-app_redisdata
+  workspaces:
+    name: agentickode-app_workspaces
   agent-binaries:
     name: agentickode-app_agent-binaries
   agent-config-claude:

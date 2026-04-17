@@ -12,7 +12,7 @@ import json
 import logging
 import shlex
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.sessions")
 
@@ -20,7 +20,7 @@ logger = logging.getLogger("agentickode.sessions")
 class SessionService:
     """Manage persistent CLI sessions on workspace servers via tmux."""
 
-    def __init__(self, ssh: SSHService, user: str | None = None):
+    def __init__(self, ssh: CommandExecutor, user: str | None = None):
         self._ssh = ssh
         self._user = user  # non-root user to run tmux as
 

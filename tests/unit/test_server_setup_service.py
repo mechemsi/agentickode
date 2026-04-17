@@ -91,19 +91,23 @@ class TestExecuteStep:
 
     async def test_ssh_test_step_success(self, server, mock_session_factory):
         mock_result = MagicMock(success=True)
-        with patch("backend.services.workspace._setup_steps.SSHService") as mock_ssh_cls:
+        with patch(
+            "backend.services.workspace._setup_steps.executor_for_server"
+        ) as mock_ssh_factory:
             mock_ssh = AsyncMock()
             mock_ssh.test_connection.return_value = mock_result
-            mock_ssh_cls.for_server.return_value = mock_ssh
+            mock_ssh_factory.return_value = mock_ssh
 
             await execute_step(mock_session_factory, server.id, "ssh_test")
 
     async def test_ssh_test_step_failure(self, server, mock_session_factory):
         mock_result = MagicMock(success=False, error="Connection refused")
-        with patch("backend.services.workspace._setup_steps.SSHService") as mock_ssh_cls:
+        with patch(
+            "backend.services.workspace._setup_steps.executor_for_server"
+        ) as mock_ssh_factory:
             mock_ssh = AsyncMock()
             mock_ssh.test_connection.return_value = mock_result
-            mock_ssh_cls.for_server.return_value = mock_ssh
+            mock_ssh_factory.return_value = mock_ssh
 
             with pytest.raises(RuntimeError, match="SSH connection failed"):
                 await execute_step(mock_session_factory, server.id, "ssh_test")
@@ -111,10 +115,12 @@ class TestExecuteStep:
     async def test_create_worker_user_step(self, server, mock_session_factory):
         mock_info = MagicMock(exists=True, error=None)
         with (
-            patch("backend.services.workspace._setup_steps.SSHService") as mock_ssh_cls,
+            patch(
+                "backend.services.workspace._setup_steps.executor_for_server"
+            ) as mock_ssh_factory,
             patch("backend.services.workspace._setup_steps.WorkerUserService") as mock_wus_cls,
         ):
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+            mock_ssh_factory.return_value = AsyncMock()
             mock_wus = mock_wus_cls.return_value
             # check_status returns "not exists" so setup() is called
             mock_wus.check_status = AsyncMock(return_value=MagicMock(exists=False))
@@ -128,10 +134,12 @@ class TestExecuteStep:
     async def test_create_worker_user_already_exists(self, server, mock_session_factory):
         mock_info = MagicMock(exists=True, error=None)
         with (
-            patch("backend.services.workspace._setup_steps.SSHService") as mock_ssh_cls,
+            patch(
+                "backend.services.workspace._setup_steps.executor_for_server"
+            ) as mock_ssh_factory,
             patch("backend.services.workspace._setup_steps.WorkerUserService") as mock_wus_cls,
         ):
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+            mock_ssh_factory.return_value = AsyncMock()
             mock_wus = mock_wus_cls.return_value
             # check_status returns "exists" — setup() should NOT be called
             mock_wus.check_status = AsyncMock(return_value=mock_info)
@@ -143,8 +151,10 @@ class TestExecuteStep:
             mock_wus.setup.assert_not_called()
 
     async def test_mark_online_step(self, server, mock_session_factory):
-        with patch("backend.services.workspace._setup_steps.SSHService") as mock_ssh_cls:
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+        with patch(
+            "backend.services.workspace._setup_steps.executor_for_server"
+        ) as mock_ssh_factory:
+            mock_ssh_factory.return_value = AsyncMock()
             await execute_step(mock_session_factory, server.id, "mark_online")
 
         # The mark_online step updates the server within its own session context

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.sessions import CliSession
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 
 logger = logging.getLogger("agentickode.messaging.agent_relay")
 
@@ -53,12 +53,7 @@ class AgentRelay:
             return "Workspace server not found for this session."
 
         try:
-            ssh = SSHService(
-                hostname=server.hostname,
-                port=server.port or 22,
-                username=server.username or "root",
-                key_path=server.ssh_key_path,
-            )
+            ssh = executor_for_server(server)
 
             # Escape message for tmux
             escaped = message.replace("'", "'\\''")

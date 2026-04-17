@@ -17,7 +17,7 @@ from backend.schemas import (
     UserGitAccessStatus,
 )
 from backend.services.git import GitAccessService
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 
 router = APIRouter(tags=["git-access"])
 
@@ -40,7 +40,7 @@ async def check_git_access(
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = GitAccessService(ssh)
 
     custom: list[tuple[str, str]] | None = None
@@ -121,7 +121,7 @@ async def sync_git_keys(
     if not server.worker_user:
         raise HTTPException(400, "No worker user configured on this server")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = GitAccessService(ssh)
 
     root_key = await svc.get_public_key()
@@ -148,7 +148,7 @@ async def generate_git_key(
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = GitAccessService(ssh)
 
     force = body.force if body else False

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 DEFAULT_PROVIDERS = [
     ("github.com", "GitHub"),
@@ -39,7 +39,7 @@ class KeyInfo:
 class GitAccessService:
     """Check git provider SSH access from a workspace server."""
 
-    def __init__(self, ssh: SSHService):
+    def __init__(self, ssh: CommandExecutor):
         self._ssh = ssh
 
     async def _run(self, cmd: str, as_user: str | None = None, timeout: int = 10):

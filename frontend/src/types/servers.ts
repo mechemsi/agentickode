@@ -12,6 +12,7 @@ export interface WorkspaceServer {
   id: number;
   name: string;
   hostname: string;
+  server_type?: string;
   port: number;
   username: string;
   ssh_key_path: string | null;

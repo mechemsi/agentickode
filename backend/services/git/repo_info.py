@@ -15,7 +15,7 @@ import httpx
 from backend.config import settings
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.repo_info")
 
@@ -68,7 +68,7 @@ async def get_default_branch(
 
 
 async def get_default_branch_via_ssh(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     git_url: str,
 ) -> str:
     """Detect the default branch by running ``git ls-remote`` on a workspace server.

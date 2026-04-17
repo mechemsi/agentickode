@@ -105,7 +105,7 @@ class TestReadinessAPI:
             patch("backend.api.servers.readiness.ProjectConfigRepository") as mock_proj_repo_cls,
             patch("backend.api.servers.readiness.WorkspaceReadinessRepository") as mock_repo_cls,
             patch("backend.api.servers.readiness.WorkspaceReadinessService") as mock_svc_cls,
-            patch("backend.api.servers.readiness.SSHService"),
+            patch("backend.api.servers.readiness.executor_for_server"),
         ):
             mock_srv_repo = mock_srv_repo_cls.return_value
             server = MagicMock(id=1, workspace_root="/workspaces", worker_user="coder")

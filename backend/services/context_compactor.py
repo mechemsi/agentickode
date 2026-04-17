@@ -15,7 +15,7 @@ import json
 import logging
 import shlex
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.context_compactor")
 
@@ -26,7 +26,7 @@ _MAX_ASSISTANT_LINES = 30
 class ContextCompactor:
     """Builds compact summaries of completed episodes."""
 
-    def __init__(self, ssh: SSHService, workspace: str):
+    def __init__(self, ssh: CommandExecutor, workspace: str):
         self._ssh = ssh
         self._workspace = workspace
 

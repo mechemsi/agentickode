@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from backend.services.workspace.ssh_service import SSHCommandError
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.remote_git_ops")
 
@@ -33,7 +33,7 @@ class GitResult:
 class RemoteGitOps:
     """Git operations executed on a remote workspace server via SSH."""
 
-    def __init__(self, ssh: SSHService) -> None:
+    def __init__(self, ssh: CommandExecutor) -> None:
         self._ssh = ssh
 
     @property

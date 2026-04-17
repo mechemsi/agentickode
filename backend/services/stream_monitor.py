@@ -15,7 +15,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.stream_monitor")
 
@@ -35,7 +35,7 @@ class StreamPollResult:
 
 
 async def poll_stream(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     jsonl_path: str,
     last_offset: int = 0,
 ) -> StreamPollResult:
@@ -110,7 +110,7 @@ async def poll_stream(
 
 
 async def check_stall(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     jsonl_path: str,
     stall_timeout_seconds: int = 600,
 ) -> bool:

@@ -28,7 +28,7 @@ from backend.services.encryption import decrypt_value
 from backend.services.git import GitAccessService
 from backend.services.git import ops as git_ops
 from backend.services.workspace.agent_install_service import AgentInstallService
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
 from backend.services.workspace.worker_user_service import WorkerUserService
 
 logger = logging.getLogger("agentickode.phases.helpers")
@@ -116,7 +116,15 @@ async def get_workspace_server_id(task_run: TaskRun, session: AsyncSession) -> i
         .limit(1)
     )
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()  # type: ignore[return-value]
+    server_id = result.scalar_one_or_none()
+    if server_id is not None:
+        return server_id  # type: ignore[return-value]
+
+    # Fallback: use the local platform server if no server is assigned
+    fallback = await session.execute(
+        select(WorkspaceServer.id).where(WorkspaceServer.server_type == "local").limit(1)
+    )
+    return fallback.scalar_one_or_none()  # type: ignore[return-value]
 
 
 async def get_workspace_server(task_run: TaskRun, session: AsyncSession) -> WorkspaceServer:
@@ -137,10 +145,13 @@ async def get_workspace_server(task_run: TaskRun, session: AsyncSession) -> Work
     return server
 
 
-async def get_ssh_for_run(task_run: TaskRun, session: AsyncSession) -> SSHService:
-    """Create an SSHService connected to the task run's workspace server."""
+async def get_ssh_for_run(task_run: TaskRun, session: AsyncSession) -> CommandExecutor:
+    """Create a CommandExecutor for the task run's workspace server.
+
+    Returns an SSHService for remote servers, LocalCommandService for the platform.
+    """
     server = await get_workspace_server(task_run, session)
-    return SSHService.for_server(server)
+    return executor_for_server(server)
 
 
 async def get_project_token(task_run: TaskRun, session: AsyncSession) -> str | None:
@@ -192,7 +203,7 @@ async def get_project_token(task_run: TaskRun, session: AsyncSession) -> str | N
 async def get_auth_url(
     repo_url: str,
     git_provider: str,
-    ssh: SSHService,
+    ssh: CommandExecutor,
     token_override: str | None = None,
 ) -> tuple[str, str]:
     """Get authenticated git URL. SSH-first, HTTPS-token fallback.

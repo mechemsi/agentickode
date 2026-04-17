@@ -21,6 +21,7 @@ from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.services.git import GitAccessService
 from backend.services.workspace.agent_discovery import AgentDiscoveryService
 from backend.services.workspace.agent_install_service import AgentInstallService
+from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
 from backend.services.workspace.project_discovery import ProjectDiscoveryService
 from backend.services.workspace.ssh_service import SSHService
 from backend.services.workspace.worker_user_service import WorkerUserService
@@ -32,11 +33,11 @@ _STEP_HANDLERS: dict[str, Any] = {}
 
 
 async def _step_ssh_test(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     repo = WorkspaceServerRepository(session)
     result = await ssh.test_connection()
-    if not result.success and setup_password:
+    if not result.success and setup_password and isinstance(ssh, SSHService):
         logger.info("Key auth failed for %s, deploying key via password...", server.hostname)
         deploy_result = await ssh.deploy_key(setup_password)
         if not deploy_result.success:
@@ -51,14 +52,14 @@ async def _step_ssh_test(
 
 
 async def _step_install_system_deps(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     username = server.worker_user or "coder"
     await _install_system_deps(ssh, server.id, username)
 
 
 async def _step_create_worker_user(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     repo = WorkspaceServerRepository(session)
     username = server.worker_user or "coder"
@@ -85,7 +86,7 @@ async def _step_create_worker_user(
 
 
 async def _step_create_workspace_dir(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     repo = WorkspaceServerRepository(session)
     username = server.worker_user or "coder"
@@ -110,7 +111,7 @@ async def _step_create_workspace_dir(
 
 
 async def _step_install_agents(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     username = server.worker_user or "coder"
     settings_repo = AppSettingRepository(session)
@@ -131,7 +132,7 @@ async def _step_install_agents(
 
 
 async def _step_sync_agents(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     username = server.worker_user or "coder"
     wus = WorkerUserService(ssh)
@@ -146,14 +147,14 @@ async def _step_sync_agents(
 
 
 async def _step_generate_ssh_key(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     gas = GitAccessService(ssh)
     await gas.generate_key(server.name)
 
 
 async def _step_discover(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     repo = WorkspaceServerRepository(session)
     username = server.worker_user or "coder"
@@ -193,7 +194,7 @@ async def _step_discover(
 
 
 async def _step_mark_online(
-    server: Any, ssh: SSHService, session: AsyncSession, setup_password: str | None
+    server: Any, ssh: CommandExecutor, session: AsyncSession, setup_password: str | None
 ) -> None:
     repo = WorkspaceServerRepository(session)
     await repo.update(
@@ -236,7 +237,7 @@ async def execute_step(
         if not server:
             raise RuntimeError(f"Server {server_id} not found")
 
-        ssh = SSHService.for_server(server)
+        ssh = executor_for_server(server)
         await handler(server, ssh, session, setup_password)
 
 
@@ -245,7 +246,7 @@ async def execute_step(
 # ---------------------------------------------------------------------------
 
 
-async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -> None:
+async def _install_system_deps(ssh: CommandExecutor, server_id: int, username: str) -> None:
     """Install system-level deps as root, then user-level deps if user exists."""
     failed: list[str] = []
 
@@ -291,7 +292,7 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
     if rc != 0:
         failed.append(f"nodejs: {stderr.strip()[:500]}")
 
-    pw_cmd = "npm install -g playwright && playwright install --with-deps chrome"
+    pw_cmd = "npm install -g @playwright/cli@latest && playwright install --with-deps chrome"
     stdout, stderr, rc = await ssh.run_command(pw_cmd, timeout=300)
     if rc != 0:
         err = stderr.strip() or stdout.strip()
@@ -316,7 +317,7 @@ async def _install_system_deps(ssh: SSHService, server_id: int, username: str) -
         raise RuntimeError(f"Some dependencies failed to install: {msg}")
 
 
-async def _install_user_deps(ssh: SSHService, username: str) -> list[str]:
+async def _install_user_deps(ssh: CommandExecutor, username: str) -> list[str]:
     """Install bun, playwright chrome as worker user. Returns list of failures."""
     failed: list[str] = []
     safe_user = shlex.quote(username)

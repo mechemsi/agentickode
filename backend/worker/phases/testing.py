@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import TaskRun
 from backend.services.container import ServiceContainer
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_ssh_for_run
 
@@ -58,7 +58,7 @@ async def run(
     await broadcaster.log(task_run.id, f"Tests {status}", phase="testing")
 
 
-async def _run_remote_tests(ssh: SSHService, workspace: str, test_cmd: str) -> dict:
+async def _run_remote_tests(ssh: CommandExecutor, workspace: str, test_cmd: str) -> dict:
     """Run tests on the remote workspace server. Best-effort."""
     try:
         stdout, stderr, rc = await ssh.run_command(test_cmd, timeout=300)

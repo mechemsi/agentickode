@@ -19,6 +19,7 @@ from backend.schemas import (
     SSHTestResult,
 )
 from backend.services.workspace.agent_discovery import AgentDiscoveryService
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.project_discovery import ProjectDiscoveryService
 from backend.services.workspace.ssh_service import SSHService
 
@@ -37,8 +38,9 @@ async def deploy_key_to_server(
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
-    result = await ssh.deploy_key(body.password)
+    ssh_svc = SSHService.for_server(server)
+    result = await ssh_svc.deploy_key(body.password)
+    ssh = ssh_svc  # Use same connection for subsequent operations
 
     if result.success:
         server = await repo.update(
@@ -124,7 +126,7 @@ async def scan_workspace_server(
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
 
     # Verify SSH connectivity first
     test = await ssh.test_connection()

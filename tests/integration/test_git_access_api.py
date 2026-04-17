@@ -15,10 +15,11 @@ from backend.services.workspace.ssh_service import SSHTestResult as SSHTestResul
 @pytest.fixture
 def mock_ssh_for_git():
     """Mock SSH for git access tests — server creation + git access calls."""
-    with patch("backend.api.servers.workspace_servers_discovery.SSHService") as ws_mock_cls:
+    with patch(
+        "backend.api.servers.workspace_servers_discovery.executor_for_server"
+    ) as ws_mock_factory:
         ws_instance = AsyncMock()
-        ws_mock_cls.return_value = ws_instance
-        ws_mock_cls.for_server = lambda server: ws_instance
+        ws_mock_factory.return_value = ws_instance
         ws_instance.test_connection = AsyncMock(
             return_value=SSHTestResultData(success=True, latency_ms=5.0)
         )
@@ -30,13 +31,13 @@ def mock_ssh_for_git():
             patch(
                 "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
             ) as mock_proj_cls,
-            patch("backend.api.servers.git_access.SSHService") as ga_mock_cls,
+            patch("backend.api.servers.git_access.executor_for_server") as ga_mock_factory,
         ):
             mock_agent_cls.return_value.discover_all = AsyncMock(return_value=[])
             mock_proj_cls.return_value.scan_workspace = AsyncMock(return_value=[])
 
             ga_instance = AsyncMock()
-            ga_mock_cls.for_server = lambda server: ga_instance
+            ga_mock_factory.return_value = ga_instance
             # Default: has key, github connected
             ga_instance.run_command = AsyncMock(
                 return_value=("ssh-ed25519 AAAA... agentickode@test", "", 0)

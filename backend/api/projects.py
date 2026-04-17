@@ -29,7 +29,7 @@ from backend.services.encryption import encrypt_value
 from backend.services.git.repo_info import get_default_branch, get_default_branch_via_ssh
 from backend.services.git.url_parser import parse_git_url
 from backend.services.http_client import get_http_client
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 
 router = APIRouter(tags=["projects"])
 
@@ -90,7 +90,7 @@ async def parse_git_url_endpoint(
         server_repo = WorkspaceServerRepository(db)
         server = await server_repo.get_by_id(body.workspace_server_id)
         if server:
-            ssh = SSHService.for_server(server)
+            ssh = executor_for_server(server)
             with contextlib.suppress(Exception):
                 default_branch = await get_default_branch_via_ssh(ssh, body.git_url)
 
@@ -138,7 +138,7 @@ async def test_connection_endpoint(
     if not server:
         raise HTTPException(status_code=404, detail="Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     try:
         stdout, stderr, exit_code = await ssh.run_command(
             f"git ls-remote {body.git_url} HEAD",
@@ -182,7 +182,7 @@ async def check_workspace_readiness(
             root = server.workspace_root or "/home/workspace"
             expected_path = f"{root}/{raw_path}".rstrip("/")
 
-        ssh = SSHService.for_server(server)
+        ssh = executor_for_server(server)
         try:
             stdout, _stderr, rc = await ssh.run_command(
                 f"test -d {expected_path}/.git && echo 'exists' || echo 'missing'",
@@ -250,7 +250,7 @@ async def create_project(
             raise HTTPException(422, f"Workspace server {first_server_id} not found")
 
         git_url = f"git@{_provider_host(body.git_provider)}:{body.repo_owner}/{body.repo_name}.git"
-        ssh = SSHService.for_server(server)
+        ssh = executor_for_server(server)
         try:
             detected_branch = await get_default_branch_via_ssh(ssh, git_url)
         except Exception as exc:

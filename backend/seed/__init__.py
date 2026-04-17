@@ -19,6 +19,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.seed.agent_settings import DEFAULT_AGENT_SETTINGS, seed_agent_settings
+from backend.seed.platform_server import seed_platform_server
 from backend.seed.prompt_overrides import AGENT_PROMPT_OVERRIDES, seed_prompt_overrides
 from backend.seed.role_configs import DEFAULT_ROLE_CONFIGS, seed_role_configs
 from backend.seed.workflow_templates import DEFAULT_WORKFLOW_TEMPLATES, seed_workflow_templates
@@ -45,4 +46,5 @@ async def seed_all(db: AsyncSession) -> None:
     await seed_workflow_templates(db)
     await seed_role_configs(db)
     await seed_prompt_overrides(db)
+    await seed_platform_server(db)
     logger.info("Seed data applied successfully")

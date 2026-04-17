@@ -19,6 +19,7 @@ class WorkspaceServerCreate(BaseModel):
     setup_password: str | None = None  # transient — used to deploy SSH key, never stored
     max_concurrent_tasks: int = 1
     server_group_id: int | None = None
+    server_type: str = "remote"
 
 
 class WorkspaceServerUpdate(BaseModel):
@@ -31,6 +32,7 @@ class WorkspaceServerUpdate(BaseModel):
     workspace_root: str | None = None
     max_concurrent_tasks: int | None = None
     server_group_id: int | None = None
+    server_type: str | None = None
 
 
 class DiscoveredAgentOut(BaseModel):
@@ -98,6 +100,7 @@ class WorkspaceServerOut(BaseModel):
     id: int
     name: str
     hostname: str
+    server_type: str = "remote"
     port: int
     username: str
     ssh_key_path: str | None

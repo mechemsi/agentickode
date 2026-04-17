@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import async_session
 from backend.models import AgentLoopExecution, TaskRun
 from backend.models.servers import WorkspaceServer
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
 
 router = APIRouter(tags=["agent-query"])
 
@@ -277,7 +277,9 @@ async def _get_session_id(db: AsyncSession, run: TaskRun) -> str | None:
     return None
 
 
-async def _get_ssh_context(db: AsyncSession, run: TaskRun) -> tuple[SSHService, str, str | None]:
+async def _get_ssh_context(
+    db: AsyncSession, run: TaskRun
+) -> tuple[CommandExecutor, str, str | None]:
     """Get SSH service, workspace path, and worker user for a run."""
     if not run.workspace_server_id:
         raise HTTPException(400, "Run has no workspace server")
@@ -286,7 +288,7 @@ async def _get_ssh_context(db: AsyncSession, run: TaskRun) -> tuple[SSHService, 
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     workspace = str(run.workspace_path or "")
     worker_user = str(server.worker_user) if server.worker_user else None
 

@@ -19,7 +19,7 @@ from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.html_to_text import html_to_text
 from backend.services.http_client import get_http_client
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_ssh_for_run
 
@@ -133,7 +133,7 @@ async def run(
 
 
 async def _try_gh_pr_create(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     cwd: str,
     title: str,
     body: str,

@@ -17,7 +17,7 @@ from backend.schemas.projects import GitIssueOut
 from backend.services.encryption import decrypt_value
 from backend.services.git.protocol import get_git_provider
 from backend.services.http_client import get_http_client
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 from .projects import _get_repo
 
@@ -78,7 +78,7 @@ def _parse_issues(provider: str, raw: list[dict]) -> list[dict]:
     return issues
 
 
-async def _fetch_issues_via_ssh(ssh: SSHService, provider: str, repo_path: str) -> list[dict]:
+async def _fetch_issues_via_ssh(ssh: CommandExecutor, provider: str, repo_path: str) -> list[dict]:
     """Fetch issues by running curl on the workspace server."""
     url, headers, params = _build_api_url(provider, repo_path)
 

@@ -40,8 +40,8 @@ def _ws_patches():
             new=AsyncMock(return_value=mock_server),
         ),
         patch(
-            "backend.worker.phases.workspace_setup.SSHService",
-            **{"for_server.return_value": mock_ssh_instance},
+            "backend.worker.phases.workspace_setup.executor_for_server",
+            return_value=mock_ssh_instance,
         ),
         patch(
             "backend.worker.phases.workspace_setup.RemoteGitOps",

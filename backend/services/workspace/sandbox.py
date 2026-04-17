@@ -11,7 +11,7 @@ import shlex
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.remote_sandbox")
 
@@ -25,7 +25,7 @@ class RemoteSandbox:
 
     def __init__(
         self,
-        ssh: SSHService,
+        ssh: CommandExecutor,
         templates_path: str = "/opt/agentickode/docker/sandboxes",
     ) -> None:
         self._ssh = ssh

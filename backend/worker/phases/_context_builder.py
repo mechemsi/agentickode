@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import TaskRun
 from backend.services.container import ServiceContainer
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 from backend.worker.phases._helpers import get_ssh_for_run
 
 logger = logging.getLogger("agentickode.phases.context_builder")
@@ -79,7 +79,7 @@ async def build_context_package(
 
 
 async def read_workspace_json(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     workspace: str,
     relative_path: str,
 ) -> dict | list | None:
@@ -99,18 +99,18 @@ async def read_workspace_json(
 # ---------------------------------------------------------------------------
 
 
-async def _ensure_autodev_dir(ssh: SSHService, workspace: str) -> None:
+async def _ensure_autodev_dir(ssh: CommandExecutor, workspace: str) -> None:
     await ssh.run_command(f"mkdir -p {shlex.quote(workspace)}/.autodev")
 
 
-async def _get_git_history(ssh: SSHService, workspace: str) -> str:
+async def _get_git_history(ssh: CommandExecutor, workspace: str) -> str:
     stdout, _, rc = await ssh.run_command(
         f"cd {shlex.quote(workspace)} && git log --oneline -{_GIT_LOG_LINES} 2>/dev/null"
     )
     return stdout.strip() if rc == 0 else "(git history unavailable)"
 
 
-async def _get_project_structure(ssh: SSHService, workspace: str) -> str:
+async def _get_project_structure(ssh: CommandExecutor, workspace: str) -> str:
     # Get a representative file listing — avoid huge outputs
     stdout, _, rc = await ssh.run_command(
         f"cd {shlex.quote(workspace)} && "
@@ -123,7 +123,7 @@ async def _get_project_structure(ssh: SSHService, workspace: str) -> str:
     return stdout.strip() if rc == 0 else "(project structure unavailable)"
 
 
-async def _get_test_status(ssh: SSHService, workspace: str) -> str:
+async def _get_test_status(ssh: CommandExecutor, workspace: str) -> str:
     """Try to get quick test collection status without running tests."""
     # Try pytest collect-only (Python) — non-destructive
     stdout, _, rc = await ssh.run_command(
@@ -283,7 +283,9 @@ Read `.autodev/context.md` for full project context including git history, file 
 """
 
 
-async def _write_file(ssh: SSHService, workspace: str, relative_path: str, content: str) -> None:
+async def _write_file(
+    ssh: CommandExecutor, workspace: str, relative_path: str, content: str
+) -> None:
     """Write content to a file in the workspace via SSH using a heredoc."""
     full_path = f"{workspace}/{relative_path}"
     # Use printf with base64 to avoid heredoc quoting issues with special chars

@@ -38,8 +38,8 @@ class TestSetupWorkerUser:
             agents=["claude"],
             error=None,
         )
-        with patch("backend.api.servers.worker_user.SSHService") as mock_ssh_cls:
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+        with patch("backend.api.servers.worker_user.executor_for_server") as mock_ssh_factory:
+            mock_ssh_factory.return_value = AsyncMock()
             with patch("backend.api.servers.worker_user.WorkerUserService") as mock_svc_cls:
                 mock_svc_cls.return_value.setup = mock_info
                 resp = await client.post(
@@ -62,8 +62,8 @@ class TestSetupWorkerUser:
             agents=[],
             error=None,
         )
-        with patch("backend.api.servers.worker_user.SSHService") as mock_ssh_cls:
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+        with patch("backend.api.servers.worker_user.executor_for_server") as mock_ssh_factory:
+            mock_ssh_factory.return_value = AsyncMock()
             with patch("backend.api.servers.worker_user.WorkerUserService") as mock_svc_cls:
                 mock_svc_cls.return_value.setup = mock_info
                 resp = await client.post(
@@ -81,8 +81,8 @@ class TestSetupWorkerUser:
             agents=[],
             error="useradd failed",
         )
-        with patch("backend.api.servers.worker_user.SSHService") as mock_ssh_cls:
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+        with patch("backend.api.servers.worker_user.executor_for_server") as mock_ssh_factory:
+            mock_ssh_factory.return_value = AsyncMock()
             with patch("backend.api.servers.worker_user.WorkerUserService") as mock_svc_cls:
                 mock_svc_cls.return_value.setup = mock_info
                 resp = await client.post(
@@ -141,8 +141,8 @@ class TestSetWorkerUserPassword:
             agents=[],
             error=None,
         )
-        with patch("backend.api.servers.worker_user.SSHService") as mock_ssh_cls:
-            mock_ssh_cls.for_server.return_value = AsyncMock()
+        with patch("backend.api.servers.worker_user.executor_for_server") as mock_ssh_factory:
+            mock_ssh_factory.return_value = AsyncMock()
             with patch("backend.api.servers.worker_user.WorkerUserService") as mock_svc_cls:
                 mock_svc_cls.return_value.set_password = mock_info
                 resp = await client.post(

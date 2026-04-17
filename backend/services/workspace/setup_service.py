@@ -30,6 +30,9 @@ SETUP_STEPS = [
     "mark_online",
 ]
 
+# Steps that require SSH and should be auto-completed for local (platform) servers.
+_LOCAL_SKIP_STEPS = {"ssh_test", "generate_ssh_key"}
+
 
 def _step_entry(status: str = "pending", error: str | None = None) -> dict[str, Any]:
     return {"status": status, "error": error, "timestamp": datetime.now(UTC).isoformat()}
@@ -78,10 +81,26 @@ class ServerSetupService:
                     {"status": "setting_up", "setup_log": setup_log, "error_message": None},
                 )
 
+            # Check if this is a local (platform) server
+            is_local = getattr(server, "server_type", "remote") == "local"
+
             # Run each step
             for i, step_name in enumerate(SETUP_STEPS):
                 if i < start_from:
                     continue
+
+                # Skip SSH-specific steps for local servers
+                if is_local and step_name in _LOCAL_SKIP_STEPS:
+                    async with self._session_factory() as session:
+                        repo = WorkspaceServerRepository(session)
+                        server = await repo.get_by_id(server_id)
+                        if not server:
+                            return
+                        setup_log = _get_setup_log(server)
+                        setup_log[step_name] = _step_entry("skipped")
+                        await repo.update(server, {"setup_log": setup_log})
+                    continue
+
                 try:
                     async with self._session_factory() as session:
                         repo = WorkspaceServerRepository(session)

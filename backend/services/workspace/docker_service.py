@@ -10,7 +10,7 @@ import json
 import logging
 import shlex
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.docker")
 
@@ -18,7 +18,7 @@ logger = logging.getLogger("agentickode.docker")
 class DockerService:
     """Run Docker commands on a remote server via SSH."""
 
-    def __init__(self, ssh: SSHService):
+    def __init__(self, ssh: CommandExecutor):
         self._ssh = ssh
 
     async def _run(self, cmd: str, timeout: int = 30) -> str:

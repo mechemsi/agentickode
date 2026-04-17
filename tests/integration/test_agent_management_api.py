@@ -27,10 +27,11 @@ async def _seed_agent_settings(db_engine):
 @pytest.fixture
 def mock_ssh_for_agents():
     """Mock SSH for agent management tests."""
-    with patch("backend.api.servers.workspace_servers_discovery.SSHService") as ws_mock_cls:
+    with patch(
+        "backend.api.servers.workspace_servers_discovery.executor_for_server"
+    ) as ws_mock_factory:
         ws_instance = AsyncMock()
-        ws_mock_cls.return_value = ws_instance
-        ws_mock_cls.for_server = lambda server: ws_instance
+        ws_mock_factory.return_value = ws_instance
         ws_instance.test_connection = AsyncMock(
             return_value=SSHTestResultData(success=True, latency_ms=5.0)
         )
@@ -42,14 +43,14 @@ def mock_ssh_for_agents():
             patch(
                 "backend.api.servers.workspace_servers_discovery.ProjectDiscoveryService"
             ) as mock_proj_cls,
-            patch("backend.api.servers.agent_management.SSHService") as am_mock_cls,
+            patch("backend.api.servers.agent_management.executor_for_server") as am_mock_factory,
             patch("backend.api.servers.agent_management.WorkerUserService") as am_user_mock_cls,
         ):
             mock_agent_cls.return_value.discover_all = AsyncMock(return_value=[])
             mock_proj_cls.return_value.scan_workspace = AsyncMock(return_value=[])
 
             am_instance = AsyncMock()
-            am_mock_cls.for_server = lambda server: am_instance
+            am_mock_factory.return_value = am_instance
             am_instance.run_command = AsyncMock(return_value=("", "", 1))
 
             # Mock WorkerUserService.setup() to return a ready user

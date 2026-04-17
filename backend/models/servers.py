@@ -25,6 +25,7 @@ class WorkspaceServer(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, unique=True, nullable=False)
     hostname = Column(Text, nullable=False)
+    server_type = Column(Text, nullable=False, server_default="remote")
     port = Column(Integer, nullable=False, default=22)
     username = Column(Text, nullable=False, default="root")
     ssh_key_path = Column(Text, nullable=True)

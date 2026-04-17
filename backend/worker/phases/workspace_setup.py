@@ -25,13 +25,13 @@ from backend.services.container import ServiceContainer
 from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.http_client import get_http_client
+from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
 from backend.services.workspace.readiness_service import (
     TTL_DAYS,
     WorkspaceReadinessService,
     format_fix_guide,
 )
 from backend.services.workspace.sandbox import RemoteSandbox
-from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_workspace_server
 
@@ -65,7 +65,7 @@ async def run(
 
     await _log(f"Connecting to workspace server for project {task_run.project_id}")
     server = await get_workspace_server(task_run, session)
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     await _log(f"Connected to {ssh.hostname}:{ssh.port} as {ssh.username}")
 
     remote_git = RemoteGitOps(ssh)
@@ -187,7 +187,7 @@ async def run(
 async def _validate_readiness(
     task_run: TaskRun,
     session: AsyncSession,
-    ssh: SSHService,
+    ssh: CommandExecutor,
     workspace: str,
     worker_user: str | None,
     ws_cfg: dict,
@@ -246,7 +246,7 @@ async def _scaffold_new(
     workspace: str,
     ws_cfg: dict,
     remote_git: RemoteGitOps,
-    ssh: SSHService,
+    ssh: CommandExecutor,
     _log: LogFn,
     project_token: str | None = None,
 ) -> None:

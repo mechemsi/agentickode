@@ -13,7 +13,7 @@ from backend.services.adapters.ollama_adapter import OllamaAdapter
 from backend.services.adapters.openhands_adapter import OpenHandsAdapter
 from backend.services.adapters.protocol import RoleAdapter
 from backend.services.ollama_service import OllamaService
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 
 if TYPE_CHECKING:
     import httpx
@@ -46,7 +46,7 @@ class AdapterFactory:
         if workspace_server is None:
             raise ValueError(f"CLI agent '{agent_name}' requires a workspace server for SSH access")
 
-        ssh = SSHService.for_server(workspace_server)
+        ssh = executor_for_server(workspace_server)
         worker_user = (
             workspace_server.worker_user
             if getattr(workspace_server, "worker_user_status", None) == "ready"

@@ -10,12 +10,12 @@ import logging
 import time
 from dataclasses import dataclass, field
 
+from backend.services.workspace.command_executor import CommandExecutor
 from backend.services.workspace.readiness_checks import (
     CheckDef,
     detect_project_checks,
     merge_checks,
 )
-from backend.services.workspace.ssh_service import SSHService
 
 logger = logging.getLogger("agentickode.readiness_service")
 
@@ -68,7 +68,7 @@ class ValidationReport:
 class WorkspaceReadinessService:
     """Runs dev-toolchain checks on a remote workspace via SSH."""
 
-    def __init__(self, ssh: SSHService, worker_user: str | None = None):
+    def __init__(self, ssh: CommandExecutor, worker_user: str | None = None):
         self._ssh = ssh
         self._worker_user = worker_user
 

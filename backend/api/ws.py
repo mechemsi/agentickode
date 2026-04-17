@@ -5,6 +5,7 @@
 """WebSocket endpoints for live log streaming, global events, SSH and local terminals."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -56,6 +57,71 @@ async def ws_global_events(websocket: WebSocket):
         broadcaster.unsubscribe_global(queue)
 
 
+async def _local_pty_terminal(websocket: WebSocket) -> None:
+    """Bridge a browser xterm.js to a local bash PTY (for the platform server)."""
+    import fcntl
+    import pty
+    import struct
+    import termios
+
+    pid, fd = pty.fork()
+    if pid == 0:  # child
+        os.execvp("bash", ["bash"])
+        return
+
+    # Set initial terminal size
+    def _set_size(cols: int, rows: int) -> None:
+        with contextlib.suppress(Exception):
+            fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+
+    _set_size(120, 40)
+    loop = asyncio.get_running_loop()
+
+    async def pty_to_ws() -> None:
+        while True:
+            try:
+                data = await loop.run_in_executor(None, os.read, fd, 4096)
+            except OSError:
+                break
+            if not data:
+                break
+            try:
+                await websocket.send_text(
+                    json.dumps({"type": "output", "data": data.decode(errors="replace")})
+                )
+            except Exception:
+                break
+
+    async def ws_to_pty() -> None:
+        try:
+            while True:
+                raw = await websocket.receive_text()
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    os.write(fd, msg["data"].encode())
+                elif msg.get("type") == "resize":
+                    _set_size(int(msg.get("cols", 120)), int(msg.get("rows", 40)))
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+
+    read_task = asyncio.create_task(pty_to_ws())
+    write_task = asyncio.create_task(ws_to_pty())
+    try:
+        await asyncio.gather(read_task, write_task, return_exceptions=True)
+    finally:
+        read_task.cancel()
+        write_task.cancel()
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        try:
+            os.kill(pid, 9)
+            os.waitpid(pid, 0)
+        except (OSError, ChildProcessError):
+            pass
+
+
 @router.websocket("/ws/servers/{server_id}/terminal")
 async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = None):
     """Bridge a browser xterm.js session to an SSH PTY on the workspace server."""
@@ -70,6 +136,11 @@ async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = N
     if not server:
         await websocket.send_text(json.dumps({"type": "output", "data": "Server not found.\r\n"}))
         await websocket.close()
+        return
+
+    # Local platform server: use a local PTY via subprocess
+    if getattr(server, "server_type", "remote") == "local":
+        await _local_pty_terminal(websocket)
         return
 
     ssh = SSHService.for_server(server)

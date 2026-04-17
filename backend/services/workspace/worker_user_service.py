@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 from backend.config import settings
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.worker_user")
 
@@ -34,7 +34,7 @@ class WorkerUserInfo:
 class WorkerUserService:
     """Manages non-root OS users on a remote workspace server via SSH."""
 
-    def __init__(self, ssh: SSHService):
+    def __init__(self, ssh: CommandExecutor):
         self._ssh = ssh
 
     async def setup(

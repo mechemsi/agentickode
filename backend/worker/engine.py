@@ -27,7 +27,7 @@ from backend.services.git.protocol import get_git_provider
 from backend.services.http_client import get_http_client
 from backend.services.queue_service import queue_service
 from backend.services.schedule import is_within_schedule
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import get_project_token
 from backend.worker.pipeline import execute_pipeline
@@ -402,7 +402,7 @@ class WorkerEngine:
                         cs.closed_at = datetime.now(UTC)
                     continue
 
-                ssh = SSHService.for_server(server)
+                ssh = executor_for_server(server)
                 # Get tmux sessions per user (sessions run as non-root users)
                 users = {cs.user_context or "root" for cs in cli_sessions}
                 active_tmux: set[str] = set()

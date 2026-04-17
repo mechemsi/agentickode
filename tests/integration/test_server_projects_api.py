@@ -15,21 +15,22 @@ from backend.services.workspace.ssh_service import SSHTestResult as SSHTestResul
 @pytest.fixture
 def mock_ssh_for_projects():
     """Mock SSH so workspace server creation and project validation succeed."""
-    with patch("backend.api.servers.workspace_servers_discovery.SSHService") as ws_mock_cls:
+    with patch(
+        "backend.api.servers.workspace_servers_discovery.executor_for_server"
+    ) as ws_mock_factory:
         ws_instance = AsyncMock()
-        ws_mock_cls.return_value = ws_instance
-        ws_mock_cls.for_server = lambda server: ws_instance
+        ws_mock_factory.return_value = ws_instance
         ws_instance.test_connection = AsyncMock(
             return_value=SSHTestResultData(success=True, latency_ms=5.0)
         )
 
-        # Also mock SSHService in projects API (for create_project SSH validation)
+        # Also mock executor_for_server in projects API (for create_project SSH validation)
         proj_ssh_instance = AsyncMock()
         proj_ssh_instance.run_command = AsyncMock(return_value=("ref HEAD", "", 0))
         with (
             patch(
-                "backend.api.projects.SSHService",
-                **{"for_server.return_value": proj_ssh_instance},
+                "backend.api.projects.executor_for_server",
+                return_value=proj_ssh_instance,
             ),
             patch(
                 "backend.api.servers.workspace_servers_discovery.AgentDiscoveryService"

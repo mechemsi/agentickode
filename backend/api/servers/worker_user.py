@@ -16,7 +16,7 @@ from backend.schemas import (
     WorkerUserSetupResult,
     WorkerUserStatus,
 )
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.worker_user_service import WorkerUserService
 
 router = APIRouter(tags=["worker-user"])
@@ -47,7 +47,7 @@ async def setup_worker_user(
         {"worker_user": username, "worker_user_status": "pending", "worker_user_error": None},
     )
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = WorkerUserService(ssh)
     info = await svc.setup(username)
 
@@ -85,7 +85,7 @@ async def check_worker_user(
     if not server.worker_user:
         return WorkerUserStatus(username=None, status=None)
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = WorkerUserService(ssh)
     info = await svc.check_status(server.worker_user)
 
@@ -116,7 +116,7 @@ async def sync_worker_user(
     if not server.worker_user:
         raise HTTPException(400, "No worker user configured")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = WorkerUserService(ssh)
     info = await svc.sync_agents(server.worker_user)
 
@@ -154,7 +154,7 @@ async def set_worker_user_password(
     if not server.worker_user:
         raise HTTPException(400, "No worker user configured")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = WorkerUserService(ssh)
     info = await svc.set_password(server.worker_user, body.password)
 

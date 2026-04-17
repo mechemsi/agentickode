@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 CLI_AGENTS = ["claude", "codex", "opencode", "aider", "gemini", "kimi"]
 
@@ -30,7 +30,7 @@ class AgentInfo:
 class AgentDiscoveryService:
     """Discover coding agents installed on a remote server via SSH."""
 
-    def __init__(self, ssh: SSHService):
+    def __init__(self, ssh: CommandExecutor):
         self._ssh = ssh
 
     async def discover_all(self, as_user: str | None = None) -> list[AgentInfo]:

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from backend.models.episodes import Episode
 from backend.services.context_compactor import ContextCompactor
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.session_recovery")
 
@@ -35,7 +35,7 @@ class RecoveryContext:
 class SessionRecoveryService:
     """Detect dead sessions and recover from git checkpoints."""
 
-    def __init__(self, ssh: SSHService, workspace: str):
+    def __init__(self, ssh: CommandExecutor, workspace: str):
         self._ssh = ssh
         self._workspace = workspace
 

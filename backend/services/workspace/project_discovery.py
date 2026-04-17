@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 SSH_REMOTE_RE = re.compile(r"(?:https?://[^/]+/|git@[^:]+:)(?P<owner>[^/]+)/(?P<name>[^/.\s]+)")
 
@@ -34,7 +34,7 @@ class DiscoveredProject:
 class ProjectDiscoveryService:
     """Scan a remote workspace directory for git repositories."""
 
-    def __init__(self, ssh: SSHService):
+    def __init__(self, ssh: CommandExecutor):
         self._ssh = ssh
 
     async def scan_workspace(self, workspace_root: str) -> list[DiscoveredProject]:

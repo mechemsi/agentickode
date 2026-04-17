@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from backend.database import async_session
 from backend.models.servers import WorkspaceServer
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
 
 logger = logging.getLogger("agentickode.workspace_commands")
 router = APIRouter(tags=["workspace-commands"])
@@ -80,9 +80,9 @@ async def list_directory(server_id: int, path: str = "/"):
     return {"listing": stdout, "path": path}
 
 
-async def _get_ssh(server_id: int) -> SSHService:
+async def _get_ssh(server_id: int) -> CommandExecutor:
     async with async_session() as db:
         server = await db.get(WorkspaceServer, server_id)
     if not server:
         raise HTTPException(404, f"Server #{server_id} not found")
-    return SSHService.for_server(server)
+    return executor_for_server(server)

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.readiness_checks")
 
@@ -109,7 +109,7 @@ _MARKER_CHECKS: dict[str, list[CheckDef]] = {
 
 
 async def detect_project_checks(
-    ssh: SSHService,
+    ssh: CommandExecutor,
     workspace_path: str,
     worker_user: str | None = None,
 ) -> list[CheckDef]:
@@ -154,7 +154,7 @@ async def detect_project_checks(
 
 
 async def _detect_npm_scripts(
-    ssh: SSHService, workspace_path: str, worker_user: str | None
+    ssh: CommandExecutor, workspace_path: str, worker_user: str | None
 ) -> list[CheckDef]:
     """Detect available npm scripts (build, test, lint) from package.json."""
     cmd = f"cd {workspace_path} && node -e \"const p=require('./package.json'); console.log(Object.keys(p.scripts||{{}}).join(','))\""

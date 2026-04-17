@@ -256,6 +256,10 @@ async def _run_migrations() -> None:
     await _run_migration_step(
         "ALTER TABLE local_terminal_sessions ADD COLUMN agent_session_id TEXT"
     )
+    # Platform-as-server: server_type column (local vs remote)
+    await _run_migration_step(
+        "ALTER TABLE workspace_servers " "ADD COLUMN server_type TEXT NOT NULL DEFAULT 'remote'"
+    )
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS platform_crons (
             id SERIAL PRIMARY KEY,

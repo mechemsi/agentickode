@@ -20,8 +20,8 @@ from backend.schemas import (
     WorkspaceServerOut,
     WorkspaceServerUpdate,
 )
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.setup_service import ServerSetupService
-from backend.services.workspace.ssh_service import SSHService
 
 router = APIRouter(tags=["workspace-servers"])
 
@@ -38,6 +38,7 @@ def _server_to_out(server: WorkspaceServer, agent_count: int, project_count: int
         id=server.id,
         name=server.name,
         hostname=server.hostname,
+        server_type=server.server_type,
         port=server.port,
         username=server.username,
         ssh_key_path=server.ssh_key_path,
@@ -62,7 +63,7 @@ async def _ping_server(server: WorkspaceServer) -> tuple[int, bool, str | None]:
     if server.status in ("setting_up",):
         return int(server.id), server.status == "online", None
     try:
-        ssh = SSHService.for_server(server)
+        ssh = executor_for_server(server)
         result = await asyncio.wait_for(ssh.test_connection(), timeout=5)
         return int(server.id), result.success, result.error
     except Exception as exc:
@@ -77,6 +78,7 @@ def _server_to_detail(server: WorkspaceServer, ac: int, pc: int) -> WorkspaceSer
         id=server.id,
         name=server.name,
         hostname=server.hostname,
+        server_type=server.server_type,
         port=server.port,
         username=server.username,
         ssh_key_path=server.ssh_key_path,

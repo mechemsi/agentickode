@@ -25,7 +25,7 @@ from backend.schemas import (
     UserAgentStatus,
 )
 from backend.services.workspace.agent_install_service import AgentInstallService
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.worker_user_service import WorkerUserService
 
 logger = logging.getLogger("agentickode.agent_management")
@@ -73,10 +73,12 @@ async def get_agent_status(
         raise HTTPException(404, "Workspace server not found")
 
     settings = await _load_agent_settings(db)
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = AgentInstallService(ssh, agent_settings=settings)
 
-    username = server.worker_user or "coder"
+    # Local platform server runs agents as the container user (no worker switch)
+    is_local = getattr(server, "server_type", "remote") == "local"
+    username = None if is_local else (server.worker_user or "coder")
     try:
         worker_agents = await svc.check_all_agents(as_user=username)
     except Exception:
@@ -111,11 +113,12 @@ async def get_agent_status(
             for a in worker_agents
             if a.installed
         ]
-        await repo.replace_agents_for_context(server_id, "worker", db_agents)
+        context = "admin" if is_local else "worker"
+        await repo.replace_agents_for_context(server_id, context, db_agents)
     except Exception:
         logger.warning("Failed to persist agent status for server %s", server_id)
 
-    by_user = [UserAgentStatus(user=username, agents=agent_statuses)]
+    by_user = [UserAgentStatus(user=username or "root", agents=agent_statuses)]
     return AgentManagementStatus(agents=agent_statuses, by_user=by_user)
 
 
@@ -135,22 +138,24 @@ async def install_agent(
         raise HTTPException(404, "Workspace server not found")
 
     settings = await _load_agent_settings(db)
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = AgentInstallService(ssh, agent_settings=settings)
 
-    username = server.worker_user or "coder"
+    is_local = getattr(server, "server_type", "remote") == "local"
+    username = None if is_local else (server.worker_user or "coder")
 
-    # Step 1: Ensure worker user exists with config/credentials
-    user_svc = WorkerUserService(ssh)
-    user_info = await user_svc.setup(username)
-    if not user_info.exists:
-        return AgentInstallResult(
-            success=False,
-            agent_name=body.agent_name,
-            error=f"Failed to create worker user '{username}': {user_info.error}",
-        )
+    # Step 1: Ensure worker user exists (only for remote servers)
+    if username:
+        user_svc = WorkerUserService(ssh)
+        user_info = await user_svc.setup(username)
+        if not user_info.exists:
+            return AgentInstallResult(
+                success=False,
+                agent_name=body.agent_name,
+                error=f"Failed to create worker user '{username}': {user_info.error}",
+            )
 
-    # Step 2: Install agent as the worker user
+    # Step 2: Install agent
     result = await svc.install_agent(body.agent_name, as_user=username)
     if not result.success:
         return AgentInstallResult(
@@ -160,10 +165,11 @@ async def install_agent(
             output=result.output,
         )
 
+    target = f"worker user '{username}'" if username else "platform"
     return AgentInstallResult(
         success=True,
         agent_name=body.agent_name,
-        message=f"{body.agent_name} installed for worker user '{username}'",
+        message=f"{body.agent_name} installed for {target}",
         output=result.output,
     )
 
@@ -181,16 +187,20 @@ async def install_agent_stream(
         raise HTTPException(404, "Workspace server not found")
 
     settings = await _load_agent_settings(db)
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     svc = AgentInstallService(ssh, agent_settings=settings)
-    username = server.worker_user or "coder"
 
-    # Ensure worker user exists
-    user_svc = WorkerUserService(ssh)
-    user_info = await user_svc.setup(username)
+    is_local = getattr(server, "server_type", "remote") == "local"
+    username = None if is_local else (server.worker_user or "coder")
+
+    # Ensure worker user exists (only for remote servers)
+    user_info = None
+    if username:
+        user_svc = WorkerUserService(ssh)
+        user_info = await user_svc.setup(username)
 
     async def event_generator():
-        if not user_info.exists:
+        if user_info is not None and not user_info.exists:
             msg = f"Failed to create worker user '{username}': {user_info.error}"
             yield f"data: {json.dumps({'type': 'error', 'line': msg})}\n\n"
             return
@@ -241,7 +251,7 @@ async def start_agent_auth_login(
         raise HTTPException(400, f"Agent '{agent_name}' does not support interactive auth login")
 
     username = server.worker_user or "coder"
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
 
     # Ensure tmux is installed
     _out, _err, rc_check = await ssh.run_command("command -v tmux")
@@ -300,7 +310,7 @@ async def stop_agent_auth_login(
         raise HTTPException(404, "Workspace server not found")
 
     username = server.worker_user or "coder"
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     tmux_name = f"auth-{agent_name}-{server_id}"
 
     kill_cmd = f"tmux kill-session -t {shlex.quote(tmux_name)} 2>/dev/null || true"

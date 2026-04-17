@@ -18,8 +18,8 @@ from backend.schemas import (
     RetrySetupRequest,
     SSHTestResult,
 )
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.setup_service import ServerSetupService
-from backend.services.workspace.ssh_service import SSHService
 
 router = APIRouter(tags=["workspace-servers"])
 
@@ -37,7 +37,7 @@ async def test_workspace_server(
     if not server:
         raise HTTPException(404, "Workspace server not found")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     result = await ssh.test_connection()
     if result.success:
         await repo.update(

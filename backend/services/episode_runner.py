@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from backend.services.adapters.cli_commands import AGENT_COMMANDS
 from backend.services.stream_monitor import check_stall, poll_stream
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.episode_runner")
 
@@ -53,7 +53,7 @@ class EpisodeRunner:
 
     def __init__(
         self,
-        ssh: SSHService,
+        ssh: CommandExecutor,
         workspace: str,
         worker_user: str,
         log_fn: Callable | None = None,

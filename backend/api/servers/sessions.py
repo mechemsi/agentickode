@@ -22,8 +22,8 @@ from backend.schemas.sessions import (
     SessionSendRequest,
     SessionSendResponse,
 )
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.session_service import SessionService
-from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
 
 router = APIRouter(tags=["sessions"])
@@ -55,7 +55,7 @@ def _session_to_out(s: CliSession, server_name: str | None = None) -> CliSession
 
 
 def _build_session_service(server, user: str | None = None) -> SessionService:
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     return SessionService(ssh, user=user)
 
 

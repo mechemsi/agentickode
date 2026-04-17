@@ -15,6 +15,10 @@ from backend.services.workspace.agent_install_service import (
     AgentStatus,
     InstallResult,
 )
+from backend.services.workspace.command_executor import (
+    CommandExecutor,
+    executor_for_server,
+)
 from backend.services.workspace.project_discovery import (
     SSH_REMOTE_RE,
     DiscoveredProject,
@@ -50,6 +54,7 @@ __all__ = [
     "AgentInfo",
     "AgentInstallService",
     "AgentStatus",
+    "CommandExecutor",
     "DiscoveredProject",
     "InstallResult",
     "ProjectDiscoveryService",
@@ -63,5 +68,6 @@ __all__ = [
     "WorkerUserService",
     "_get_setup_log",
     "_step_entry",
+    "executor_for_server",
     "parse_git_remote",
 ]

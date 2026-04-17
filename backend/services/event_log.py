@@ -15,7 +15,7 @@ import logging
 import shlex
 from datetime import UTC, datetime
 
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.event_log")
 
@@ -23,7 +23,7 @@ logger = logging.getLogger("agentickode.event_log")
 class EventLog:
     """Append-only execution event log stored on the remote workspace."""
 
-    def __init__(self, ssh: SSHService, workspace: str):
+    def __init__(self, ssh: CommandExecutor, workspace: str):
         self._ssh = ssh
         self._workspace = workspace
         self._path = f"{workspace}/.autodev/event_log.jsonl"

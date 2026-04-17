@@ -17,8 +17,8 @@ from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.repositories.readiness_repo import WorkspaceReadinessRepository
 from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.schemas.readiness import WorkspaceReadinessOut
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.readiness_service import TTL_DAYS, WorkspaceReadinessService
-from backend.services.workspace.ssh_service import SSHService
 
 router = APIRouter(tags=["workspace-readiness"])
 
@@ -73,7 +73,7 @@ async def trigger_validation(server_id: int, project_id: str, db: AsyncSession =
         root = server.workspace_root or "/home/workspace"
         workspace_path = f"{root}/{workspace_path}".rstrip("/")
 
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     worker_user = server.worker_user
     dev_commands = ws_cfg.get("dev_commands")
 

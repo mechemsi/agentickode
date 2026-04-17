@@ -87,7 +87,7 @@ function SetupProgress({ server, onForceRetry }: { server: WSType; onForceRetry?
   if (!log) return null;
 
   const steps = Object.entries(log);
-  const completed = steps.filter(([, v]) => v.status === "completed").length;
+  const completed = steps.filter(([, v]) => v.status === "completed" || v.status === "skipped").length;
   const failed = steps.find(([, v]) => v.status === "failed");
   const running = steps.find(([, v]) => v.status === "running");
   const stuck = running ? isStepStuck(running[1]) : false;
@@ -131,11 +131,13 @@ function SetupProgress({ server, onForceRetry }: { server: WSType; onForceRetry?
             className={`h-1.5 flex-1 rounded-full ${
               entry.status === "completed"
                 ? "bg-green-500"
-                : entry.status === "running"
-                  ? isStepStuck(entry) ? "bg-yellow-500 animate-pulse" : "bg-blue-500 animate-pulse"
-                  : entry.status === "failed"
-                    ? "bg-red-500"
-                    : "bg-gray-700"
+                : entry.status === "skipped"
+                  ? "bg-gray-500"
+                  : entry.status === "running"
+                    ? isStepStuck(entry) ? "bg-yellow-500 animate-pulse" : "bg-blue-500 animate-pulse"
+                    : entry.status === "failed"
+                      ? "bg-red-500"
+                      : "bg-gray-700"
             }`}
           />
         ))}
@@ -350,6 +352,445 @@ export default function WorkspaceServers() {
     }
   };
 
+  const renderServerCard = (s: WSType) => (
+    <>
+      {editing === s.id ? (
+        <WorkspaceServerForm
+          initial={{
+            name: s.name,
+            hostname: s.hostname,
+            port: s.port,
+            username: s.username,
+            ssh_key_path: s.ssh_key_path || "",
+            worker_user: s.worker_user || "coder",
+            workspace_root: s.workspace_root || "",
+          }}
+          onSubmit={(data) => handleUpdate(s.id, data)}
+          onCancel={() => setEditing(null)}
+          isEdit
+        />
+      ) : (
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ring-2 ring-gray-900 ${statusColor[s.status] || statusColor.unknown}`}
+              />
+              <span className="font-medium text-white">{s.name}</span>
+              {s.server_type === "local" ? (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-medium">Platform</span>
+              ) : (
+                <span className="text-gray-500 text-sm font-mono">{s.hostname}:{s.port}</span>
+              )}
+              {s.status === "setting_up" && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 inline-flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Setting up...
+                </span>
+              )}
+              {s.status !== "setting_up" && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-400">
+                  {s.agent_count} agents · {s.project_count} projects
+                  {s.last_seen_at && (
+                    <span className="ml-1 text-gray-500" title={`Last seen: ${new Date(s.last_seen_at).toLocaleString()}`}>
+                      · {(() => {
+                        const ago = Date.now() - new Date(s.last_seen_at).getTime();
+                        if (ago < 60_000) return "just now";
+                        if (ago < 3600_000) return `${Math.floor(ago / 60_000)}m ago`;
+                        if (ago < 86400_000) return `${Math.floor(ago / 3600_000)}h ago`;
+                        return `${Math.floor(ago / 86400_000)}d ago`;
+                      })()}
+                    </span>
+                  )}
+                </span>
+              )}
+              <select
+                value={s.server_group_id ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : null;
+                  handleGroupChange(s.id, val, s.server_group_id);
+                }}
+                className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                title="Server group"
+              >
+                <option value="">No group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+              {s.setup_log && (
+                <button
+                  onClick={() => toggleSet(setSetupExpanded, s.id)}
+                  className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  {setupExpanded.has(s.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  Setup Log
+                </button>
+              )}
+              {s.server_type !== "local" && (s.status === "setup_failed" || s.status === "online" || s.status === "setting_up") && (
+                <button
+                  onClick={() => handleRetrySetup(s.id)}
+                  disabled={busyAction === `retry-${s.id}`}
+                  className={`text-xs disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                    s.status === "setup_failed" || s.status === "setting_up"
+                      ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20"
+                      : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                  }`}
+                >
+                  {busyAction === `retry-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {busyAction === `retry-${s.id}` ? "Running..." : s.status === "setup_failed" ? "Retry Setup" : s.status === "setting_up" ? "Restart Setup" : "Re-Setup"}
+                </button>
+              )}
+              <button
+                onClick={() => toggleSet(setAgentsExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                {agentsExpanded.has(s.id) ? "Collapse" : "Agents"}
+              </button>
+              <button
+                onClick={() => toggleSet(setGitExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <GitBranch className="w-3 h-3" />
+                Git Access
+              </button>
+              <button
+                onClick={() => toggleSet(setGitTokensExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <KeyRound className="w-3 h-3" />
+                Git Tokens
+              </button>
+              <button
+                onClick={() => toggleSet(setProjectsExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <FolderOpen className="w-3 h-3" />
+                Projects
+              </button>
+              <button
+                onClick={() => toggleSet(setHistoryExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <History className="w-3 h-3" />
+                History
+              </button>
+              {s.server_type !== "local" && (
+                <button
+                  onClick={() => toggleSet(setSshConfigExpanded, s.id)}
+                  className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  <Monitor className="w-3 h-3" />
+                  VS Code
+                </button>
+              )}
+              {!terminalExpanded.has(s.id) ? (
+                <div className="relative inline-flex">
+                  <button
+                    onClick={() => {
+                      setTerminalUser((prev) => ({ ...prev, [s.id]: "root" }));
+                      toggleSet(setTerminalExpanded, s.id);
+                    }}
+                    className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded-l hover:bg-gray-700/50 transition-colors"
+                  >
+                    <SquareTerminal className="w-3 h-3" />
+                    Terminal
+                  </button>
+                  {s.worker_user && (
+                    <select
+                      value={terminalUser[s.id] || "root"}
+                      onChange={(e) => {
+                        setTerminalUser((prev) => ({ ...prev, [s.id]: e.target.value }));
+                        if (!terminalExpanded.has(s.id)) {
+                          toggleSet(setTerminalExpanded, s.id);
+                        }
+                      }}
+                      className="text-xs bg-gray-800 text-gray-400 border-l border-gray-600 px-1 py-1 rounded-r hover:bg-gray-700/50 cursor-pointer"
+                    >
+                      <option value="root">root</option>
+                      <option value="worker">{s.worker_user}</option>
+                    </select>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => toggleSet(setTerminalExpanded, s.id)}
+                  className="text-xs text-orange-400 hover:text-orange-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  <SquareTerminal className="w-3 h-3" />
+                  Close Terminal
+                </button>
+              )}
+              <button
+                onClick={() => toggleSet(setDockerExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <Box className="w-3 h-3" />
+                {dockerExpanded.has(s.id) ? "Close Docker" : "Docker"}
+              </button>
+              <button
+                onClick={() => toggleSet(setSessionsExpanded, s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <SquareTerminal className="w-3 h-3" />
+                {sessionsExpanded.has(s.id) ? "Close Sessions" : "Sessions"}
+              </button>
+              {s.server_type !== "local" && (
+                <button
+                  onClick={() => handleTest(s.id)}
+                  disabled={busyAction === `test-${s.id}`}
+                  className="text-xs text-gray-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  {busyAction === `test-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                  {busyAction === `test-${s.id}` ? "Testing..." : "Test"}
+                </button>
+              )}
+              <button
+                onClick={() => handleScan(s.id)}
+                disabled={busyAction === `scan-${s.id}`}
+                className="text-xs text-gray-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                {busyAction === `scan-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanSearch className="w-3 h-3" />}
+                {busyAction === `scan-${s.id}` ? "Scanning..." : "Scan"}
+              </button>
+              {s.server_type !== "local" && (
+                <button
+                  onClick={() => setEditing(s.id)}
+                  className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />
+                  Edit
+                </button>
+              )}
+              {s.server_type !== "local" && (
+                <button
+                  onClick={() => handleDelete(s.id)}
+                  className="text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-red-900/20 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete
+                </button>
+              )}
+            </div>
+          </div>
+          {s.error_message && (
+            <pre className="text-red-400 text-xs mt-2 pl-5 whitespace-pre-wrap break-all">{s.error_message}</pre>
+          )}
+          {(s.status === "setting_up" || s.status === "setup_failed") && s.setup_log && (
+            <SetupProgress server={s} onForceRetry={() => handleRetrySetup(s.id)} />
+          )}
+          {setupExpanded.has(s.id) && s.setup_log && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <h4 className="text-xs text-gray-400 mb-2 font-medium">Setup Log</h4>
+              <div className="space-y-1.5">
+                {Object.entries(s.setup_log).map(([name, entry]) => (
+                  <div key={name}>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${
+                        entry.status === "completed" ? "bg-green-500" :
+                        entry.status === "skipped" ? "bg-gray-500" :
+                        entry.status === "running" ? "bg-blue-500 animate-pulse" :
+                        entry.status === "failed" ? "bg-red-500" :
+                        "bg-gray-600"
+                      }`} />
+                      <span className="text-gray-300 w-28 shrink-0">{STEP_LABELS[name] || name}</span>
+                      <span className={
+                        entry.status === "completed" ? "text-green-400" :
+                        entry.status === "skipped" ? "text-gray-400" :
+                        entry.status === "running" ? "text-blue-400" :
+                        entry.status === "failed" ? "text-red-400" :
+                        "text-gray-500"
+                      }>{entry.status}</span>
+                    </div>
+                    {entry.error && (
+                      <pre className="text-red-400/80 text-xs mt-1 ml-5 whitespace-pre-wrap break-all bg-red-950/20 border border-red-900/30 rounded px-2 py-1 max-h-32 overflow-y-auto">
+                        {entry.error}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {deployingKey === s.id && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <KeyRound className="w-4 h-4 text-yellow-400 shrink-0" />
+              <span className="text-xs text-gray-400 shrink-0">Deploy SSH key:</span>
+              <input
+                type="password"
+                placeholder="Server password"
+                value={deployPassword}
+                onChange={(e) => setDeployPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && deployPassword) handleDeployKey(s.id);
+                }}
+                className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+              />
+              <button
+                onClick={() => handleDeployKey(s.id)}
+                disabled={!deployPassword || deployLoading}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+              >
+                {deployLoading ? "Deploying..." : "Deploy Key"}
+              </button>
+              <button
+                onClick={() => { setDeployingKey(null); setDeployPassword(""); }}
+                className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {agentsExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <AgentManagementPanel serverId={s.id} />
+            </div>
+          )}
+          {gitExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <GitAccessPanel serverId={s.id} />
+            </div>
+          )}
+          {gitTokensExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <h4 className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5" />
+                Git Tokens
+              </h4>
+              <GitConnectionsPanel serverId={s.id} />
+            </div>
+          )}
+          {projectsExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <ProjectsPanel serverId={s.id} server={s} />
+            </div>
+          )}
+          {terminalExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs text-gray-500">
+                  Connected as: <span className="text-gray-300">{terminalUser[s.id] === "worker" ? s.worker_user : "root"}</span>
+                </span>
+                {s.worker_user && (
+                  <button
+                    onClick={() => {
+                      const newUser = terminalUser[s.id] === "worker" ? "root" : "worker";
+                      setTerminalUser((prev) => ({ ...prev, [s.id]: newUser }));
+                      setTerminalExpanded((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
+                      setTimeout(() => setTerminalExpanded((prev) => new Set(prev).add(s.id)), 50);
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Switch to {terminalUser[s.id] === "worker" ? "root" : s.worker_user}
+                  </button>
+                )}
+              </div>
+              <TerminalPanel
+                serverId={s.id}
+                user={terminalUser[s.id] || "root"}
+                key={`terminal-${s.id}-${terminalUser[s.id] || "root"}`}
+              />
+            </div>
+          )}
+          {historyExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <ServerHistoryPanel serverId={s.id} />
+            </div>
+          )}
+          {dockerExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <DockerPanel serverId={s.id} />
+            </div>
+          )}
+          {sessionsExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <SessionsPanel serverId={s.id} workerUser={s.worker_user} />
+            </div>
+          )}
+          {sshConfigExpanded.has(s.id) && (
+            <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-300">SSH Config for VS Code Remote-SSH</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generateSSHConfig(s));
+                    toast.success("SSH config copied to clipboard");
+                  }}
+                  className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+                >
+                  <ClipboardCopy className="w-3 h-3" />
+                  Copy to Clipboard
+                </button>
+              </div>
+              <pre className="text-xs text-gray-300 bg-gray-950/60 border border-gray-800/50 rounded-lg p-3 font-mono whitespace-pre overflow-x-auto">
+                {generateSSHConfig(s)}
+              </pre>
+              <p className="text-xs text-gray-500 mt-2">
+                Add this to <code className="text-gray-400">~/.ssh/config</code>, then use the Open in VS Code buttons on each project.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                JetBrains Gateway also reads <code className="text-gray-400">~/.ssh/config</code> — the same config works for both VS Code and JetBrains IDEs.
+              </p>
+              {s.worker_user && (
+                <div className="mt-3 pt-3 border-t border-gray-700/40">
+                  <span className="text-xs font-medium text-gray-300">Worker User Password</span>
+                  {s.worker_user_password && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <code className="text-xs text-gray-300 bg-gray-950/60 border border-gray-800/50 rounded px-2 py-1 font-mono">
+                        {showPassword === s.id ? s.worker_user_password : "••••••••"}
+                      </code>
+                      <button
+                        onClick={() => setShowPassword(showPassword === s.id ? null : s.id)}
+                        className="text-xs text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700/50 transition-colors"
+                        title={showPassword === s.id ? "Hide password" : "Show password"}
+                      >
+                        {showPassword === s.id ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(s.worker_user_password!);
+                          toast.success("Password copied");
+                        }}
+                        className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 p-1 rounded hover:bg-gray-700/50 transition-colors"
+                        title="Copy password"
+                      >
+                        <ClipboardCopy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="password"
+                      placeholder={s.worker_user_password ? "Change password" : "Set password for VS Code SSH"}
+                      value={workerPassword}
+                      onChange={(e) => setWorkerPassword(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && workerPassword) handleSetWorkerPassword(s.id);
+                      }}
+                      className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    />
+                    <button
+                      onClick={() => handleSetWorkerPassword(s.id)}
+                      disabled={!workerPassword || workerPasswordLoading}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+                    >
+                      {workerPasswordLoading ? "Setting..." : "Set Password"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Set a password so VS Code Remote-SSH can connect without SSH keys.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -376,6 +817,13 @@ export default function WorkspaceServers() {
         </div>
       </div>
 
+      {/* Platform (local) servers always render first */}
+      {servers.filter((s) => s.server_type === "local").map((s) => (
+        <div key={s.id} className="bg-gray-900/40 border border-purple-800/40 rounded-xl p-4 hover:border-purple-700/50 hover:bg-gray-900/60 transition-all group backdrop-blur-sm mb-4">
+          {renderServerCard(s)}
+        </div>
+      ))}
+
       <ServerGroupPanel onGroupsChanged={() => { loadGroups(); load(); }} />
 
       {adding && (
@@ -392,430 +840,9 @@ export default function WorkspaceServers() {
       )}
 
       <div className="space-y-3">
-        {servers.map((s) => (
+        {servers.filter((s) => s.server_type !== "local").map((s) => (
           <div key={s.id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 hover:border-gray-700/60 hover:bg-gray-900/60 transition-all group backdrop-blur-sm">
-            {editing === s.id ? (
-              <WorkspaceServerForm
-                initial={{
-                  name: s.name,
-                  hostname: s.hostname,
-                  port: s.port,
-                  username: s.username,
-                  ssh_key_path: s.ssh_key_path || "",
-                  worker_user: s.worker_user || "coder",
-                  workspace_root: s.workspace_root || "",
-                }}
-                onSubmit={(data) => handleUpdate(s.id, data)}
-                onCancel={() => setEditing(null)}
-                isEdit
-              />
-            ) : (
-              <>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ring-2 ring-gray-900 ${statusColor[s.status] || statusColor.unknown}`}
-                    />
-                    <span className="font-medium text-white">{s.name}</span>
-                    <span className="text-gray-500 text-sm font-mono">
-                      {s.hostname}:{s.port}
-                    </span>
-                    {s.status === "setting_up" && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 inline-flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Setting up...
-                      </span>
-                    )}
-                    {s.status !== "setting_up" && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-400">
-                        {s.agent_count} agents · {s.project_count} projects
-                        {s.last_seen_at && (
-                          <span className="ml-1 text-gray-500" title={`Last seen: ${new Date(s.last_seen_at).toLocaleString()}`}>
-                            · {(() => {
-                              const ago = Date.now() - new Date(s.last_seen_at).getTime();
-                              if (ago < 60_000) return "just now";
-                              if (ago < 3600_000) return `${Math.floor(ago / 60_000)}m ago`;
-                              if (ago < 86400_000) return `${Math.floor(ago / 3600_000)}h ago`;
-                              return `${Math.floor(ago / 86400_000)}d ago`;
-                            })()}
-                          </span>
-                        )}
-                      </span>
-                    )}
-                    <select
-                      value={s.server_group_id ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value ? Number(e.target.value) : null;
-                        handleGroupChange(s.id, val, s.server_group_id);
-                      }}
-                      className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
-                      title="Server group"
-                    >
-                      <option value="">No group</option>
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    {s.setup_log && (
-                      <button
-                        onClick={() => toggleSet(setSetupExpanded, s.id)}
-                        className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                      >
-                        {setupExpanded.has(s.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                        Setup Log
-                      </button>
-                    )}
-                    {(s.status === "setup_failed" || s.status === "online" || s.status === "setting_up") && (
-                      <button
-                        onClick={() => handleRetrySetup(s.id)}
-                        disabled={busyAction === `retry-${s.id}`}
-                        className={`text-xs disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded transition-colors ${
-                          s.status === "setup_failed" || s.status === "setting_up"
-                            ? "text-yellow-400 hover:text-yellow-300 hover:bg-yellow-900/20"
-                            : "text-gray-400 hover:text-white hover:bg-gray-700/50"
-                        }`}
-                      >
-                        {busyAction === `retry-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        {busyAction === `retry-${s.id}` ? "Running..." : s.status === "setup_failed" ? "Retry Setup" : s.status === "setting_up" ? "Restart Setup" : "Re-Setup"}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => toggleSet(setAgentsExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      {agentsExpanded.has(s.id) ? "Collapse" : "Agents"}
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setGitExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <GitBranch className="w-3 h-3" />
-                      Git Access
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setGitTokensExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <KeyRound className="w-3 h-3" />
-                      Git Tokens
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setProjectsExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <FolderOpen className="w-3 h-3" />
-                      Projects
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setHistoryExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <History className="w-3 h-3" />
-                      History
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setSshConfigExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <Monitor className="w-3 h-3" />
-                      VS Code
-                    </button>
-                    {!terminalExpanded.has(s.id) ? (
-                      <div className="relative inline-flex">
-                        <button
-                          onClick={() => {
-                            setTerminalUser((prev) => ({ ...prev, [s.id]: "root" }));
-                            toggleSet(setTerminalExpanded, s.id);
-                          }}
-                          className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded-l hover:bg-gray-700/50 transition-colors"
-                        >
-                          <SquareTerminal className="w-3 h-3" />
-                          Terminal
-                        </button>
-                        {s.worker_user && (
-                          <select
-                            value={terminalUser[s.id] || "root"}
-                            onChange={(e) => {
-                              setTerminalUser((prev) => ({ ...prev, [s.id]: e.target.value }));
-                              if (!terminalExpanded.has(s.id)) {
-                                toggleSet(setTerminalExpanded, s.id);
-                              }
-                            }}
-                            className="text-xs bg-gray-800 text-gray-400 border-l border-gray-600 px-1 py-1 rounded-r hover:bg-gray-700/50 cursor-pointer"
-                          >
-                            <option value="root">root</option>
-                            <option value="worker">{s.worker_user}</option>
-                          </select>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => toggleSet(setTerminalExpanded, s.id)}
-                        className="text-xs text-orange-400 hover:text-orange-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                      >
-                        <SquareTerminal className="w-3 h-3" />
-                        Close Terminal
-                      </button>
-                    )}
-                    <button
-                      onClick={() => toggleSet(setDockerExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <Box className="w-3 h-3" />
-                      {dockerExpanded.has(s.id) ? "Close Docker" : "Docker"}
-                    </button>
-                    <button
-                      onClick={() => toggleSet(setSessionsExpanded, s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <SquareTerminal className="w-3 h-3" />
-                      {sessionsExpanded.has(s.id) ? "Close Sessions" : "Sessions"}
-                    </button>
-                    <button
-                      onClick={() => handleTest(s.id)}
-                      disabled={busyAction === `test-${s.id}`}
-                      className="text-xs text-gray-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      {busyAction === `test-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
-                      {busyAction === `test-${s.id}` ? "Testing..." : "Test"}
-                    </button>
-                    <button
-                      onClick={() => handleScan(s.id)}
-                      disabled={busyAction === `scan-${s.id}`}
-                      className="text-xs text-gray-400 hover:text-white disabled:opacity-50 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      {busyAction === `scan-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanSearch className="w-3 h-3" />}
-                      {busyAction === `scan-${s.id}` ? "Scanning..." : "Scan"}
-                    </button>
-                    <button
-                      onClick={() => setEditing(s.id)}
-                      className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                    >
-                      <Pencil className="w-3 h-3" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(s.id)}
-                      className="text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-red-900/20 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                {s.error_message && (
-                  <pre className="text-red-400 text-xs mt-2 pl-5 whitespace-pre-wrap break-all">{s.error_message}</pre>
-                )}
-                {(s.status === "setting_up" || s.status === "setup_failed") && s.setup_log && (
-                  <SetupProgress server={s} onForceRetry={() => handleRetrySetup(s.id)} />
-                )}
-                {setupExpanded.has(s.id) && s.setup_log && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <h4 className="text-xs text-gray-400 mb-2 font-medium">Setup Log</h4>
-                    <div className="space-y-1.5">
-                      {Object.entries(s.setup_log).map(([name, entry]) => (
-                        <div key={name}>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${
-                              entry.status === "completed" ? "bg-green-500" :
-                              entry.status === "running" ? "bg-blue-500 animate-pulse" :
-                              entry.status === "failed" ? "bg-red-500" :
-                              "bg-gray-600"
-                            }`} />
-                            <span className="text-gray-300 w-28 shrink-0">{STEP_LABELS[name] || name}</span>
-                            <span className={
-                              entry.status === "completed" ? "text-green-400" :
-                              entry.status === "running" ? "text-blue-400" :
-                              entry.status === "failed" ? "text-red-400" :
-                              "text-gray-500"
-                            }>{entry.status}</span>
-                          </div>
-                          {entry.error && (
-                            <pre className="text-red-400/80 text-xs mt-1 ml-5 whitespace-pre-wrap break-all bg-red-950/20 border border-red-900/30 rounded px-2 py-1 max-h-32 overflow-y-auto">
-                              {entry.error}
-                            </pre>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {deployingKey === s.id && (
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <KeyRound className="w-4 h-4 text-yellow-400 shrink-0" />
-                    <span className="text-xs text-gray-400 shrink-0">Deploy SSH key:</span>
-                    <input
-                      type="password"
-                      placeholder="Server password"
-                      value={deployPassword}
-                      onChange={(e) => setDeployPassword(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && deployPassword) handleDeployKey(s.id);
-                      }}
-                      className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
-                    />
-                    <button
-                      onClick={() => handleDeployKey(s.id)}
-                      disabled={!deployPassword || deployLoading}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
-                    >
-                      {deployLoading ? "Deploying..." : "Deploy Key"}
-                    </button>
-                    <button
-                      onClick={() => { setDeployingKey(null); setDeployPassword(""); }}
-                      className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-                {agentsExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <AgentManagementPanel serverId={s.id} />
-                  </div>
-                )}
-                {gitExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <GitAccessPanel serverId={s.id} />
-                  </div>
-                )}
-                {gitTokensExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <h4 className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5" />
-                      Git Tokens
-                    </h4>
-                    <GitConnectionsPanel serverId={s.id} />
-                  </div>
-                )}
-                {projectsExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <ProjectsPanel serverId={s.id} server={s} />
-                  </div>
-                )}
-                {terminalExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-500">
-                        Connected as: <span className="text-gray-300">{terminalUser[s.id] === "worker" ? s.worker_user : "root"}</span>
-                      </span>
-                      {s.worker_user && (
-                        <button
-                          onClick={() => {
-                            const newUser = terminalUser[s.id] === "worker" ? "root" : "worker";
-                            setTerminalUser((prev) => ({ ...prev, [s.id]: newUser }));
-                            setTerminalExpanded((prev) => { const n = new Set(prev); n.delete(s.id); return n; });
-                            setTimeout(() => setTerminalExpanded((prev) => new Set(prev).add(s.id)), 50);
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300"
-                        >
-                          Switch to {terminalUser[s.id] === "worker" ? "root" : s.worker_user}
-                        </button>
-                      )}
-                    </div>
-                    <TerminalPanel
-                      serverId={s.id}
-                      user={terminalUser[s.id] || "root"}
-                      key={`terminal-${s.id}-${terminalUser[s.id] || "root"}`}
-                    />
-                  </div>
-                )}
-                {historyExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <ServerHistoryPanel serverId={s.id} />
-                  </div>
-                )}
-                {dockerExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <DockerPanel serverId={s.id} />
-                  </div>
-                )}
-                {sessionsExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <SessionsPanel serverId={s.id} workerUser={s.worker_user} />
-                  </div>
-                )}
-                {sshConfigExpanded.has(s.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-700/40 animate-fade-in">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-300">SSH Config for VS Code Remote-SSH</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(generateSSHConfig(s));
-                          toast.success("SSH config copied to clipboard");
-                        }}
-                        className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                      >
-                        <ClipboardCopy className="w-3 h-3" />
-                        Copy to Clipboard
-                      </button>
-                    </div>
-                    <pre className="text-xs text-gray-300 bg-gray-950/60 border border-gray-800/50 rounded-lg p-3 font-mono whitespace-pre overflow-x-auto">
-                      {generateSSHConfig(s)}
-                    </pre>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Add this to <code className="text-gray-400">~/.ssh/config</code>, then use the Open in VS Code buttons on each project.
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      JetBrains Gateway also reads <code className="text-gray-400">~/.ssh/config</code> — the same config works for both VS Code and JetBrains IDEs.
-                    </p>
-                    {s.worker_user && (
-                      <div className="mt-3 pt-3 border-t border-gray-700/40">
-                        <span className="text-xs font-medium text-gray-300">Worker User Password</span>
-                        {s.worker_user_password && (
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <code className="text-xs text-gray-300 bg-gray-950/60 border border-gray-800/50 rounded px-2 py-1 font-mono">
-                              {showPassword === s.id ? s.worker_user_password : "••••••••"}
-                            </code>
-                            <button
-                              onClick={() => setShowPassword(showPassword === s.id ? null : s.id)}
-                              className="text-xs text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700/50 transition-colors"
-                              title={showPassword === s.id ? "Hide password" : "Show password"}
-                            >
-                              {showPassword === s.id ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                            </button>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(s.worker_user_password!);
-                                toast.success("Password copied");
-                              }}
-                              className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 p-1 rounded hover:bg-gray-700/50 transition-colors"
-                              title="Copy password"
-                            >
-                              <ClipboardCopy className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <input
-                            type="password"
-                            placeholder={s.worker_user_password ? "Change password" : "Set password for VS Code SSH"}
-                            value={workerPassword}
-                            onChange={(e) => setWorkerPassword(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && workerPassword) handleSetWorkerPassword(s.id);
-                            }}
-                            className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
-                          />
-                          <button
-                            onClick={() => handleSetWorkerPassword(s.id)}
-                            disabled={!workerPassword || workerPasswordLoading}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
-                          >
-                            {workerPasswordLoading ? "Setting..." : "Set Password"}
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Set a password so VS Code Remote-SSH can connect without SSH keys.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+            {renderServerCard(s)}
           </div>
         ))}
         {initialLoading && servers.length === 0 && (

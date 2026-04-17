@@ -25,8 +25,8 @@ from backend.schemas.docker import (
     PruneRequest,
     PruneResult,
 )
+from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.docker_service import DockerService
-from backend.services.workspace.ssh_service import SSHService
 
 logger = logging.getLogger("agentickode.docker_management")
 
@@ -39,7 +39,7 @@ async def _get_docker_service(server_id: int, db: AsyncSession) -> DockerService
     server = await repo.get_by_id(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    ssh = SSHService.for_server(server)
+    ssh = executor_for_server(server)
     return DockerService(ssh)
 
 

@@ -1,6 +1,7 @@
 # IDE / tools
 .screenshots/
 .playwright-mcp/
+.playwright-cli/
 .serena/
 .vscode/
 .idea/

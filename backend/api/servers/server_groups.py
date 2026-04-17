@@ -24,7 +24,7 @@ from backend.schemas.server_groups import (
 )
 from backend.services.encryption import decrypt_value, encrypt_value
 from backend.services.git import GitAccessService
-from backend.services.workspace.ssh_service import SSHService
+from backend.services.workspace.command_executor import executor_for_server
 
 logger = logging.getLogger("agentickode.server_groups")
 
@@ -178,7 +178,7 @@ async def deploy_group_token(
     results: list[dict] = []
     for server in group.servers:
         try:
-            ssh = SSHService.for_server(server)
+            ssh = executor_for_server(server)
             cmd = _build_git_credential_cmd(provider, token, server.worker_user)
             stdout, stderr, rc = await ssh.run_command(cmd, timeout=30)
             results.append(
@@ -210,7 +210,7 @@ async def deploy_group_ssh_key(
         raise HTTPException(400, "No servers in this group")
 
     source = group.servers[0]
-    ssh_source = SSHService.for_server(source)
+    ssh_source = executor_for_server(source)
     svc = GitAccessService(ssh_source)
 
     key_info = await svc.generate_key(source.name, force=False, copy_to_user=source.worker_user)
@@ -222,7 +222,7 @@ async def deploy_group_ssh_key(
 
     async def _deploy_to(server: WorkspaceServer) -> dict:
         try:
-            ssh = SSHService.for_server(server)
+            ssh = executor_for_server(server)
             cmd = (
                 f"mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
                 f"grep -qF '{public_key}' ~/.ssh/authorized_keys 2>/dev/null || "

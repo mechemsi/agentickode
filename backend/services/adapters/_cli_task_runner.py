@@ -20,12 +20,12 @@ from backend.services.adapters.cli_wrappers import (
 
 if TYPE_CHECKING:
     from backend.services.adapters.cli_adapter import CLIAdapter, LogFn
-    from backend.services.workspace.ssh_service import SSHService
+    from backend.services.workspace.command_executor import CommandExecutor
 
 logger = logging.getLogger("agentickode.adapters.cli")
 
 
-async def detect_changed_files(ssh: SSHService, workspace: str) -> list[str]:
+async def detect_changed_files(ssh: CommandExecutor, workspace: str) -> list[str]:
     """Get list of files changed by the agent (uncommitted + committed on branch)."""
     try:
         cmd = (
