@@ -122,6 +122,11 @@ describe("TypeScript interfaces", () => {
       ai_config: null,
       workspace_server_ids: [],
       autonomy_config: null,
+      integration_config: {},
+      poll_enabled: false,
+      poll_interval_minutes: 5,
+      last_polled_at: null,
+      next_poll_at: null,
       created_at: "2024-01-01T00:00:00Z",
       updated_at: "2024-01-01T00:00:00Z",
     };

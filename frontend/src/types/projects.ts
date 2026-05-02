@@ -35,6 +35,11 @@ export interface ProjectConfig {
   workspace_path: string | null;
   has_git_provider_token: boolean;
   autonomy_config: AutonomyConfig | null;
+  integration_config: Record<string, unknown>;
+  poll_enabled: boolean;
+  poll_interval_minutes: number;
+  last_polled_at: string | null;
+  next_poll_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -13,6 +13,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | Doc | Date | Summary |
 |-----|------|---------|
 | [Research: Autonomous Platform](../claudedocs/research_autonomous_platform_integrations_20260328.md) | 2026-03-28 | Research notes on autonomous agent scheduling and self-sustaining loops |
+| [Notion + issue polling](implementations/2026-05-02-notion-and-issue-polling.md) | 2026-05-02 | Notion task source (webhook + poller + bidirectional manager) and generic issue-polling fallback for all trackers |
 
 ## Decisions
 

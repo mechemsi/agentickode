@@ -80,3 +80,72 @@ class TestTaskSourceUpdater:
 
         # Should not raise
         await updater.notify("github", meta, "coding", "completed", run_id=1)
+
+    async def test_notify_notion_with_plaintext_key(self, updater, mock_client):
+        mock_client.post.return_value = httpx.Response(200)
+        meta = {"page_id": "page-abc"}
+        cfg = {"notion_api_key": "plain-secret"}
+
+        await updater.notify(
+            "notion",
+            meta,
+            "reviewing",
+            "completed",
+            run_id=42,
+            pr_url="https://pr.url",
+            project_integration_config=cfg,
+        )
+
+        mock_client.post.assert_called_once()
+        url = mock_client.post.call_args.args[0]
+        headers = mock_client.post.call_args.kwargs["headers"]
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert url == "https://api.notion.com/v1/comments"
+        assert headers["Authorization"] == "Bearer plain-secret"
+        assert headers["Notion-Version"] == "2022-06-28"
+        assert payload["parent"]["page_id"] == "page-abc"
+        body = payload["rich_text"][0]["text"]["content"]
+        assert "Run #42" in body
+        assert "reviewing" in body
+        assert "https://pr.url" in body
+
+    async def test_notify_notion_with_encrypted_key(self, updater, mock_client):
+        from backend.services.encryption import encrypt_value
+
+        mock_client.post.return_value = httpx.Response(200)
+        cfg = {"notion_api_key_enc": encrypt_value("real-secret")}
+        meta = {"page_id": "page-xyz"}
+
+        await updater.notify(
+            "notion",
+            meta,
+            "coding",
+            "completed",
+            run_id=7,
+            project_integration_config=cfg,
+        )
+
+        headers = mock_client.post.call_args.kwargs["headers"]
+        assert headers["Authorization"] == "Bearer real-secret"
+
+    async def test_notify_notion_without_page_id_skips(self, updater, mock_client):
+        await updater.notify(
+            "notion",
+            {},
+            "coding",
+            "completed",
+            run_id=1,
+            project_integration_config={"notion_api_key": "x"},
+        )
+        mock_client.post.assert_not_called()
+
+    async def test_notify_notion_without_api_key_skips(self, updater, mock_client):
+        await updater.notify(
+            "notion",
+            {"page_id": "abc"},
+            "coding",
+            "completed",
+            run_id=1,
+            project_integration_config={},
+        )
+        mock_client.post.assert_not_called()

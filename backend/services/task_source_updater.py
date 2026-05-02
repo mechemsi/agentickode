@@ -2,7 +2,10 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Posts status comments to task sources (Plane/GitHub/Gitea/GitLab) at phase transitions."""
+"""Posts status comments to task sources at phase transitions.
+
+Supports GitHub, Plane, Gitea, GitLab, Notion.
+"""
 
 import logging
 from urllib.parse import quote
@@ -10,6 +13,7 @@ from urllib.parse import quote
 import httpx
 
 from backend.config import settings
+from backend.services.encryption import decrypt_value
 
 logger = logging.getLogger("agentickode.task_source_updater")
 
@@ -28,8 +32,13 @@ class TaskSourceUpdater:
         status: str,
         run_id: int,
         pr_url: str | None = None,
+        project_integration_config: dict | None = None,
     ) -> None:
-        """Post a comment/update to the task source about a phase transition."""
+        """Post a comment/update to the task source about a phase transition.
+
+        ``project_integration_config`` is optional — pass it when the caller
+        needs per-project secrets (e.g. Notion API key).
+        """
         try:
             if task_source == "github":
                 await self._notify_github(task_source_meta, phase_name, status, run_id, pr_url)
@@ -39,6 +48,15 @@ class TaskSourceUpdater:
                 await self._notify_gitea(task_source_meta, phase_name, status, run_id, pr_url)
             elif task_source == "gitlab":
                 await self._notify_gitlab(task_source_meta, phase_name, status, run_id, pr_url)
+            elif task_source == "notion":
+                await self._notify_notion(
+                    task_source_meta,
+                    phase_name,
+                    status,
+                    run_id,
+                    pr_url,
+                    project_integration_config or {},
+                )
             elif task_source in ("plain", "manual"):
                 pass  # No external tracker to notify
             else:
@@ -168,3 +186,48 @@ class TaskSourceUpdater:
         resp = await self._client.post(url, json={"body": body}, headers=headers, timeout=10)
         if resp.status_code >= 400:
             logger.warning("GitLab note failed: %s %s", resp.status_code, resp.text[:200])
+
+    async def _notify_notion(
+        self,
+        meta: dict,
+        phase_name: str,
+        status: str,
+        run_id: int,
+        pr_url: str | None,
+        integration_config: dict,
+    ) -> None:
+        """Post a comment on a Notion page."""
+        page_id = meta.get("page_id") or meta.get("id", "")
+        if not page_id:
+            logger.debug("No Notion page_id in meta, skipping Notion notify")
+            return
+
+        enc = integration_config.get("notion_api_key_enc")
+        api_key = integration_config.get("notion_api_key")
+        if enc and not api_key:
+            try:
+                api_key = decrypt_value(enc)
+            except Exception:
+                logger.exception("Failed to decrypt notion_api_key")
+                return
+        if not api_key:
+            logger.debug("No Notion api key, skipping Notion notify")
+            return
+
+        body = f"**AgenticKode Run #{run_id}** — Phase `{phase_name}` {status}"
+        if pr_url:
+            body += f"\nPR: {pr_url}"
+
+        url = "https://api.notion.com/v1/comments"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "parent": {"page_id": page_id},
+            "rich_text": [{"type": "text", "text": {"content": body}}],
+        }
+        resp = await self._client.post(url, headers=headers, json=payload, timeout=10)
+        if resp.status_code >= 400:
+            logger.warning("Notion comment failed: %s %s", resp.status_code, resp.text[:200])

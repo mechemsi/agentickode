@@ -49,11 +49,37 @@ def _provider_host(provider: str) -> str:
     return parsed.hostname or "gitea.local"
 
 
+_INTEGRATION_SECRET_KEYS = ("notion_api_key", "plane_api_key")
+
+
+def _encrypt_integration_secrets(integration_config: dict | None) -> dict | None:
+    """Encrypt plaintext secret fields inside integration_config in place.
+
+    Plaintext keys like ``notion_api_key`` are encrypted and re-stored as
+    ``notion_api_key_enc`` so we never persist secrets in the clear.
+    """
+    if not integration_config:
+        return integration_config
+    cfg = dict(integration_config)
+    for key in _INTEGRATION_SECRET_KEYS:
+        raw = cfg.pop(key, None)
+        if raw:
+            cfg[f"{key}_enc"] = encrypt_value(str(raw))
+    return cfg
+
+
 def _project_out(project: ProjectConfig) -> ProjectConfigOut:
     """Convert a ProjectConfig model to its output schema, computing derived fields."""
     out = ProjectConfigOut.model_validate(project)
     out.has_git_provider_token = bool(project.git_provider_token_enc)
     out.workspace_server_ids = [ws.workspace_server_id for ws in project.workspace_servers]
+    # Redact secrets when echoing integration_config back to clients.
+    stored: dict = project.integration_config or {}  # type: ignore[assignment]
+    cfg: dict = {k: v for k, v in stored.items() if k not in _INTEGRATION_SECRET_KEYS}
+    for key in _INTEGRATION_SECRET_KEYS:
+        cfg.pop(f"{key}_enc", None)
+        cfg[f"has_{key}"] = bool(stored.get(f"{key}_enc"))
+    out.integration_config = cfg
     return out
 
 
@@ -286,6 +312,8 @@ async def create_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token:
         data["git_provider_token_enc"] = encrypt_value(raw_token)
+    if "integration_config" in data:
+        data["integration_config"] = _encrypt_integration_secrets(data["integration_config"]) or {}
     # workspace_server_ids stored via join table, not as a model column
     workspace_server_ids = data.pop("workspace_server_ids", [])
     project = ProjectConfig(**data)
@@ -307,6 +335,10 @@ async def update_project(
     raw_token = data.pop("git_provider_token", None)
     if raw_token is not None:
         data["git_provider_token_enc"] = encrypt_value(raw_token) if raw_token else None
+    if "integration_config" in data:
+        # Merge with existing so partial updates don't wipe the stored secret.
+        merged = {**(project.integration_config or {}), **(data["integration_config"] or {})}
+        data["integration_config"] = _encrypt_integration_secrets(merged) or {}
     # workspace_server_ids is handled by the repository via the join table
     updated = await repo.update(project, data)
     return _project_out(updated)

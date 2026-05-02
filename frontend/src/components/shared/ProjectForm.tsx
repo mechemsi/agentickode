@@ -15,7 +15,10 @@ const TASK_SOURCES = [
   { value: "gitea", label: "Gitea Issues" },
   { value: "gitlab", label: "GitLab Issues" },
   { value: "plane", label: "Plane" },
+  { value: "notion", label: "Notion" },
 ];
+
+const POLL_CAPABLE_SOURCES = new Set(["github", "gitea", "gitlab", "plane", "notion"]);
 const GIT_PROVIDERS = [
   { value: "github", label: "GitHub" },
   { value: "gitlab", label: "GitLab" },
@@ -28,7 +31,27 @@ function defaultTaskSource(p: string) {
 }
 
 type Status = { ok: boolean; msg: string };
-type FD = { project_id: string; project_slug: string; repo_owner: string; repo_name: string; default_branch: string; task_source: string; git_provider: string; workspace_server_ids: number[]; git_provider_token: string };
+type NotionFields = {
+  notion_api_key: string;
+  notion_database_id: string;
+  notion_status_property: string;
+  notion_tag_property: string;
+  notion_title_property: string;
+};
+type FD = {
+  project_id: string;
+  project_slug: string;
+  repo_owner: string;
+  repo_name: string;
+  default_branch: string;
+  task_source: string;
+  git_provider: string;
+  workspace_server_ids: number[];
+  git_provider_token: string;
+  poll_enabled: boolean;
+  poll_interval_minutes: number;
+  notion: NotionFields;
+};
 type Initial = Partial<Omit<ProjectConfig, "created_at" | "updated_at" | "workspace_config" | "ai_config">>;
 
 function Field({ label, icon: Icon, children }: { label: string; icon?: React.ElementType; children: React.ReactNode }) {
@@ -82,6 +105,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
   const [providerHost, setProviderHost] = useState("");
   const [connStatus, setConnStatus] = useState<Status | null>(null);
   const [saveErr, setSaveErr] = useState("");
+  const integrationCfg = (initial?.integration_config ?? {}) as Record<string, unknown>;
   const [form, setForm] = useState<FD>({
     project_id: initial?.project_id ?? "",
     project_slug: initial?.project_slug ?? "",
@@ -92,8 +116,21 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     git_provider: initial?.git_provider ?? "gitea",
     workspace_server_ids: initial?.workspace_server_ids ?? [],
     git_provider_token: "",
+    poll_enabled: initial?.poll_enabled ?? false,
+    poll_interval_minutes: initial?.poll_interval_minutes ?? 5,
+    notion: {
+      notion_api_key: "",
+      notion_database_id: String(integrationCfg["notion_database_id"] ?? ""),
+      notion_status_property: String(integrationCfg["notion_status_property"] ?? "Status"),
+      notion_tag_property: String(integrationCfg["notion_tag_property"] ?? "Tags"),
+      notion_title_property: String(integrationCfg["notion_title_property"] ?? "Name"),
+    },
   });
-  const set = (k: keyof FD, v: string | number | null | number[]) => setForm((p) => ({ ...p, [k]: v }));
+  const hasNotionKey = Boolean(integrationCfg["has_notion_api_key"]);
+  const set = (k: keyof FD, v: string | number | boolean | null | number[]) =>
+    setForm((p) => ({ ...p, [k]: v }));
+  const setNotion = (k: keyof NotionFields, v: string) =>
+    setForm((p) => ({ ...p, notion: { ...p.notion, [k]: v } }));
 
   const handleParsed = (r: GitUrlParseResponse) => {
     setParsed(true);
@@ -113,11 +150,26 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
   };
 
   const handleSave = () => {
-    if (!isEdit && !parsed) { setSaveErr("Parse git URL first"); return; }
+    if (!isEdit && !parsed && form.task_source !== "notion") {
+      setSaveErr("Parse git URL first");
+      return;
+    }
     setSaveErr("");
-    const data: Record<string, unknown> = { ...form };
-    // Only send token if user entered one (empty string = keep existing)
+    const { notion, ...rest } = form;
+    const data: Record<string, unknown> = { ...rest };
     if (!data.git_provider_token) delete data.git_provider_token;
+
+    // Build integration_config for Notion. Only include fields with values so
+    // partial updates don't overwrite stored settings with blanks.
+    if (form.task_source === "notion") {
+      const cfg: Record<string, unknown> = {};
+      if (notion.notion_database_id) cfg.notion_database_id = notion.notion_database_id;
+      if (notion.notion_api_key) cfg.notion_api_key = notion.notion_api_key;
+      if (notion.notion_status_property) cfg.notion_status_property = notion.notion_status_property;
+      if (notion.notion_tag_property) cfg.notion_tag_property = notion.notion_tag_property;
+      if (notion.notion_title_property) cfg.notion_title_property = notion.notion_title_property;
+      if (Object.keys(cfg).length > 0) data.integration_config = cfg;
+    }
     onSubmit(data);
   };
 
@@ -190,6 +242,86 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       <Field label={`Access Token${initial?.has_git_provider_token ? " (set)" : ""}`} icon={Key}>
         <input className={CLS} type="password" placeholder={initial?.has_git_provider_token ? "••••••• (leave blank to keep)" : "Per-project access token (optional)"} value={form.git_provider_token} onChange={(e) => set("git_provider_token", e.target.value)} />
       </Field>
+
+      {form.task_source === "notion" && (
+        <div
+          className="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border border-gray-700/60 bg-gray-900/40"
+          data-testid="notion-fields"
+        >
+          <div className="col-span-1 sm:col-span-2 text-xs text-gray-400 inline-flex items-center gap-1">
+            <Key className="w-3 h-3" />Notion Integration
+          </div>
+          <Field label={`Notion API Key${hasNotionKey ? " (set)" : ""}`} icon={Key}>
+            <input
+              className={CLS}
+              type="password"
+              placeholder={hasNotionKey ? "••••••• (leave blank to keep)" : "secret_..."}
+              value={form.notion.notion_api_key}
+              onChange={(e) => setNotion("notion_api_key", e.target.value)}
+            />
+          </Field>
+          <Field label="Notion Database ID" icon={Tag}>
+            <input
+              className={CLS}
+              value={form.notion.notion_database_id}
+              onChange={(e) => setNotion("notion_database_id", e.target.value)}
+              placeholder="UUID of the database to watch"
+            />
+          </Field>
+          <Field label="Title property">
+            <input
+              className={CLS}
+              value={form.notion.notion_title_property}
+              onChange={(e) => setNotion("notion_title_property", e.target.value)}
+            />
+          </Field>
+          <Field label="Status property">
+            <input
+              className={CLS}
+              value={form.notion.notion_status_property}
+              onChange={(e) => setNotion("notion_status_property", e.target.value)}
+            />
+          </Field>
+          <Field label="Tag property">
+            <input
+              className={CLS}
+              value={form.notion.notion_tag_property}
+              onChange={(e) => setNotion("notion_tag_property", e.target.value)}
+            />
+          </Field>
+        </div>
+      )}
+
+      {POLL_CAPABLE_SOURCES.has(form.task_source) && (
+        <div
+          className="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border border-gray-700/60 bg-gray-900/40"
+          data-testid="polling-fields"
+        >
+          <div className="col-span-1 sm:col-span-2 text-xs text-gray-400 inline-flex items-center gap-1">
+            <Zap className="w-3 h-3" />Issue Polling (fallback to webhooks)
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-300">
+            <input
+              type="checkbox"
+              checked={form.poll_enabled}
+              onChange={(e) => set("poll_enabled", e.target.checked)}
+              className="accent-blue-500 w-3.5 h-3.5"
+            />
+            Enable periodic issue polling
+          </label>
+          <Field label="Poll interval (minutes)">
+            <input
+              className={CLS}
+              type="number"
+              min={1}
+              value={form.poll_interval_minutes}
+              onChange={(e) =>
+                set("poll_interval_minutes", Math.max(1, Number(e.target.value) || 5))
+              }
+            />
+          </Field>
+        </div>
+      )}
 
       {isEdit && (
         <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">

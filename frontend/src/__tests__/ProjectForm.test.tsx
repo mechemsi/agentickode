@@ -157,4 +157,53 @@ describe("ProjectForm", () => {
       expect.objectContaining({ workspace_server_ids: [] }),
     );
   });
+
+  it("hides Notion fields when task_source is not notion", () => {
+    const initialGithub = { ...editInitial, task_source: "github" };
+    render(
+      <ProjectForm initial={initialGithub} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("notion-fields")).not.toBeInTheDocument();
+  });
+
+  it("shows Notion fields when task_source is notion", () => {
+    const initialNotion = { ...editInitial, task_source: "notion" };
+    render(
+      <ProjectForm initial={initialNotion} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(screen.getByTestId("notion-fields")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("UUID of the database to watch")).toBeInTheDocument();
+  });
+
+  it("hides polling block for plain task_source", () => {
+    const initialPlain = { ...editInitial, task_source: "plain" };
+    render(
+      <ProjectForm initial={initialPlain} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("polling-fields")).not.toBeInTheDocument();
+  });
+
+  it("shows polling block for poll-capable sources", () => {
+    const initialGithub = { ...editInitial, task_source: "github" };
+    render(<ProjectForm initial={initialGithub} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByTestId("polling-fields")).toBeInTheDocument();
+    expect(screen.getByText("Enable periodic issue polling")).toBeInTheDocument();
+  });
+
+  it("submits integration_config when Notion fields are filled", () => {
+    const onSubmit = vi.fn();
+    const initialNotion = { ...editInitial, task_source: "notion" };
+    render(
+      <ProjectForm initial={initialNotion} onSubmit={onSubmit} onCancel={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText("UUID of the database to watch"), {
+      target: { value: "db-abc" },
+    });
+    fireEvent.click(screen.getByText("Save"));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        integration_config: expect.objectContaining({ notion_database_id: "db-abc" }),
+      }),
+    );
+  });
 });

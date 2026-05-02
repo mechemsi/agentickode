@@ -66,6 +66,9 @@ class StatusSyncer:
         try:
             async with async_session() as session:
                 from sqlalchemy import select
+                from sqlalchemy.orm import selectinload
+
+                from backend.models import ProjectConfig
 
                 result = await session.execute(select(TaskRun).where(TaskRun.id == run_id))
                 run = result.scalar_one_or_none()
@@ -76,8 +79,15 @@ class StatusSyncer:
                 if run.task_source in ("manual", "scheduled", "automation"):
                     return
 
+                project_result = await session.execute(
+                    select(ProjectConfig)
+                    .options(selectinload(ProjectConfig.workspace_servers))
+                    .where(ProjectConfig.project_id == run.project_id)
+                )
+                project = project_result.scalar_one_or_none()
+
                 client = get_http_client()
-                manager = get_task_manager(run.task_source, client)
+                manager = get_task_manager(run.task_source, client, project=project)
                 await manager.update_status(run.task_source_meta, status)
 
                 # Also post a comment for key status changes

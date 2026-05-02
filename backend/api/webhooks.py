@@ -11,9 +11,12 @@ and creates a task_run row for the worker to pick up.
 import logging
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
+from backend.models import ProjectConfig, TaskRun
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.services.run_factory import create_task_run, resolve_workspace_path
 
@@ -233,4 +236,130 @@ async def gitlab_issue_webhook(
     await db.refresh(run)
 
     logger.info(f"Created run #{run.id} from GitLab webhook: {run.title}")
+    return {"status": "accepted", "run_id": run.id}
+
+
+_NOTION_AI_TASK_TAG = "ai-task"
+_NOTION_USE_CLAUDE_TAG = "use-claude"
+
+
+def _notion_multi_select(prop: dict | None) -> list[str]:
+    if not isinstance(prop, dict):
+        return []
+    return [opt.get("name", "") for opt in prop.get("multi_select", []) or []]
+
+
+def _notion_title_text(prop: dict | None) -> str:
+    if not isinstance(prop, dict):
+        return ""
+    return "".join(chunk.get("plain_text", "") for chunk in prop.get("title", []) or [])
+
+
+async def _project_for_notion_database(db: AsyncSession, database_id: str) -> ProjectConfig | None:
+    """Find the project whose integration_config.notion_database_id matches.
+
+    Does the match in Python so the query stays portable across PostgreSQL
+    and SQLite (used in tests).
+    """
+    stmt = (
+        select(ProjectConfig)
+        .options(selectinload(ProjectConfig.workspace_servers))
+        .where(ProjectConfig.task_source == "notion")
+    )
+    result = await db.execute(stmt)
+    for project in result.scalars().all():
+        cfg = project.integration_config or {}
+        if cfg.get("notion_database_id") == database_id:
+            return project
+    return None
+
+
+@router.post("/webhooks/notion")
+async def notion_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive Notion page events from a database with ai-task tagging.
+
+    Handles Notion's initial subscription verification by echoing the
+    ``verification_token`` field when it is present.
+    """
+    body = await request.json()
+
+    # Notion subscription verification handshake.
+    verification_token = body.get("verification_token")
+    if verification_token and "event" not in body and "page" not in body:
+        return {"verification_token": verification_token}
+
+    # Support both top-level ``page`` payloads and the event wrapper used by
+    # Notion's webhook deliveries (``{"type": "...", "page": {...}}``).
+    event_type = body.get("event") or body.get("type", "")
+    page = body.get("page") or body.get("data") or {}
+    if not isinstance(page, dict) or not page.get("id"):
+        return {"status": "ignored", "reason": "no_page"}
+
+    parent = page.get("parent", {}) or {}
+    database_id = parent.get("database_id") or page.get("database_id") or ""
+    if not database_id:
+        return {"status": "ignored", "reason": "no_database"}
+
+    project = await _project_for_notion_database(db, database_id)
+    if not project:
+        logger.warning("No Notion project config for database %s", database_id)
+        return {"status": "ignored", "reason": "unknown_project"}
+
+    cfg = project.integration_config or {}
+    tag_property = cfg.get("notion_tag_property", "Tags")
+    title_property = cfg.get("notion_title_property", "Name")
+    status_property = cfg.get("notion_status_property", "Status")
+    ai_task_tag = cfg.get("notion_ai_task_tag", _NOTION_AI_TASK_TAG)
+    use_claude_tag = cfg.get("notion_use_claude_tag", _NOTION_USE_CLAUDE_TAG)
+
+    props = page.get("properties", {}) or {}
+    tags = _notion_multi_select(props.get(tag_property))
+    if ai_task_tag not in tags:
+        return {"status": "ignored", "reason": "not_ai_task"}
+
+    title = _notion_title_text(props.get(title_property))
+    status_prop = props.get(status_property) or {}
+    status_value = ""
+    if isinstance(status_prop, dict):
+        sel = status_prop.get("select") or status_prop.get("status")
+        if isinstance(sel, dict):
+            status_value = sel.get("name", "")
+
+    # Dedupe: if a run already exists for this page, ignore
+    existing = await db.execute(
+        select(TaskRun.id).where(
+            TaskRun.project_id == project.project_id,
+            TaskRun.task_source == "notion",
+            TaskRun.task_id == page["id"],
+        )
+    )
+    if existing.scalar_one_or_none():
+        return {"status": "ignored", "reason": "duplicate"}
+
+    run = _create_task_run(
+        task_id=page["id"],
+        project=project,
+        title=title,
+        description=page.get("url", ""),
+        task_source="notion",
+        task_source_meta={
+            "database_id": database_id,
+            "page_id": page["id"],
+            "url": page.get("url", ""),
+            "tags": tags,
+            "status": status_value,
+            "status_property": status_property,
+            "title_property": title_property,
+            "event": event_type,
+        },
+        use_claude=use_claude_tag in tags,
+    )
+    db.add(run)
+    await db.commit()
+    await db.refresh(run)
+
+    logger.info("Created run #%d from Notion webhook: %s", run.id, title)
     return {"status": "accepted", "run_id": run.id}

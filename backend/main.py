@@ -77,6 +77,7 @@ from backend.services.queue_service import queue_service
 from backend.services.rules_dispatcher import RulesDispatcher
 from backend.services.task_management.status_sync import StatusSyncer
 from backend.worker.engine import WorkerEngine
+from backend.worker.issue_poller_scheduler import IssuePollerScheduler
 from backend.worker.platform_cron_scheduler import PlatformCronScheduler
 from backend.worker.scheduler import TaskScheduler
 
@@ -260,6 +261,19 @@ async def _run_migrations() -> None:
     await _run_migration_step(
         "ALTER TABLE workspace_servers " "ADD COLUMN server_type TEXT NOT NULL DEFAULT 'remote'"
     )
+    # Polling fields + generic integration_config on project_configs
+    await _run_migration_step(
+        "ALTER TABLE project_configs ADD COLUMN poll_enabled BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _run_migration_step(
+        "ALTER TABLE project_configs ADD COLUMN poll_interval_minutes INTEGER NOT NULL DEFAULT 5"
+    )
+    await _run_migration_step("ALTER TABLE project_configs ADD COLUMN last_polled_at TIMESTAMPTZ")
+    await _run_migration_step("ALTER TABLE project_configs ADD COLUMN next_poll_at TIMESTAMPTZ")
+    await _run_migration_step(
+        "ALTER TABLE project_configs "
+        "ADD COLUMN integration_config JSONB NOT NULL DEFAULT '{}'::jsonb"
+    )
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS platform_crons (
             id SERIAL PRIMARY KEY,
@@ -334,6 +348,8 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(scheduler.run())
     cron_scheduler = PlatformCronScheduler(async_session)
     cron_scheduler_task = asyncio.create_task(cron_scheduler.run())
+    issue_poller = IssuePollerScheduler(async_session)
+    issue_poller_task = asyncio.create_task(issue_poller.run())
     yield
     logger.info("Shutting down worker")
     notification_dispatcher.stop()
@@ -341,14 +357,17 @@ async def lifespan(app: FastAPI):
     status_syncer.stop()
     scheduler.stop()
     cron_scheduler.stop()
+    issue_poller.stop()
     worker_engine.stop()
     scheduler_task.cancel()
     cron_scheduler_task.cancel()
+    issue_poller_task.cancel()
     worker_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await worker_task
         await scheduler_task
         await cron_scheduler_task
+        await issue_poller_task
     await close_http_client()
     await queue_service.close()
 

@@ -40,6 +40,9 @@ class ProjectConfigCreate(BaseModel):
     workspace_server_ids: list[int] = []
     workspace_path: str | None = None
     git_provider_token: str | None = None
+    integration_config: dict[str, Any] | None = None
+    poll_enabled: bool = False
+    poll_interval_minutes: int = 5
 
     @field_validator("workspace_server_ids")
     @classmethod
@@ -63,6 +66,9 @@ class ProjectConfigUpdate(BaseModel):
     workspace_path: str | None = None
     git_provider_token: str | None = None
     autonomy_config: AutonomyConfig | None = None
+    integration_config: dict[str, Any] | None = None
+    poll_enabled: bool | None = None
+    poll_interval_minutes: int | None = None
 
     @field_validator("workspace_server_ids")
     @classmethod
@@ -87,6 +93,11 @@ class ProjectConfigOut(BaseModel):
     workspace_path: str | None = None
     has_git_provider_token: bool = False
     autonomy_config: dict[str, Any] | None = None
+    integration_config: dict[str, Any] = {}
+    poll_enabled: bool = False
+    poll_interval_minutes: int = 5
+    last_polled_at: datetime | None = None
+    next_poll_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

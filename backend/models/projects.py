@@ -2,7 +2,7 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -24,6 +24,11 @@ class ProjectConfig(Base):
     workspace_path = Column(Text, nullable=True)
     git_provider_token_enc = Column(Text, nullable=True)
     autonomy_config = Column(JSONB, nullable=True, default=dict)
+    integration_config = Column(JSONB, nullable=False, default=dict, server_default="{}")
+    poll_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
+    poll_interval_minutes = Column(Integer, nullable=False, default=5, server_default="5")
+    last_polled_at = Column(DateTime(timezone=True), nullable=True)
+    next_poll_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
