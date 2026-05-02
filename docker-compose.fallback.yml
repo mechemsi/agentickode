@@ -1,0 +1,19 @@
+# docker-compose.fallback.yml — host-port publishing when the hub is down.
+#
+# Applied on top of docker-compose.dev.yml when the Traefik hub container
+# isn't running (toggled by the Makefile). Publishes the in-container ports
+# on the host so the apps stay reachable directly.
+#
+# Why a separate overlay (instead of `ports:` in the base compose):
+# Compose merges `ports:` additively — keeping ports in the base would
+# publish them in *both* modes, defeating the routed/fallback split and
+# risking host-port collisions when the hub is up.
+
+services:
+  frontend:
+    ports:
+      - "5173:5173"
+
+  backend:
+    ports:
+      - "8222:8000"

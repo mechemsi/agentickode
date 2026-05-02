@@ -1,10 +1,34 @@
-DC = docker compose -f docker-compose.dev.yml
+# ── Traefik routing toggle ───────────────────────────────────
+# Hub running → routed overlay (http://autodev.localhost, http://autodev-api.localhost)
+# Hub down    → fallback overlay (http://localhost:5173, http://localhost:8222)
+TRAEFIK_RUNNING := $(shell docker inspect -f '{{.State.Running}}' traefik 2>/dev/null)
+
+ifeq ($(TRAEFIK_RUNNING),true)
+  COMPOSE_OVERLAY := -f docker-compose.traefik.yml
+  TRAEFIK_MODE    := routed via Traefik
+  ACCESS_FRONTEND := http://autodev.localhost
+  ACCESS_BACKEND  := http://autodev-api.localhost
+else
+  COMPOSE_OVERLAY := -f docker-compose.fallback.yml
+  TRAEFIK_MODE    := fallback (direct port)
+  ACCESS_FRONTEND := http://localhost:5173
+  ACCESS_BACKEND  := http://localhost:8222
+endif
+
+DC = docker compose -f docker-compose.dev.yml $(COMPOSE_OVERLAY)
 
 # ── Dev environment ──────────────────────────────────────────
-.PHONY: up down build restart logs
+.PHONY: up down build restart logs traefik-info
+
+traefik-info:
+	@echo "Traefik:  $(if $(filter true,$(TRAEFIK_RUNNING)),running,not running)"
+	@echo "Mode:     $(TRAEFIK_MODE)"
+	@echo "Frontend: $(ACCESS_FRONTEND)"
+	@echo "Backend:  $(ACCESS_BACKEND)"
 
 up:
 	$(DC) up -d
+	@$(MAKE) --no-print-directory traefik-info
 
 down:
 	$(DC) down

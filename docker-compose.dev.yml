@@ -27,8 +27,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend.dev
-    ports:
-      - "8222:8000"
     env_file:
       - path: .env
         required: false
@@ -64,8 +62,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend.dev
-    ports:
-      - "5173:5173"
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public

@@ -1,0 +1,39 @@
+# docker-compose.traefik.yml — Traefik overlay for the local hub.
+#
+# Applied on top of docker-compose.dev.yml when the hub container is running
+# (Makefile detects this via `docker inspect traefik`). Adds Traefik labels
+# and attaches the web-facing services to the shared `proxy` network.
+#
+# Routed hostnames:
+#   - frontend → http://autodev.localhost
+#   - backend  → http://autodev-api.localhost
+#
+# Multi-service consumer pattern: map-form labels with a YAML merge anchor
+# (sequence-form labels do not merge cleanly with anchors).
+
+x-traefik-common: &traefik-common
+  traefik.enable: "true"
+  traefik.docker.network: proxy
+
+services:
+  frontend:
+    labels:
+      <<: *traefik-common
+      traefik.http.routers.autodev-frontend.rule: "Host(`autodev.localhost`)"
+      traefik.http.services.autodev-frontend.loadbalancer.server.port: "5173"
+    networks:
+      - proxy
+      - default
+
+  backend:
+    labels:
+      <<: *traefik-common
+      traefik.http.routers.autodev-backend.rule: "Host(`autodev-api.localhost`)"
+      traefik.http.services.autodev-backend.loadbalancer.server.port: "8000"
+    networks:
+      - proxy
+      - default
+
+networks:
+  proxy:
+    external: true
