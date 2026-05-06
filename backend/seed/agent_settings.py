@@ -26,31 +26,71 @@ _CLAUDE_MARKETPLACES = [
     "obra/superpowers-marketplace",
     "thedotmack/claude-mem",
     "forrestchang/andrej-karpathy-skills",
+    "openai/codex-plugin-cc",
 ]
 
 _CLAUDE_PLUGINS = [
     # claude-plugins-official
+    "Notion@claude-plugins-official",
     "agent-sdk-dev@claude-plugins-official",
+    "asana@claude-plugins-official",
+    "atlassian@claude-plugins-official",
+    "clangd-lsp@claude-plugins-official",
     "claude-code-setup@claude-plugins-official",
     "claude-md-management@claude-plugins-official",
+    "cloudflare@claude-plugins-official",
     "code-review@claude-plugins-official",
     "code-simplifier@claude-plugins-official",
     "commit-commands@claude-plugins-official",
     "context7@claude-plugins-official",
+    "csharp-lsp@claude-plugins-official",
+    "explanatory-output-style@claude-plugins-official",
+    "expo@claude-plugins-official",
     "feature-dev@claude-plugins-official",
+    "figma@claude-plugins-official",
+    "firebase@claude-plugins-official",
     "firecrawl@claude-plugins-official",
     "frontend-design@claude-plugins-official",
     "github@claude-plugins-official",
+    "gitlab@claude-plugins-official",
+    "goodmem@claude-plugins-official",
+    "gopls-lsp@claude-plugins-official",
+    "greptile@claude-plugins-official",
+    "hookify@claude-plugins-official",
+    "laravel-boost@claude-plugins-official",
+    "learning-output-style@claude-plugins-official",
+    "linear@claude-plugins-official",
+    "lua-lsp@claude-plugins-official",
+    "mcp-server-dev@claude-plugins-official",
+    "php-lsp@claude-plugins-official",
     "playground@claude-plugins-official",
     "playwright@claude-plugins-official",
+    "plugin-dev@claude-plugins-official",
+    "postman@claude-plugins-official",
+    "pr-review-toolkit@claude-plugins-official",
+    "pyright-lsp@claude-plugins-official",
     "qodo-skills@claude-plugins-official",
+    "ralph-wiggum@claude-plugins-official",
+    "remember@claude-plugins-official",
+    "rust-analyzer-lsp@claude-plugins-official",
     "security-guidance@claude-plugins-official",
+    "sentry@claude-plugins-official",
     "serena@claude-plugins-official",
     "skill-creator@claude-plugins-official",
+    "slack@claude-plugins-official",
+    "stripe@claude-plugins-official",
+    "supabase@claude-plugins-official",
     "superpowers@claude-plugins-official",
+    "swift-lsp@claude-plugins-official",
+    "typescript-lsp@claude-plugins-official",
+    "vercel@claude-plugins-official",
     # superpowers-marketplace
+    "double-shot-latte@superpowers-marketplace",
+    "elements-of-style@superpowers-marketplace",
     "episodic-memory@superpowers-marketplace",
+    "superpowers-chrome@superpowers-marketplace",
     "superpowers-developing-for-claude-code@superpowers-marketplace",
+    "superpowers-lab@superpowers-marketplace",
     # thedotmack
     "claude-mem@thedotmack",
     # anthropic-agent-skills
@@ -60,6 +100,8 @@ _CLAUDE_PLUGINS = [
     "everything-claude-code@everything-claude-code",
     # karpathy-skills
     "andrej-karpathy-skills@karpathy-skills",
+    # openai-codex
+    "codex@openai-codex",
 ]
 
 # Extra tools installed after Claude plugins
@@ -161,8 +203,7 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "prereq_check": "command -v npm",
         "prereq_name": "npm (Node.js 18+)",
         "install_cmd": (
-            'mkdir -p "$HOME/.local" && '
-            'npm install -g @google/gemini-cli --prefix "$HOME/.local"'
+            'mkdir -p "$HOME/.local" && npm install -g @google/gemini-cli --prefix "$HOME/.local"'
         ),
         "needs_non_root": True,
         "consolidated_default": True,
