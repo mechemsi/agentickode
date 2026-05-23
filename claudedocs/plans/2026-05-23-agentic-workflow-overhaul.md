@@ -660,15 +660,13 @@ gh release create v0.5.0 --title "v0.5.0 — Composable agentic workflows" --not
 
 ---
 
-## Open Questions (resolve before starting any task)
+## Open Questions — resolved 2026-05-23
 
-1. **Backward-compat horizon.** Do we keep legacy `*_result` TaskRun columns for one release (proposed) or two? Affects external integrations reading those fields.
-2. **Trigger storage.** Confirm `WorkflowTemplate.triggers` JSONB vs a separate `workflow_triggers` table. JSONB is faster to ship and matches how `phases` is stored, but querying "which workflows match this event" is O(N) over templates. Pick before Task 2.1.
-3. **Templating engine.** Hand-rolled `{{steps.NAME.field}}` (proposed, ~50 lines) or pull in `jinja2`? Hand-rolled is safer (no untrusted exec); Jinja unlocks loops/conditionals later but is overkill for v1.
-4. **Worktree on remote servers.** myDash's host-gateway runs git as the host user via `setpriv`. We already SSH as the worker user — confirm `git worktree add` works under that user against the existing clone. May need ownership fix-ups already covered by `ensure_agent_ready`.
-5. **Frontend rewrite scope.** Replace `WorkflowTemplates.tsx` in-place (proposed) or build new `Workflows.tsx` alongside it and deprecate the old? In-place is cleaner; alongside is safer if users have it open mid-rollout.
-
-Resolve these inline in the relevant ADR / first task of each phase.
+1. **Backward-compat horizon: ONE release.** Write to legacy `*_result` TaskRun columns through v0.5.0, drop the write path in v0.6.0, drop the columns themselves in v0.7.0. Task 5.2 follows this.
+2. **Trigger storage: JSONB column on `workflow_templates`.** Matches existing `phases` storage; simpler migration. O(N) matching is fine until thousands of templates — revisit if that ever happens. Task 2.1 reflects this.
+3. **Templating engine: hand-rolled, ~50 lines, no exec.** Regex substitution on the documented placeholder set (`{{steps.NAME.field}}`, `{{run.title}}`, `{{run.description}}`, `{{run.task_id}}`). No Jinja, no `eval`. Task 1.3 implements this in `backend/worker/steps/templating.py`.
+4. **Worktree on remote servers.** Deferred — empirical check in Task 4.3. We already SSH as the worker user; `git worktree add` should just work. If it doesn't, fall back to ownership fix-ups already established by `ensure_agent_ready` in `_helpers.py`.
+5. **Frontend rewrite: in-place.** Replace `WorkflowTemplates.tsx` directly in Task 3.6. No `/workflows-v2` parallel path. Users with the old page open get a refresh prompt on next API hit.
 
 ---
 
