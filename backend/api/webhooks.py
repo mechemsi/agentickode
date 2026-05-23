@@ -19,6 +19,7 @@ from backend.database import get_db
 from backend.models import ProjectConfig, TaskRun
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.services.run_factory import create_task_run, resolve_workspace_path
+from backend.services.triggers import TriggerEvent, TriggerMatcher
 
 logger = logging.getLogger("agentickode.webhooks")
 router = APIRouter(tags=["webhooks"])
@@ -31,6 +32,24 @@ def _get_repo(db: AsyncSession = Depends(get_db)) -> ProjectConfigRepository:
 # Re-export for backwards compatibility with webhooks_pr.py and tests
 _create_task_run = create_task_run
 _resolve_workspace_path = resolve_workspace_path
+
+
+# Map Plane's event names (issue.created, issue.updated, ...) to the trigger
+# schema's action vocabulary. Unknown events fall back to None so the trigger's
+# action='any' still matches.
+_PLANE_EVENT_TO_ACTION = {
+    "issue.created": "opened",
+    "issue_created": "opened",
+    "issue.updated": "labeled",
+    "issue_updated": "labeled",
+    "issue.commented": "commented",
+    "issue_commented": "commented",
+}
+
+
+def _normalize_action(event: str) -> str | None:
+    """Translate provider event names to the trigger-schema action vocab."""
+    return _PLANE_EVENT_TO_ACTION.get(event) if event else None
 
 
 @router.post("/webhooks/plane")
@@ -62,6 +81,15 @@ async def plane_webhook(
         logger.warning(f"No project config for project_id={project_id}")
         return {"status": "ignored", "reason": "unknown_project"}
 
+    template = await TriggerMatcher(db).match(
+        TriggerEvent(
+            type="issue_event",
+            source="plane",
+            labels=label_names,
+            action=_normalize_action(event),
+        )
+    )
+
     run = _create_task_run(
         task_id=task_id,
         project=project,
@@ -75,6 +103,7 @@ async def plane_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
+        workflow_template_id=template.id if template else None,
     )
     db.add(run)
     await db.commit()
@@ -115,6 +144,15 @@ async def github_webhook(
         return {"status": "ignored", "reason": "unknown_project"}
 
     task_id = str(issue.get("number", ""))
+    template = await TriggerMatcher(db).match(
+        TriggerEvent(
+            type="issue_event",
+            source="github",
+            labels=label_names,
+            action=action or None,
+        )
+    )
+
     run = _create_task_run(
         task_id=task_id,
         project=project,
@@ -127,6 +165,7 @@ async def github_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
+        workflow_template_id=template.id if template else None,
     )
     db.add(run)
     await db.commit()
@@ -165,6 +204,15 @@ async def gitea_issue_webhook(
         return {"status": "ignored", "reason": "unknown_project"}
 
     task_id = str(issue.get("number", ""))
+    template = await TriggerMatcher(db).match(
+        TriggerEvent(
+            type="issue_event",
+            source="gitea",
+            labels=label_names,
+            action=action or None,
+        )
+    )
+
     run = _create_task_run(
         task_id=task_id,
         project=project,
@@ -177,6 +225,7 @@ async def gitea_issue_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
+        workflow_template_id=template.id if template else None,
     )
     db.add(run)
     await db.commit()
@@ -217,6 +266,18 @@ async def gitlab_issue_webhook(
         return {"status": "ignored", "reason": "unknown_project"}
 
     task_id = str(attrs.get("iid", ""))
+    # GitLab uses 'open'/'update'; normalize to the trigger schema's vocab
+    # so triggers configured with action='opened'/'labeled' line up.
+    gitlab_action = {"open": "opened", "update": "labeled"}.get(action) or action or None
+    template = await TriggerMatcher(db).match(
+        TriggerEvent(
+            type="issue_event",
+            source="gitlab",
+            labels=label_names,
+            action=gitlab_action,
+        )
+    )
+
     run = _create_task_run(
         task_id=task_id,
         project=project,
@@ -230,6 +291,7 @@ async def gitlab_issue_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
+        workflow_template_id=template.id if template else None,
     )
     db.add(run)
     await db.commit()
@@ -339,6 +401,10 @@ async def notion_webhook(
     if existing.scalar_one_or_none():
         return {"status": "ignored", "reason": "duplicate"}
 
+    template = await TriggerMatcher(db).match(
+        TriggerEvent(type="label", source="notion", labels=tags)
+    )
+
     run = _create_task_run(
         task_id=page["id"],
         project=project,
@@ -356,6 +422,7 @@ async def notion_webhook(
             "event": event_type,
         },
         use_claude=use_claude_tag in tags,
+        workflow_template_id=template.id if template else None,
     )
     db.add(run)
     await db.commit()
