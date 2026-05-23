@@ -119,7 +119,20 @@ def mock_services() -> ServiceContainer:
 
 @pytest.fixture()
 def make_task_run():
-    """Factory for creating TaskRun instances with sensible defaults."""
+    """Factory for creating TaskRun instances with sensible defaults.
+
+    NOTE: After PRAGMA foreign_keys=ON was enabled (commit 5992b83), tests
+    using the factory's default ``project_id='proj-1'`` must explicitly
+    create a parent ``ProjectConfig`` row first, e.g.::
+
+        db_session.add(ProjectConfig(project_id="proj-1", project_slug="x",
+                                     repo_owner="o", repo_name="r"))
+        await db_session.commit()
+        run = make_task_run()
+
+    Pre-existing tests that don't follow this pattern are tracked as known
+    FK-fixture debt — see follow-up cleanup issue.
+    """
     from backend.models import TaskRun
 
     def _make(**overrides):
