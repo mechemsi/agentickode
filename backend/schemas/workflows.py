@@ -22,6 +22,7 @@ class PhaseConfig(BaseModel):
     agent_mode: str | None = None
     timeout_seconds: int | None = None
     trigger_mode: str = "auto"
+    failure_mode: Literal["fail", "skip"] = "fail"
     notify_source: bool = False
     params: dict[str, Any] = {}
     cli_flags: dict[str, str] | None = None

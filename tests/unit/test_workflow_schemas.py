@@ -36,3 +36,21 @@ def test_phase_config_rejects_unknown_kind():
 
     with pytest.raises(ValidationError):
         PhaseConfig(phase_name="x", kind="not-a-kind")
+
+
+def test_phase_config_defaults_failure_mode_to_fail():
+    cfg = PhaseConfig(phase_name="x")
+    assert cfg.failure_mode == "fail"
+
+
+def test_phase_config_accepts_skip_failure_mode():
+    cfg = PhaseConfig(phase_name="x", kind="bash", failure_mode="skip")
+    assert cfg.failure_mode == "skip"
+
+
+def test_phase_config_rejects_unknown_failure_mode():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        PhaseConfig(phase_name="x", failure_mode="explode")

@@ -123,6 +123,42 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict] = [
             _phase("finalization"),
         ],
     },
+    {
+        "name": "example-composable",
+        "description": (
+            "Example template demonstrating composable bash + agent steps "
+            "(ADR-007). Manual-trigger only; not matched by any label."
+        ),
+        "is_default": False,
+        "is_system": True,
+        "label_rules": [],
+        "phases": [
+            _phase("workspace_setup", kind="legacy_phase"),
+            _phase("init", kind="legacy_phase"),
+            _phase(
+                "build",
+                kind="bash",
+                params={"command": "make build"},
+                timeout_seconds=600,
+            ),
+            _phase(
+                "implement",
+                kind="agent",
+                role="coder",
+                params={
+                    "prompt": "Implement the task: {{run.title}}\n\n{{run.description}}",
+                    "mode": "task",
+                },
+                uses_agent=True,
+            ),
+            _phase(
+                "deploy",
+                kind="bash",
+                params={"command": "echo deploying && ./scripts/deploy.sh"},
+                failure_mode="skip",
+            ),
+        ],
+    },
 ]
 
 
