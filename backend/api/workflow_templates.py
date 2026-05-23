@@ -131,6 +131,7 @@ async def create_workflow_template(
         name=body.name,
         description=body.description,
         label_rules=[r.model_dump() for r in body.label_rules],
+        triggers=[t.model_dump() for t in body.triggers],
         phases=[p.model_dump() for p in body.phases],
         is_default=body.is_default,
     )
@@ -150,6 +151,10 @@ async def update_workflow_template(
     if "label_rules" in data:
         data["label_rules"] = [
             r.model_dump() if hasattr(r, "model_dump") else r for r in data["label_rules"]
+        ]
+    if "triggers" in data:
+        data["triggers"] = [
+            t.model_dump() if hasattr(t, "model_dump") else t for t in data["triggers"]
         ]
     if "phases" in data:
         data["phases"] = [p.model_dump() if hasattr(p, "model_dump") else p for p in data["phases"]]
