@@ -79,6 +79,7 @@ from backend.services.task_management.status_sync import StatusSyncer
 from backend.worker.engine import WorkerEngine
 from backend.worker.issue_poller_scheduler import IssuePollerScheduler
 from backend.worker.platform_cron_scheduler import PlatformCronScheduler
+from backend.worker.schedule_trigger_scheduler import ScheduleTriggerScheduler
 from backend.worker.scheduler import TaskScheduler
 
 logger = logging.getLogger("agentickode")
@@ -350,6 +351,8 @@ async def lifespan(app: FastAPI):
     cron_scheduler_task = asyncio.create_task(cron_scheduler.run())
     issue_poller = IssuePollerScheduler(async_session)
     issue_poller_task = asyncio.create_task(issue_poller.run())
+    schedule_trigger_scheduler = ScheduleTriggerScheduler(async_session)
+    schedule_trigger_scheduler_task = asyncio.create_task(schedule_trigger_scheduler.run())
     yield
     logger.info("Shutting down worker")
     notification_dispatcher.stop()
@@ -358,16 +361,19 @@ async def lifespan(app: FastAPI):
     scheduler.stop()
     cron_scheduler.stop()
     issue_poller.stop()
+    schedule_trigger_scheduler.stop()
     worker_engine.stop()
     scheduler_task.cancel()
     cron_scheduler_task.cancel()
     issue_poller_task.cancel()
+    schedule_trigger_scheduler_task.cancel()
     worker_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await worker_task
         await scheduler_task
         await cron_scheduler_task
         await issue_poller_task
+        await schedule_trigger_scheduler_task
     await close_http_client()
     await queue_service.close()
 
