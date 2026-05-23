@@ -29,26 +29,33 @@ function makePhase(overrides: Partial<PhaseExecution> & { phase_name: string; or
 }
 
 describe("PhaseTimeline", () => {
-  // Fallback mode tests
-  it("renders all phase labels in fallback mode", () => {
+  // Fallback mode tests — ADR-007 removed the fixed 8-phase fallback list
+  // since any composable workflow can have any steps. Fallback now just shows
+  // the current step (or "Pending" / "Completed" with no current phase).
+  it("renders Pending placeholder when no currentPhase and not completed", () => {
     render(<PhaseTimeline currentPhase={null} status="pending" />);
-    expect(screen.getByText("Workspace Setup")).toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
-    expect(screen.getByText("Finalization")).toBeInTheDocument();
+    expect(screen.getByText("Pending")).toBeInTheDocument();
+  });
+
+  it("renders Completed placeholder when no currentPhase and completed", () => {
+    render(<PhaseTimeline currentPhase={null} status="completed" />);
+    expect(screen.getByText("Completed")).toBeInTheDocument();
   });
 
   it("highlights current phase in blue (fallback)", () => {
     const { container } = render(<PhaseTimeline currentPhase="coding" status="running" />);
     const spans = container.querySelectorAll("span");
-    const codingSpan = Array.from(spans).find(s => s.textContent === "Coding");
+    const codingSpan = Array.from(spans).find((s) => s.textContent === "Coding");
     expect(codingSpan).toHaveClass("text-blue-300");
   });
 
-  it("marks completed phases in green when status=completed (fallback)", () => {
-    const { container } = render(<PhaseTimeline currentPhase="finalization" status="completed" />);
+  it("marks current phase green when status=completed (fallback)", () => {
+    const { container } = render(
+      <PhaseTimeline currentPhase="finalization" status="completed" />,
+    );
     const spans = container.querySelectorAll("span");
-    const setupSpan = Array.from(spans).find(s => s.textContent === "Workspace Setup");
-    expect(setupSpan).toHaveClass("text-green-300");
+    const finalSpan = Array.from(spans).find((s) => s.textContent === "Finalization");
+    expect(finalSpan).toHaveClass("text-green-300");
   });
 
   // PhaseExecution mode tests

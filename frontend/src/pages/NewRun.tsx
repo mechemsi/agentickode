@@ -16,7 +16,15 @@ import { useToast } from "../components/shared/Toast";
 import { AGENT_NAMES } from "../types";
 import type { GitIssue, ProjectConfig, WorkflowTemplate, WorkspaceServer } from "../types";
 
-const PHASES_WITH_AGENTS = [
+/**
+ * Phase names whose per-step agent the user can override at run-create time.
+ *
+ * Used as a fallback when no `workflow_template_id` is selected yet. When a
+ * template IS selected, we pull the list from that template's `phases[]` so
+ * composable workflows (with bash/agent steps named anything) show the right
+ * override slots.
+ */
+const FALLBACK_PHASES_WITH_AGENTS = [
   "workspace_setup",
   "init",
   "planning",
@@ -418,31 +426,41 @@ export default function NewRun() {
                 </p>
               </div>
 
-              {/* Per-phase overrides */}
+              {/* Per-phase overrides — pull from selected template's phases if available */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Per-Phase Agent Overrides
+                  Per-Step Agent Overrides
                 </label>
                 <div className="space-y-2">
-                  {PHASES_WITH_AGENTS.map((phase) => (
-                    <div key={phase} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-400 w-36 shrink-0 font-mono">
-                        {phase}
-                      </span>
-                      <select
-                        value={phaseOverrides[phase] ?? ""}
-                        onChange={(e) => setPhaseAgent(phase, e.target.value)}
-                        className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
-                      >
-                        <option value="">Inherit</option>
-                        {AGENT_NAMES.map((a) => (
-                          <option key={a} value={a}>
-                            {a}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                  {(() => {
+                    const tpl = templates.find((t) => t.id === workflowTemplateId);
+                    const phaseNames = tpl
+                      ? tpl.phases
+                          .filter(
+                            (p) => (p.kind ?? "legacy_phase") !== "bash",
+                          )
+                          .map((p) => p.phase_name)
+                      : FALLBACK_PHASES_WITH_AGENTS;
+                    return phaseNames.map((phase) => (
+                      <div key={phase} className="flex items-center gap-3">
+                        <span className="text-sm text-gray-400 w-36 shrink-0 font-mono">
+                          {phase}
+                        </span>
+                        <select
+                          value={phaseOverrides[phase] ?? ""}
+                          onChange={(e) => setPhaseAgent(phase, e.target.value)}
+                          className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                        >
+                          <option value="">Inherit</option>
+                          {AGENT_NAMES.map((a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>

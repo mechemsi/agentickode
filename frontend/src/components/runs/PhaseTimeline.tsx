@@ -21,16 +21,8 @@ import type { ElementType } from "react";
 import type { PhaseExecution } from "../../types";
 import { formatDuration } from "../../utils/formatDuration";
 
-const PHASES = [
-  "workspace_setup",
-  "init",
-  "planning",
-  "coding",
-  "reviewing",
-  "approval",
-  "finalization",
-];
-
+// Icon hints for the well-known legacy phase names. New (bash / agent) steps
+// just render without an icon — that's fine, the kind is shown elsewhere.
 const phaseIcons: Record<string, ElementType> = {
   workspace_setup: FolderOpen,
   init: FileText,
@@ -161,32 +153,31 @@ export default function PhaseTimeline({
     );
   }
 
-  // Fallback: old-style display using currentPhase/status
-  const currentIdx = currentPhase ? PHASES.indexOf(currentPhase) : -1;
-  const done = status === "completed";
+  // Fallback when no PhaseExecution data: just show the current step.
+  // The old fixed 8-phase layout was incorrect for composable workflows
+  // (ADR-007) where any template can have any steps in any order, so
+  // there's nothing meaningful to render ahead of time.
+  if (!currentPhase) {
+    return (
+      <div className="flex flex-wrap gap-1 items-center">
+        <span className="px-2 py-1 text-xs rounded bg-gray-800 text-gray-500">
+          {status === "completed" ? "Completed" : "Pending"}
+        </span>
+      </div>
+    );
+  }
+  const FallbackIcon = phaseIcons[currentPhase];
+  const fallbackCls =
+    status === "completed"
+      ? "bg-green-900/60 text-green-300"
+      : "bg-blue-900/60 text-blue-300 ring-1 ring-blue-500";
 
   return (
     <div className="flex flex-wrap gap-1 items-center">
-      {PHASES.map((p, i) => {
-        let cls = "bg-gray-800 text-gray-500";
-        if (done || i < currentIdx) cls = "bg-green-900/60 text-green-300";
-        else if (i === currentIdx)
-          cls = "bg-blue-900/60 text-blue-300 ring-1 ring-blue-500";
-
-        const Icon = phaseIcons[p];
-
-        return (
-          <div key={p} className="flex items-center gap-1">
-            <span className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${cls}`}>
-              {Icon && <Icon className="w-3 h-3" />}
-              {phaseLabel(p)}
-            </span>
-            {i < PHASES.length - 1 && (
-              <span className="text-gray-700 text-xs">&rarr;</span>
-            )}
-          </div>
-        );
-      })}
+      <span className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${fallbackCls}`}>
+        {FallbackIcon && <FallbackIcon className="w-3 h-3" />}
+        {phaseLabel(currentPhase)}
+      </span>
     </div>
   );
 }

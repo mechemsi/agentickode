@@ -6,6 +6,7 @@ export { default as TaskRunTable } from "./TaskRunTable";
 export { default as PhaseTimeline } from "./PhaseTimeline";
 export { default as CodingResultsPanel } from "./CodingResultsPanel";
 export { default as ReviewResultPanel } from "./ReviewResultPanel";
+export { default as GenericStepResult } from "./GenericStepResult";
 export { default as ComparisonResultsPanel } from "./ComparisonResultsPanel";
 export { default as ApprovalButtons } from "./ApprovalButtons";
 export { default as LogViewer } from "./LogViewer";
