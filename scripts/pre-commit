@@ -184,7 +184,7 @@ if $HAS_BACKEND; then
 
     # 2e. Complexity check (warning only, non-blocking)
     if command -v radon &>/dev/null || [ -n "$RUN_BE" ]; then
-        PY_FILE_ARGS=$(echo "$BACKEND_PY" | grep -E '^backend/' | tr '\n' ' ')
+        PY_FILE_ARGS=$(echo "$BACKEND_PY" | { grep -E '^backend/' || true; } | tr '\n' ' ')
         if [ -n "$PY_FILE_ARGS" ]; then
             if [ -n "$RUN_BE" ]; then
                 COMPLEXITY_OUT=$($RUN_BE python scripts/check_complexity.py C $PY_FILE_ARGS 2>&1) || true
