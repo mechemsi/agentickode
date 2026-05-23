@@ -43,6 +43,67 @@ async def list_phases():
     ]
 
 
+@router.get("/step-kinds")
+async def list_step_kinds():
+    """Return the composable step kinds the workflow builder can use.
+
+    The frontend builder renders kind-specific param editors based on this.
+    ``legacy_phase`` enumerates the discovered phase modules; ``bash`` and
+    ``agent`` are the generic primitives introduced by ADR-007.
+    """
+    return [
+        {
+            "kind": "bash",
+            "description": "Run a shell command on the workspace server.",
+            "params_schema": {
+                "command": {
+                    "type": "string",
+                    "required": True,
+                    "description": (
+                        "Shell command. Supports {{run.title}}, {{run.description}}, "
+                        "{{run.task_id}}, and {{steps.NAME.field}} substitution."
+                    ),
+                }
+            },
+        },
+        {
+            "kind": "agent",
+            "description": "Invoke a configured agent (via RoleResolver).",
+            "params_schema": {
+                "prompt": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Instruction sent to the agent (templating supported).",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["generate", "task"],
+                    "default": "generate",
+                    "description": "generate -> adapter.generate; task -> adapter.run_task with workspace.",
+                },
+                "session_id": {
+                    "type": "string",
+                    "required": False,
+                    "description": "Optional CLI session id (e.g. Claude --resume).",
+                },
+                "new_session": {
+                    "type": "boolean",
+                    "required": False,
+                    "default": False,
+                },
+            },
+        },
+        {
+            "kind": "legacy_phase",
+            "description": (
+                "Run a built-in phase module by name. Discovered modules are listed "
+                "in `values` and via GET /phases. Defaults when `kind` is omitted."
+            ),
+            "values": sorted(discover_phases().keys()),
+        },
+    ]
+
+
 @router.get("/workflow-templates", response_model=list[WorkflowTemplateOut])
 async def list_workflow_templates(
     repo: WorkflowTemplateRepository = Depends(_get_repo),
