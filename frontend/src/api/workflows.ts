@@ -4,6 +4,7 @@
 
 import type {
   PhaseInfo,
+  StepKindDescriptor,
   WorkflowTemplate,
   WorkflowTemplateCreate,
   WorkflowTemplateUpdate,
@@ -11,6 +12,8 @@ import type {
 import { get, post, put, httpDelete } from "./client";
 
 export const getPhases = () => get<PhaseInfo[]>("/phases");
+
+export const getStepKinds = () => get<StepKindDescriptor[]>("/step-kinds");
 
 export const getWorkflowTemplates = () =>
   get<WorkflowTemplate[]>("/workflow-templates");
