@@ -4,6 +4,8 @@
 
 """Workflow template CRUD + label matching endpoint."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,7 @@ from backend.schemas import (
     WorkflowTemplateOut,
     WorkflowTemplateUpdate,
 )
+from backend.services.triggers import TriggerEvent, TriggerMatcher
 from backend.worker.phases.registry import discover_phases
 
 router = APIRouter(tags=["workflow-templates"])
@@ -23,6 +26,26 @@ router = APIRouter(tags=["workflow-templates"])
 
 class MatchLabelsRequest(BaseModel):
     labels: list[str]
+
+
+class DryRunRequest(BaseModel):
+    """Payload for ``POST /workflow-templates/{id}/dry-run``.
+
+    Mirrors the ``TriggerEvent`` dataclass so the UI can ask "would this
+    template fire for this event?" without inventing a separate vocabulary.
+    """
+
+    type: Literal["label", "issue_event", "pr_event", "schedule"]
+    source: str = "any"
+    labels: list[str] = []
+    action: str | None = None
+    cron_tick: str | None = None
+
+
+class DryRunResponse(BaseModel):
+    matched: bool
+    template: WorkflowTemplateOut | None
+    reason: str
 
 
 def _get_repo(db: AsyncSession = Depends(get_db)) -> WorkflowTemplateRepository:
@@ -185,3 +208,43 @@ async def match_workflow_template(
     if not template:
         raise HTTPException(404, "No matching workflow template found")
     return template
+
+
+@router.post("/workflow-templates/{template_id}/dry-run", response_model=DryRunResponse)
+async def dry_run_template(
+    template_id: int,
+    body: DryRunRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Test whether a given event would fire this template's triggers.
+
+    Returns ``matched=True`` and a human-readable ``reason`` like
+    ``"matched trigger #2 (LabelTrigger source=github)"`` when any of the
+    template's ``triggers[]`` entries match the synthetic event, otherwise
+    ``matched=False`` with ``"no triggers matched"``.
+
+    This is for the UI's trigger preview — when the user edits triggers they
+    want to confirm "would this fire for X event?".
+    """
+    repo = WorkflowTemplateRepository(db)
+    template = await repo.get_by_id(template_id)
+    if not template:
+        raise HTTPException(404, "Workflow template not found")
+
+    event = TriggerEvent(
+        type=body.type,
+        source=body.source,
+        labels=body.labels,
+        action=body.action,
+        cron_tick=body.cron_tick,
+    )
+
+    triggers = template.triggers or []
+    for idx, trigger in enumerate(triggers):
+        if TriggerMatcher._trigger_matches(trigger, event):
+            ttype = trigger.get("type", "unknown")
+            tsource = trigger.get("source", "any")
+            reason = f"matched trigger #{idx} ({ttype} source={tsource})"
+            return DryRunResponse(matched=True, template=template, reason=reason)
+
+    return DryRunResponse(matched=False, template=None, reason="no triggers matched")
