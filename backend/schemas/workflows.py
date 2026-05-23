@@ -3,7 +3,7 @@
 # Commercial licensing: info@mechemsi.com
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -15,6 +15,7 @@ class LabelRule(BaseModel):
 
 class PhaseConfig(BaseModel):
     phase_name: str
+    kind: Literal["legacy_phase", "bash", "agent"] = "legacy_phase"
     enabled: bool = True
     role: str | None = None
     uses_agent: bool | None = None
