@@ -21,8 +21,9 @@ Quick reference for all project documentation. Claude reads this first to find r
 |-----|------|---------|
 | [001 — Local LLMs First](decisions/001-local-llm-first.md) | 2026-02 | Local LLMs (Ollama) as the default backend, not cloud APIs |
 | [003 — Workspace Types](decisions/003-workspace-types.md) | 2026-02 | Three workspace types: local, SSH remote, container |
-| [005 — Multi-Agent Pipeline](decisions/005-multi-agent-pipeline.md) | 2026-02 | 8-phase pipeline with planner/coder/reviewer roles |
+| [005 — Multi-Agent Pipeline](decisions/005-multi-agent-pipeline.md) | 2026-02 | Superseded by ADR-007 — see below |
 | [006 — Multi-Source Task Intake](decisions/006-multi-source-task-intake.md) | 2026-03 | Webhooks from Plane, GitHub, Gitea, GitLab for task ingestion |
+| [007 — Composable Step Workflows](decisions/007-composable-step-workflows.md) | 2026-05 | Generic bash + agent step kinds; legacy phases preserved as kind: legacy_phase; triggers as first-class |
 
 ## Runbooks
 
