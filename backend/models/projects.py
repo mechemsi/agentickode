@@ -34,7 +34,12 @@ class ProjectConfig(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    runs = relationship("TaskRun", back_populates="project")
+    runs = relationship(
+        "TaskRun",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     workspace_servers = relationship(
         "ProjectWorkspaceServer",
         back_populates="project",

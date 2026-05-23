@@ -128,6 +128,38 @@ class TestProjectsCRUD:
         resp = await client.delete("/api/projects/nope")
         assert resp.status_code == 404
 
+    async def test_delete_cascades_task_runs(
+        self, client, sample_project, db_session, make_task_run
+    ):
+        """Regression: deleting a project that has TaskRuns must succeed.
+
+        Before the fix, the ProjectConfig.runs relationship lacked
+        passive_deletes/cascade, so SQLAlchemy emitted
+        UPDATE task_runs SET project_id=NULL which violated the NOT NULL
+        constraint. Now project delete cascades to runs.
+        """
+        await client.post("/api/projects", json=sample_project)
+
+        run = make_task_run(project_id="proj-test-1", task_id="REG-1")
+        db_session.add(run)
+        await db_session.commit()
+        run_id = run.id
+
+        resp = await client.delete("/api/projects/proj-test-1")
+        assert resp.status_code == 204
+
+        # Project gone
+        resp = await client.get("/api/projects/proj-test-1")
+        assert resp.status_code == 404
+
+        # Run cascaded away
+        from sqlalchemy import select
+
+        from backend.models import TaskRun
+
+        result = await db_session.execute(select(TaskRun).where(TaskRun.id == run_id))
+        assert result.scalar_one_or_none() is None
+
     async def test_list_returns_created_projects(self, client, sample_project):
         await client.post("/api/projects", json=sample_project)
         resp = await client.get("/api/projects")

@@ -17,11 +17,13 @@ class RoleAssignment(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     role = Column(Text, nullable=False)  # planner / coder / reviewer / fast
     provider_type = Column(Text, nullable=False)  # ollama / agent
-    ollama_server_id = Column(Integer, ForeignKey("ollama_servers.id"), nullable=True)
+    ollama_server_id = Column(
+        Integer, ForeignKey("ollama_servers.id", ondelete="CASCADE"), nullable=True
+    )
     model_name = Column(Text, nullable=True)  # Ollama model name
     agent_name = Column(Text, nullable=True)  # claude / codex / opencode / aider / openhands
     workspace_server_id = Column(
-        Integer, ForeignKey("workspace_servers.id"), nullable=True
+        Integer, ForeignKey("workspace_servers.id", ondelete="CASCADE"), nullable=True
     )  # null = global default
     priority = Column(Integer, nullable=False, default=0)  # 0 = primary, 1 = fallback
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -41,9 +41,21 @@ def _render_jsonb_as_json(metadata):
 
 @pytest.fixture()
 async def db_engine():
-    """Create an async in-memory SQLite engine with all tables."""
+    """Create an async in-memory SQLite engine with all tables.
+
+    Enables PRAGMA foreign_keys=ON so ondelete clauses behave like Postgres.
+    Without this, SQLite silently ignores FK constraints and cascade behavior
+    can't be tested.
+    """
     _render_jsonb_as_json(Base.metadata)
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_sqlite_fks(dbapi_conn, _):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine

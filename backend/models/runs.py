@@ -25,7 +25,9 @@ class TaskRun(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_type = Column(Text, nullable=False, default="ai_task")
     task_id = Column(Text, nullable=False)
-    project_id = Column(Text, ForeignKey("project_configs.project_id"), nullable=False)
+    project_id = Column(
+        Text, ForeignKey("project_configs.project_id", ondelete="CASCADE"), nullable=False
+    )
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False, default="")
     branch_name = Column(Text, nullable=False)
