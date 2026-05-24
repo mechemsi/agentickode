@@ -51,10 +51,18 @@ class PrEventTrigger(BaseModel):
 
 
 class ScheduleTrigger(BaseModel):
-    """Fire on a cron schedule. ``cron`` is a standard 5-field expression."""
+    """Fire on a cron schedule. ``cron`` is a standard 5-field expression.
+
+    ``project_id`` is required for the scheduler to actually create a TaskRun
+    (schedule triggers without a project context are skipped at dispatch).
+    Modelled as optional in the schema so a template can carry a schedule
+    trigger that's only valid once a project is assigned, but the
+    ScheduleTriggerScheduler will no-op until ``project_id`` is set.
+    """
 
     type: Literal["schedule"] = "schedule"
     cron: str
+    project_id: str | None = None
 
 
 class ManualTrigger(BaseModel):

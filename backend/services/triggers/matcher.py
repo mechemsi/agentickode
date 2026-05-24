@@ -36,6 +36,10 @@ class TriggerEvent:
     labels: list[str] = field(default_factory=list)
     action: str | None = None  # for issue_event / pr_event
     cron_tick: str | None = None  # for schedule (the cron expression that fired)
+    # Project the event belongs to. Used by schedule matching so two templates
+    # sharing the same cron in different projects don't poach each other's
+    # ticks. ``None`` means "any project" (back-compat with non-schedule events).
+    project_id: str | None = None
 
 
 class TriggerMatcher:
@@ -126,7 +130,14 @@ class TriggerMatcher:
         if ttype == "schedule":
             if event.type != "schedule":
                 return False
-            return trigger.get("cron") == event.cron_tick
+            if trigger.get("cron") != event.cron_tick:
+                return False
+            # Scope by project when the trigger declares one — otherwise two
+            # templates sharing the same cron in different projects would
+            # poach each other's ticks. A trigger without ``project_id``
+            # stays cross-project (back-compat).
+            trigger_project = trigger.get("project_id")
+            return not (trigger_project and event.project_id != trigger_project)
 
         # Unknown trigger type -- ignore, don't false-positive.
         return False

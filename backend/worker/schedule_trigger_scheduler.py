@@ -11,10 +11,10 @@ choke point).
 
 Notes:
 * Each template can have multiple schedule triggers; each fires independently.
-* A ``project_id`` is required to create a TaskRun. If the template carries a
-  ``params.project_id`` field on the schedule trigger, that project is used;
-  otherwise the trigger is skipped with a warning (we don't pick an arbitrary
-  project — see the report at the bottom of Phase 2).
+* A ``project_id`` is required to create a TaskRun. The scheduler reads it
+  from the top-level ``project_id`` field on the schedule trigger entry
+  (matching the ``ScheduleTrigger`` Pydantic schema); if absent, the trigger
+  is skipped with a debug log — we don't pick an arbitrary project.
 * The scheduler tracks per-trigger last-fire times in-process so a single
   cron tick can't double-fire even if ``_tick`` is invoked twice within the
   same minute (e.g. on startup catch-up).
@@ -153,11 +153,14 @@ class ScheduleTriggerScheduler:
         # Route through TriggerMatcher so dispatch precedence stays unified —
         # if the user added a more-specific schedule trigger to another
         # template with the same cron, the matcher honors that priority.
+        # ``project_id`` is forwarded so cross-project cron collisions don't
+        # bind the run to the wrong template.
         matched = await TriggerMatcher(session).match(
             TriggerEvent(
                 type="schedule",
                 source="cron",
                 cron_tick=trigger.get("cron"),
+                project_id=project_id,
             )
         )
         bind_to = matched or template
