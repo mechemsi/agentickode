@@ -2,7 +2,6 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-/* global ResizeObserver */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Loader2, LogIn, RefreshCw, RotateCcw, X } from "lucide-react";
 import { Terminal } from "@xterm/xterm";

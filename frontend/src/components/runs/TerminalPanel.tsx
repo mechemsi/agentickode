@@ -2,7 +2,6 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-/* global ResizeObserver */
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";

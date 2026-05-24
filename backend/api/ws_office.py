@@ -36,7 +36,7 @@ def _run_to_agent(run: TaskRun) -> dict | None:
     """Convert a running TaskRun to an office agent dict."""
     if run.status not in ("running", "pending"):
         return None
-    phase = run.current_phase or "init"
+    phase = str(run.current_phase or "init")
     activity = _PHASE_ACTIVITY.get(phase, "coding")
     return {
         "id": f"run-{run.id}",

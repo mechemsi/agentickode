@@ -2,7 +2,6 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-/* global ResizeObserver */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Terminal as TerminalIcon, Play, Pause, CheckCircle } from "lucide-react";
