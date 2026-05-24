@@ -28,7 +28,6 @@ function renderEditor(step: Partial<PhaseConfig> = {}, onChange = vi.fn()) {
     canMoveUp: true,
     canMoveDown: true,
     legacyPhaseNames: ["workspace_setup", "init", "coding"],
-    agentNames: ["claude", "codex"],
   };
   render(<StepEditor {...props} />);
   return { onChange, onRemove: props.onRemove };

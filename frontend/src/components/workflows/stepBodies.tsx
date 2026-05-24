@@ -17,15 +17,10 @@ interface BodyProps {
   onChange: (next: PhaseConfig) => void;
 }
 
-interface AgentBodyProps extends BodyProps {
-  agentNames: string[];
-}
-
 interface LegacyBodyProps {
   step: PhaseConfig;
   onChange: (next: PhaseConfig) => void;
   legacyPhaseNames: string[];
-  agentNames: string[];
 }
 
 const SUBSTITUTION_HELP = (
@@ -40,7 +35,6 @@ export function LegacyPhaseBody({
   step,
   onChange,
   legacyPhaseNames,
-  agentNames,
 }: LegacyBodyProps) {
   return (
     <>
@@ -61,44 +55,17 @@ export function LegacyPhaseBody({
           ))}
         </select>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Role</label>
-          <input
-            type="text"
-            value={step.role ?? ''}
-            onChange={(e) =>
-              onChange({ ...step, role: e.target.value || null })
-            }
-            placeholder="default"
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">
-            Agent override
-          </label>
-          <select
-            value={(step.params?.agent_override as string) ?? ''}
-            onChange={(e) =>
-              onChange({
-                ...step,
-                params: {
-                  ...(step.params ?? {}),
-                  agent_override: e.target.value || undefined,
-                },
-              })
-            }
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          >
-            <option value="">(use role default)</option>
-            {agentNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Role</label>
+        <input
+          type="text"
+          value={step.role ?? ''}
+          onChange={(e) =>
+            onChange({ ...step, role: e.target.value || null })
+          }
+          placeholder="default"
+          className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+        />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="inline-flex items-center gap-2 text-xs text-gray-300">
@@ -187,16 +154,11 @@ export function BashBody({ step, onParam, onChange }: BodyProps) {
   );
 }
 
-export function AgentBody({
-  step,
-  onParam,
-  onChange,
-  agentNames,
-}: AgentBodyProps) {
+export function AgentBody({ step, onParam, onChange }: BodyProps) {
   const mode = getParamString(step, 'mode') || 'generate';
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-gray-400 mb-1">Role</label>
           <select
@@ -225,31 +187,6 @@ export function AgentBody({
           >
             <option value="generate">Generate</option>
             <option value="task">Task</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">
-            Agent override
-          </label>
-          <select
-            value={(step.params?.agent_override as string) ?? ''}
-            onChange={(e) =>
-              onChange({
-                ...step,
-                params: {
-                  ...(step.params ?? {}),
-                  agent_override: e.target.value || undefined,
-                },
-              })
-            }
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          >
-            <option value="">(use role default)</option>
-            {agentNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
           </select>
         </div>
       </div>

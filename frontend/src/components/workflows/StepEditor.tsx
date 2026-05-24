@@ -26,8 +26,6 @@ interface StepEditorProps {
   canMoveDown: boolean;
   /** Phase module names from GET /step-kinds → kind=legacy_phase → values */
   legacyPhaseNames: string[];
-  /** Agent names from getAgents() for the agent_override dropdown */
-  agentNames: string[];
 }
 
 const KIND_OPTIONS: { value: StepKind; label: string }[] = [
@@ -55,7 +53,6 @@ export default function StepEditor({
   canMoveUp,
   canMoveDown,
   legacyPhaseNames,
-  agentNames,
 }: StepEditorProps) {
   const [rulesOpen, setRulesOpen] = useState(false);
   const kind = getKind(step);
@@ -136,7 +133,6 @@ export default function StepEditor({
             step={step}
             onChange={onChange}
             legacyPhaseNames={legacyPhaseNames}
-            agentNames={agentNames}
           />
         )}
 
@@ -145,12 +141,7 @@ export default function StepEditor({
         )}
 
         {kind === 'agent' && (
-          <AgentBody
-            step={step}
-            onParam={setParam}
-            onChange={onChange}
-            agentNames={agentNames}
-          />
+          <AgentBody step={step} onParam={setParam} onChange={onChange} />
         )}
       </div>
 

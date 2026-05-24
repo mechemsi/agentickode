@@ -14,14 +14,12 @@ import {
 import {
   createWorkflowTemplate,
   deleteWorkflowTemplate,
-  getAgents,
   getPhases,
   getStepKinds,
   getWorkflowTemplates,
   updateWorkflowTemplate,
 } from '../api';
 import type {
-  AgentSettings,
   PhaseConfig,
   PhaseInfo,
   StepKindDescriptor,
@@ -33,7 +31,6 @@ import { StepListEditor } from '../components/workflows';
 
 export default function WorkflowTemplates() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
-  const [agentSettings, setAgentSettings] = useState<AgentSettings[]>([]);
   const [availablePhases, setAvailablePhases] = useState<PhaseInfo[]>([]);
   const [stepKinds, setStepKinds] = useState<StepKindDescriptor[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -54,21 +51,14 @@ export default function WorkflowTemplates() {
     return availablePhases.map((p) => p.name);
   }, [stepKinds, availablePhases]);
 
-  const agentNames = useMemo(
-    () => agentSettings.map((a) => a.agent_name).sort(),
-    [agentSettings],
-  );
-
   const load = async () => {
     try {
-      const [t, as_, ph, sk] = await Promise.all([
+      const [t, ph, sk] = await Promise.all([
         getWorkflowTemplates(),
-        getAgents(),
         getPhases(),
         getStepKinds().catch(() => [] as StepKindDescriptor[]),
       ]);
       setTemplates(t);
-      setAgentSettings(as_);
       setAvailablePhases(ph);
       setStepKinds(sk);
       setError(null);
@@ -384,7 +374,6 @@ export default function WorkflowTemplates() {
                     steps={t.phases}
                     onChange={(next) => persistPhases(t, next)}
                     legacyPhaseNames={legacyPhaseNames}
-                    agentNames={agentNames}
                   />
                 </div>
 
