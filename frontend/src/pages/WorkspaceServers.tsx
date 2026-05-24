@@ -368,6 +368,7 @@ export default function WorkspaceServers() {
           onSubmit={(data) => handleUpdate(s.id, data)}
           onCancel={() => setEditing(null)}
           isEdit
+          isLocal={s.server_type === "local"}
         />
       ) : (
         <>

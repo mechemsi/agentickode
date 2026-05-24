@@ -34,12 +34,17 @@ export default function WorkspaceServerForm({
   onCancel,
   loading,
   isEdit,
+  isLocal,
 }: {
   initial?: Partial<FormData>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   loading?: boolean;
   isEdit?: boolean;
+  /** Hide SSH-only fields (hostname/port/SSH user/key/setup password)
+   * when the form edits the local "platform" server — those don't
+   * apply to the host the backend itself runs on. */
+  isLocal?: boolean;
 }) {
   const [form, setForm] = useState<FormData>({ ...defaults, ...initial });
 
@@ -60,50 +65,54 @@ export default function WorkspaceServerForm({
           placeholder="coding-01"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-          <Globe className="w-3 h-3" />
-          hostname
-        </span>
-        <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          value={form.hostname}
-          onChange={(e) => set("hostname", e.target.value)}
-          placeholder="10.10.50.25"
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-400">port</span>
-        <input
-          type="number"
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          value={form.port}
-          onChange={(e) => set("port", parseInt(e.target.value) || 22)}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-          <User className="w-3 h-3" />
-          SSH admin user
-        </span>
-        <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          value={form.username}
-          onChange={(e) => set("username", e.target.value)}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-          <Key className="w-3 h-3" />
-          ssh_key_path
-        </span>
-        <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-          value={form.ssh_key_path}
-          onChange={(e) => set("ssh_key_path", e.target.value)}
-          placeholder="(uses server default)"
-        />
-      </label>
+      {!isLocal && (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              <Globe className="w-3 h-3" />
+              hostname
+            </span>
+            <input
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={form.hostname}
+              onChange={(e) => set("hostname", e.target.value)}
+              placeholder="10.10.50.25"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400">port</span>
+            <input
+              type="number"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={form.port}
+              onChange={(e) => set("port", parseInt(e.target.value) || 22)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              <User className="w-3 h-3" />
+              SSH admin user
+            </span>
+            <input
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={form.username}
+              onChange={(e) => set("username", e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              <Key className="w-3 h-3" />
+              ssh_key_path
+            </span>
+            <input
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={form.ssh_key_path}
+              onChange={(e) => set("ssh_key_path", e.target.value)}
+              placeholder="(uses server default)"
+            />
+          </label>
+        </>
+      )}
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-400 inline-flex items-center gap-1">
           <Users className="w-3 h-3" />
@@ -128,7 +137,7 @@ export default function WorkspaceServerForm({
           placeholder="/home/coder/workspaces (auto-created if empty)"
         />
       </label>
-      {!isEdit && (
+      {!isEdit && !isLocal && (
         <label className="flex flex-col gap-1 sm:col-span-2">
           <span className="text-xs text-gray-400 inline-flex items-center gap-1">
             <Lock className="w-3 h-3" />
