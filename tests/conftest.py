@@ -118,20 +118,38 @@ def mock_services() -> ServiceContainer:
 
 
 @pytest.fixture()
+async def seed_proj1(db_session):
+    """Idempotently seed the default ``proj-1`` ProjectConfig.
+
+    Tests using ``make_task_run`` rely on the default ``project_id='proj-1'``;
+    after PRAGMA foreign_keys=ON was enabled (commit 5992b83), inserting a
+    TaskRun without that parent row raises IntegrityError. Request this
+    fixture (or pull it in via ``pytestmark = pytest.mark.usefixtures(...)``)
+    from any test that uses the default. It's a no-op when the row already
+    exists, so it composes safely with tests that create their own proj-1.
+    """
+    from backend.models import ProjectConfig
+
+    existing = await db_session.get(ProjectConfig, "proj-1")
+    if existing is None:
+        db_session.add(
+            ProjectConfig(
+                project_id="proj-1",
+                project_slug="proj-1",
+                repo_owner="org",
+                repo_name="repo",
+            )
+        )
+        await db_session.commit()
+
+
+@pytest.fixture()
 def make_task_run():
     """Factory for creating TaskRun instances with sensible defaults.
 
-    NOTE: After PRAGMA foreign_keys=ON was enabled (commit 5992b83), tests
-    using the factory's default ``project_id='proj-1'`` must explicitly
-    create a parent ``ProjectConfig`` row first, e.g.::
-
-        db_session.add(ProjectConfig(project_id="proj-1", project_slug="x",
-                                     repo_owner="o", repo_name="r"))
-        await db_session.commit()
-        run = make_task_run()
-
-    Pre-existing tests that don't follow this pattern are tracked as known
-    FK-fixture debt — see follow-up cleanup issue.
+    NOTE: tests committing a TaskRun built with the default
+    ``project_id='proj-1'`` should also request the ``seed_proj1`` fixture
+    so the parent ProjectConfig row exists.
     """
     from backend.models import TaskRun
 

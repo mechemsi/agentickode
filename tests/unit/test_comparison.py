@@ -14,6 +14,8 @@ from backend.worker.phases import coding
 
 
 class TestComparisonDetection:
+    pytestmark = pytest.mark.usefixtures("seed_proj1")
+
     """coding.run detects comparison config and delegates."""
 
     async def test_delegates_to_comparison(self, db_session, make_task_run, mock_services):
@@ -226,6 +228,8 @@ class TestComparisonResults:
 
 class TestPickWinnerEndpoint:
     """API endpoint for picking comparison winner."""
+
+    pytestmark = pytest.mark.usefixtures("seed_proj1")
 
     async def test_pick_winner_success(self, client, db_session):
         from backend.models import TaskRun

@@ -214,9 +214,20 @@ class TestWorkerEngine:
         self, db_session, make_task_run
     ):
         """Two pending runs for the same project on different workspace servers are both dispatched."""
+        from backend.models.servers import WorkspaceServer
+
         db_session.add(
             ProjectConfig(project_id="proj-qf", project_slug="qf", repo_owner="o", repo_name="r")
         )
+        # Seed the two target workspace servers so the FK on
+        # TaskRun.workspace_server_id is satisfied under PRAGMA foreign_keys=ON.
+        db_session.add_all(
+            [
+                WorkspaceServer(id=1, name="srv-a", hostname="10.0.0.1"),
+                WorkspaceServer(id=2, name="srv-b", hostname="10.0.0.2"),
+            ]
+        )
+        await db_session.flush()
 
         run1 = make_task_run(
             task_id="TASK-F1", project_id="proj-qf", status="pending", workspace_server_id=1

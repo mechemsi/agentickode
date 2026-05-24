@@ -6,6 +6,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.adapters.cli_commands import AGENT_COMMANDS
 from backend.services.role_resolver import ResolvedRole
@@ -407,10 +409,20 @@ class TestGenerateWithSession:
 
 
 class TestPlanningSessionContinuity:
+    pytestmark = pytest.mark.usefixtures("seed_proj1")
+
     async def test_planning_generates_session_id_for_session_adapter(
         self, db_session, make_task_run, mock_services
     ):
         """Planning phase creates session_id when adapter supports sessions."""
+        # Seed the workspace server that get_workspace_server_id is patched to
+        # return (id=42), so the AgentInvocation FK on workspace_server_id
+        # holds under PRAGMA foreign_keys=ON.
+        from backend.models.servers import WorkspaceServer
+
+        db_session.add(WorkspaceServer(id=42, name="ws-42", hostname="10.0.0.42"))
+        await db_session.flush()
+
         run = make_task_run(planning_result={"context_docs": ["some context"]})
         db_session.add(run)
         await db_session.commit()
