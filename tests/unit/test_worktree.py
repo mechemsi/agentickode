@@ -213,6 +213,110 @@ class TestWorktreeManagerRemove:
         await mgr.remove(paths)  # does not raise
 
 
+class TestWorkspaceSetupFinalizationRoundTrip:
+    """End-to-end: workspace_setup creates a worktree, finalization removes it.
+
+    Drives the actual phase functions (not just the manager) to prove the
+    `workspace_result['worktree_paths']` shape round-trips through
+    `WorktreePaths(**stored)` in finalization without drift.
+    """
+
+    async def test_worktree_paths_survive_setup_to_finalization(
+        self, db_session, make_task_run, mock_services
+    ):
+        from unittest.mock import MagicMock, patch
+
+        from backend.models import ProjectConfig
+        from backend.worker.phases import finalization, workspace_setup
+
+        db_session.add(
+            ProjectConfig(project_id="proj-1", project_slug="x", repo_owner="o", repo_name="r")
+        )
+        await db_session.commit()
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing", "strategy": "worktree"},
+            pr_url="https://gitea.test/org/repo/pulls/9",
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        # --- Phase 1: workspace_setup with a real WorktreeManager but a
+        #     mocked SSH. The manager builds + records the paths into
+        #     task_run.workspace_result.
+        server = MagicMock(workspace_root="/home/workspace", worker_user="coder")
+        ssh = MagicMock(hostname="h", port=22, username="root")
+        ssh.run_command = AsyncMock(return_value=("", "", 0))
+
+        with (
+            patch(
+                "backend.worker.phases.workspace_setup.get_workspace_server",
+                new=AsyncMock(return_value=server),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.executor_for_server",
+                return_value=ssh,
+            ),
+            patch("backend.worker.phases.workspace_setup.RemoteGitOps") as mock_git_cls,
+            patch("backend.worker.phases.workspace_setup.RemoteSandbox"),
+            patch(
+                "backend.worker.phases.workspace_setup.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_auth_url",
+                new=AsyncMock(return_value=("https://authed", "https")),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_project_token",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup._validate_readiness",
+                new=AsyncMock(),
+            ),
+        ):
+            git = mock_git_cls.return_value
+            git.mkdir = AsyncMock()
+            git.has_repo = AsyncMock(return_value=True)
+            git.run_git = AsyncMock()
+            git._mark_safe_directory = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+        # workspace_setup mutated the run + recorded the paths.
+        stored = run.workspace_result["worktree_paths"]
+        assert run.workspace_path == stored["worktree_dir"]
+        assert run.branch_name == stored["branch"]
+
+        # --- Phase 2: finalization rehydrates via WorktreePaths(**stored)
+        #     and calls remove. Verify the same dataclass survives the
+        #     round-trip without key drift.
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=ssh),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.WorktreeManager") as mock_wm_cls,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+            mock_wm_cls.return_value.remove = AsyncMock()
+
+            await finalization.run(run, db_session, mock_services)
+
+            removed = mock_wm_cls.return_value.remove.call_args.args[0]
+            # Same triple emerges on the other side.
+            assert removed.branch == stored["branch"]
+            assert removed.worktree_dir == stored["worktree_dir"]
+            assert removed.project_root == stored["project_root"]
+
+
 class TestWorktreeManagerList:
     async def test_parses_porcelain_output(self):
         porcelain = (
