@@ -6,10 +6,10 @@
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import WorkflowTemplate
+from backend.models import TaskRun, WorkflowTemplate
 
 logger = logging.getLogger("agentickode.seed")
 
@@ -85,79 +85,6 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict] = [
         ],
     },
     {
-        "name": "planner",
-        "description": "Analyze task and decompose into subtasks",
-        "is_default": False,
-        "is_system": True,
-        "label_rules": [{"match_all": [], "match_any": ["plan-only", "decompose"]}],
-        "phases": [
-            _phase("workspace_setup"),
-            _phase("init"),
-            _phase("planning", uses_agent=True),
-            _phase("task_creation"),
-            _phase("finalization"),
-        ],
-    },
-    {
-        "name": "hotfix",
-        "description": "Quick coding without planning phase",
-        "is_default": False,
-        "is_system": True,
-        "label_rules": [{"match_all": [], "match_any": ["hotfix", "quick-fix"]}],
-        "phases": [
-            _phase("workspace_setup"),
-            _phase("init"),
-            _phase("coding", uses_agent=True),
-            _phase("testing"),
-            _phase("reviewing", uses_agent=True),
-            _phase("approval", trigger_mode="wait_for_approval"),
-            _phase("finalization"),
-        ],
-    },
-    {
-        "name": "small-task",
-        "description": "Execute a pre-planned subtask (child of planner)",
-        "is_default": False,
-        "is_system": True,
-        "label_rules": [{"match_all": [], "match_any": ["subtask"]}],
-        "phases": [
-            _phase("workspace_setup"),
-            _phase("init"),
-            _phase("coding", uses_agent=True),
-            _phase("testing"),
-            _phase("reviewing", uses_agent=True),
-            _phase("approval", trigger_mode="wait_for_approval"),
-            _phase("finalization"),
-        ],
-    },
-    {
-        "name": "pr-review",
-        "description": "Review an existing PR/MR via API",
-        "is_default": False,
-        "is_system": True,
-        "label_rules": [{"match_all": [], "match_any": ["review-pr", "pr-review"]}],
-        "phases": [
-            _phase("pr_fetch"),
-            _phase("reviewing", uses_agent=True),
-            _phase("finalization"),
-        ],
-    },
-    {
-        "name": "fix-pr",
-        "description": "Fix code after PR review feedback",
-        "is_default": False,
-        "is_system": True,
-        "label_rules": [{"match_all": [], "match_any": ["fix-pr", "pr-fix"]}],
-        "phases": [
-            _phase("pr_fetch"),
-            _phase("workspace_setup"),
-            _phase("init"),
-            _phase("coding", uses_agent=True),
-            _phase("reviewing", uses_agent=True),
-            _phase("finalization"),
-        ],
-    },
-    {
         "name": "example-composable",
         "description": (
             "Example template demonstrating composable bash + agent steps "
@@ -197,6 +124,19 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict] = [
 
 
 _BACKFILL_KEYS = ("cli_flags", "environment_vars", "command_templates", "uses_agent", "agent_mode")
+
+
+# System templates we used to seed but no longer do. ``seed_workflow_templates``
+# deletes any row whose name is in this set when ``is_system=True``. Operators
+# who customized these templates by hand (still under the same name) will also
+# see them deleted — they opted into the system rename by keeping the name.
+_DEPRECATED_SYSTEM_TEMPLATES = (
+    "planner",
+    "hotfix",
+    "small-task",
+    "pr-review",
+    "fix-pr",
+)
 
 
 # Pre-v0.5.2 ``default`` template — used to detect "still the system
@@ -239,7 +179,35 @@ async def seed_workflow_templates(db: AsyncSession) -> None:
     - Upgrades the ``default`` template from the pre-v0.5.2 8-phase
       shape to the new simplified 5-step shape when it hasn't been
       edited by the operator.
+    - Deletes deprecated system templates (``_DEPRECATED_SYSTEM_TEMPLATES``)
+      from existing DBs so the seed and the DB stay in sync.
     """
+    # Step 0: prune deprecated system templates. Only ``is_system=True``
+    # rows are touched — operator-created templates with the same name
+    # are left alone. Historic ``task_runs`` rows referencing these
+    # templates get their FK NULLed so the cascade doesn't fail (the
+    # column is nullable and the FK has no ON DELETE clause).
+    deprecated_result = await db.execute(
+        select(WorkflowTemplate).where(
+            WorkflowTemplate.name.in_(_DEPRECATED_SYSTEM_TEMPLATES),
+            WorkflowTemplate.is_system.is_(True),
+        )
+    )
+    deleted_names: list[str] = []
+    for row in deprecated_result.scalars().all():
+        await db.execute(
+            update(TaskRun)
+            .where(TaskRun.workflow_template_id == row.id)
+            .values(workflow_template_id=None)
+        )
+        deleted_names.append(row.name)
+        await db.delete(row)
+    if deleted_names:
+        logger.info(
+            "Removed deprecated system workflow templates: %s",
+            ", ".join(sorted(deleted_names)),
+        )
+
     created = 0
     backfilled = 0
     upgraded_default = False
