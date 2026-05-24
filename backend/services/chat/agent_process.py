@@ -21,12 +21,61 @@ import contextlib
 import json
 import logging
 import os
+import shlex
 import shutil
 import tempfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+from backend.services.workspace.usernames import validate_username
+
 logger = logging.getLogger("agentickode.chat.agent_process")
+
+
+def _maybe_wrap_runuser(
+    cmd_str: str,
+    *,
+    worker_user: str | None,
+    platform_url: str,
+    readable_paths: tuple[str, ...] = (),
+) -> str:
+    """Wrap ``cmd_str`` so it runs as ``worker_user`` via ``runuser -l``.
+
+    No-op when ``worker_user`` is falsy, equals the current process user,
+    or the backend isn't running as root (``runuser`` would just fail).
+
+    ``runuser -l`` simulates a full login (HOME / PATH for the target
+    user) so Claude can find ``~/.claude/`` and the agent binary on the
+    user's PATH. The cost is that the caller's env is wiped — we
+    re-export the variables the agent actually needs inside the wrapped
+    command.
+
+    Tempfiles created by the parent process are owned by root with mode
+    0600 by default; ``chmod 0644`` widens them so the worker user can
+    read them via ``cat`` / ``--mcp-config``.
+    """
+    if not worker_user:
+        return cmd_str
+    validate_username(worker_user, field="platform server worker_user")
+    if os.geteuid() != 0:
+        return cmd_str
+    try:
+        if worker_user == os.getlogin():
+            return cmd_str
+    except OSError:
+        pass
+
+    for path in readable_paths:
+        with contextlib.suppress(OSError):
+            os.chmod(path, 0o644)
+
+    # Re-export the env vars the agent reads; ``runuser -l`` strips
+    # everything else. Keep this list tight — anything not exported here
+    # is invisible to the agent process.
+    env_prefix = f"export AGENTICKODE_URL={shlex.quote(platform_url)}; "
+    inner = env_prefix + cmd_str
+    return f"runuser -l {shlex.quote(worker_user)} -c {shlex.quote(inner)}"
+
 
 # System prompt for the conversational agent
 SYSTEM_PROMPT = """\
@@ -137,6 +186,7 @@ async def invoke_agent(
     is_new_session: bool = True,
     platform_url: str = "http://localhost:8000",
     timeout: float = 120.0,
+    worker_user: str | None = None,
 ) -> InvocationResult:
     """Invoke an agent with a single message.
 
@@ -150,6 +200,10 @@ async def invoke_agent(
         is_new_session: True for first message, False for subsequent
         platform_url: Platform API URL for MCP tools
         timeout: Max seconds to wait for response
+        worker_user: If set, wrap the agent command in ``runuser -l`` so
+            it runs as that OS user instead of the backend's process
+            user. No-op when unset, when it matches the current user,
+            or when the backend isn't root (``runuser`` would fail).
 
     Returns:
         InvocationResult with parsed output
@@ -193,7 +247,20 @@ async def invoke_agent(
 
         env = {**os.environ, "AGENTICKODE_URL": platform_url}
 
-        logger.info("Invoking %s (session=%s, new=%s)", agent_name, session_id[:8], is_new_session)
+        cmd_str = _maybe_wrap_runuser(
+            cmd_str,
+            worker_user=worker_user,
+            platform_url=platform_url,
+            readable_paths=(msg_path, mcp_config_path),
+        )
+
+        logger.info(
+            "Invoking %s (session=%s, new=%s, run_as=%s)",
+            agent_name,
+            session_id[:8],
+            is_new_session,
+            worker_user or "(self)",
+        )
 
         proc = await asyncio.create_subprocess_shell(
             cmd_str,
@@ -240,10 +307,13 @@ async def invoke_agent_streaming(
     is_new_session: bool = True,
     platform_url: str = "http://localhost:8000",
     timeout: float = 120.0,
+    worker_user: str | None = None,
 ) -> AsyncIterator[str]:
     """Invoke an agent and stream output chunks as they arrive.
 
     Yields parsed text chunks for real-time display in the chat UI.
+    ``worker_user`` mirrors :func:`invoke_agent` — wraps the command in
+    ``runuser -l`` when set, no-op otherwise.
     """
     cmds = AGENT_COMMANDS.get(agent_name)
     if not cmds:
@@ -273,6 +343,13 @@ async def invoke_agent_streaming(
             )
 
         env = {**os.environ, "AGENTICKODE_URL": platform_url}
+
+        cmd_str = _maybe_wrap_runuser(
+            cmd_str,
+            worker_user=worker_user,
+            platform_url=platform_url,
+            readable_paths=(msg_path, mcp_config_path),
+        )
 
         proc = await asyncio.create_subprocess_shell(
             cmd_str,
