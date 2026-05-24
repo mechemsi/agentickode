@@ -555,15 +555,13 @@ export default function WorkspaceServers() {
                 {busyAction === `scan-${s.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanSearch className="w-3 h-3" />}
                 {busyAction === `scan-${s.id}` ? "Scanning..." : "Scan"}
               </button>
-              {s.server_type !== "local" && (
-                <button
-                  onClick={() => setEditing(s.id)}
-                  className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
-                >
-                  <Pencil className="w-3 h-3" />
-                  Edit
-                </button>
-              )}
+              <button
+                onClick={() => setEditing(s.id)}
+                className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </button>
               {s.server_type !== "local" && (
                 <button
                   onClick={() => handleDelete(s.id)}
