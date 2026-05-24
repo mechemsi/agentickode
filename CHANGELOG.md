@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-24
+
+Workspace configuration patch — makes AutoDev usable from a developer host
+(e.g. WSL) without running as `root` and without re-cloning a repo that's
+already checked out locally. All three knobs are opt-in and the previous
+default behavior is unchanged.
+
+### Added
+
+- `ProjectConfig.local_path` — when set, `workspace_setup` validates the
+  path (exists, is a git repo, working tree clean) and uses it directly,
+  skipping clone/fetch/scaffold. Dirty tree → `LocalPathError` before any
+  side-effect. Worktree strategy is auto-forced under
+  `<local_path>/.worktrees/` so concurrent runs stay isolated.
+- `ProjectConfig.worker_user_override` and `step.params.run_as` —
+  per-project and per-step worker-user overrides. `bash_step` wraps the
+  rendered command in `runuser -l`; `agent_step` temporarily flips
+  `CLIAdapter.worker_user` and restores it in a `finally` so concurrent
+  runs sharing the adapter aren't affected.
+- `workspace.default_root` `AppSetting` — new workspace servers inherit
+  this value when no `workspace_root` is supplied in the create body.
+  Surfaced in the Settings page as a new "Workspace" section.
+- `validate_username(name)` boundary check enforcing
+  `[a-z_][a-z0-9_-]{0,31}$?`. Applied at every entry that flows into
+  `runuser`/`chown` (server.worker_user, project override, step
+  `run_as`). Unsafe values surface as a clear `UsernameError`
+  pre-flight rather than a confusing shell error mid-run.
+- Two new dependency-security fixes (PR #16, issue #9): backend
+  `pytest` 8.3.4 → 9.0.3 (CVE-2025-71176) plus `pytest-asyncio` →
+  1.3.0; frontend `npm audit fix` resolved 7 transitive advisories
+  (`@xmldom/xmldom`, `brace-expansion`, `dompurify`, `flatted`,
+  `picomatch`, `postcss`, `vite`, `ws`).
+
+### Changed
+
+- `workspace_setup` chown / `safe.directory` wrapping now fires when
+  the executor is the local platform server too (not only when SSH
+  user is `root`), and is a no-op when the executor already runs as
+  the target user.
+- All `chown` interpolations of `worker_user` are now `shlex.quote`'d
+  (workspace root, worktree dir, `CLIAdapter._check_status`) as
+  defense-in-depth alongside the new validator.
+
+### Fixed
+
+- Three Copilot review findings on PR #17 resolved before merge:
+  `needs_user_drop` no-op guard for non-root local executors,
+  unquoted `chown` interpolation, and `run_as` flowing into
+  `CLIAdapter.worker_user` without validation.
+
+### Migration
+
+- Alembic migration `038_workspace_config` adds
+  `project_configs.local_path` and `project_configs.worker_user_override`
+  (both `Text NULL`). Backfill is a no-op — every existing project
+  keeps today's behavior (clone every run, use server default user).
+- `workspace.default_root` lives in the existing `app_settings` KV
+  table; no new schema for it.
+
 ## [0.5.0] - 2026-05-24
 
 The composable-workflow release. The fixed 8-phase pipeline is no longer the
