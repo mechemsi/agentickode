@@ -48,6 +48,8 @@ const sampleServer = {
   project_count: 1,
   server_group_id: null,
   server_group_name: null,
+    bridge_url: null,
+    has_bridge_token: false,
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-01T00:00:00Z",
 };

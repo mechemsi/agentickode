@@ -18,9 +18,74 @@ from sqlalchemy import select
 
 from backend.database import async_session
 from backend.models import ProjectWorkspaceServer, TaskRun, WorkspaceServer
+from backend.services.workspace.host_bridge_service import (
+    HostBridgeService,
+    host_bridge_from_server,
+)
 from backend.services.workspace.runuser_prefix import runuser_prefix, wrap_for_user
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
+
+
+async def _platform_bridge() -> HostBridgeService | None:
+    """Return the platform server's host bridge if configured."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(WorkspaceServer).where(WorkspaceServer.server_type == "local").limit(1)
+        )
+        server = result.scalar_one_or_none()
+    return host_bridge_from_server(server) if server else None
+
+
+async def _proxy_ws_to_bridge_pty(
+    websocket: WebSocket, bridge: HostBridgeService, cmd: str
+) -> None:
+    """Open a WebSocket to the bridge daemon's ``/pty`` and forward both ways.
+
+    The daemon spawns a real PTY on the host, runs ``cmd`` inside, and
+    streams output back over its WebSocket. We accept the browser WS,
+    relay each message, and close together. Cancellation on either side
+    tears the whole thing down.
+    """
+    import websockets
+
+    # ``bridge.hostname`` already strips the trailing slash.
+    base = bridge.hostname.replace("http://", "ws://").replace("https://", "wss://")
+    url = f"{base}/pty?token={bridge._token}"
+
+    await websocket.accept()
+
+    try:
+        async with websockets.connect(url, max_size=None) as bridge_ws:
+            # First message is the cmd spec (cols/rows defaulted on the
+            # daemon side; the browser will resize via /resize messages).
+            await bridge_ws.send(json.dumps({"cmd": cmd, "cols": 120, "rows": 40}))
+
+            async def bridge_to_browser() -> None:
+                try:
+                    async for chunk in bridge_ws:
+                        await websocket.send_text(chunk)
+                except Exception:
+                    pass
+
+            async def browser_to_bridge() -> None:
+                try:
+                    while True:
+                        raw = await websocket.receive_text()
+                        await bridge_ws.send(raw)
+                except WebSocketDisconnect:
+                    pass
+                except Exception:
+                    pass
+
+            await asyncio.gather(bridge_to_browser(), browser_to_bridge(), return_exceptions=True)
+    except Exception as exc:
+        with contextlib.suppress(Exception):
+            await websocket.send_text(
+                json.dumps({"type": "output", "data": f"Bridge connect failed: {exc}\r\n"})
+            )
+        with contextlib.suppress(Exception):
+            await websocket.close()
 
 
 async def _platform_worker_user() -> str | None:
@@ -552,7 +617,19 @@ async def ws_local_terminal(websocket: WebSocket, agent_name: str):
 
 @router.websocket("/ws/local-terminal-attach/{tmux_name}")
 async def ws_local_terminal_attach(websocket: WebSocket, tmux_name: str):
-    """Attach to an existing local terminal tmux session. Session persists after disconnect."""
+    """Attach to an existing local terminal tmux session.
+
+    If the platform server has a host bridge configured, attach happens
+    on the host (the daemon spawns ``tmux attach-session`` in a real
+    PTY and we proxy the WS). Otherwise we fall back to the legacy
+    in-container PTY.
+    """
+    bridge = await _platform_bridge()
+    if bridge is not None:
+        await _proxy_ws_to_bridge_pty(
+            websocket, bridge, f"tmux attach-session -t {shlex.quote(tmux_name)}"
+        )
+        return
     await _attach_to_tmux(websocket, tmux_name, agent_name=None, cleanup_on_close=False)
 
 

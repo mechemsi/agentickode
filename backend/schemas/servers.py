@@ -20,6 +20,10 @@ class WorkspaceServerCreate(BaseModel):
     max_concurrent_tasks: int = 1
     server_group_id: int | None = None
     server_type: str = "remote"
+    # Host bridge — when the local platform server has both set, commands
+    # route through ``scripts/host_bridge.py`` on the operator's host.
+    bridge_url: str | None = None
+    bridge_token: str | None = None  # transient — encrypted into bridge_token_enc on save
 
 
 class WorkspaceServerUpdate(BaseModel):
@@ -33,6 +37,8 @@ class WorkspaceServerUpdate(BaseModel):
     max_concurrent_tasks: int | None = None
     server_group_id: int | None = None
     server_type: str | None = None
+    bridge_url: str | None = None
+    bridge_token: str | None = None  # transient — encrypted on save
 
 
 class DiscoveredAgentOut(BaseModel):
@@ -117,6 +123,8 @@ class WorkspaceServerOut(BaseModel):
     project_count: int = 0
     server_group_id: int | None = None
     server_group_name: str | None = None
+    bridge_url: str | None = None
+    has_bridge_token: bool = False
     created_at: datetime
     updated_at: datetime
 

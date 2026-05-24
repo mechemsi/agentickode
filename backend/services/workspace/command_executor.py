@@ -47,8 +47,26 @@ class CommandExecutor(Protocol):
 
 
 def executor_for_server(server: WorkspaceServer) -> CommandExecutor:
-    """Factory: return a LocalCommandService for local servers, SSHService for remote."""
+    """Factory: pick the right executor for a workspace server.
+
+    Dispatch order:
+    1. ``server_type == "local"`` with ``bridge_url`` + ``bridge_token_enc``
+       configured → ``HostBridgeService``. Commands run on the operator's
+       host via ``scripts/host_bridge.py``.
+    2. ``server_type == "local"`` without a bridge → ``LocalCommandService``
+       (legacy: commands run in the backend container itself).
+    3. Anything else → ``SSHService`` to a remote workspace server.
+    """
     if getattr(server, "server_type", "remote") == "local":
+        # Prefer host bridge when configured.
+        from backend.services.workspace.host_bridge_service import (
+            host_bridge_from_server,
+        )
+
+        bridge = host_bridge_from_server(server)
+        if bridge is not None:
+            return bridge
+
         from backend.services.workspace.local_command_service import LocalCommandService
 
         return LocalCommandService()

@@ -21,6 +21,7 @@ from backend.schemas import (
     WorkspaceServerOut,
     WorkspaceServerUpdate,
 )
+from backend.services.encryption import encrypt_value
 from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.setup_service import ServerSetupService
 
@@ -59,6 +60,8 @@ def _server_to_out(server: WorkspaceServer, agent_count: int, project_count: int
         project_count=project_count,
         server_group_id=server.server_group_id,
         server_group_name=group_name,
+        bridge_url=server.bridge_url,
+        has_bridge_token=bool(server.bridge_token_enc),
         created_at=server.created_at,
         updated_at=server.updated_at,
     )
@@ -99,6 +102,8 @@ def _server_to_detail(server: WorkspaceServer, ac: int, pc: int) -> WorkspaceSer
         project_count=pc,
         server_group_id=server.server_group_id,
         server_group_name=group_name,
+        bridge_url=server.bridge_url,
+        has_bridge_token=bool(server.bridge_token_enc),
         created_at=server.created_at,
         updated_at=server.updated_at,
         agents=[
@@ -164,6 +169,10 @@ async def create_workspace_server(
     repo = WorkspaceServerRepository(db)
 
     data = body.model_dump(exclude={"setup_password"})
+    # Encrypt the bridge token if provided; never store the plaintext.
+    raw_bridge_token = data.pop("bridge_token", None)
+    if raw_bridge_token:
+        data["bridge_token_enc"] = encrypt_value(raw_bridge_token)
     if not data.get("workspace_root"):
         # Honor a platform-wide override before falling back to the
         # historical default. Operators on shared hosts (e.g. WSL) can
@@ -212,7 +221,18 @@ async def update_workspace_server(
     server = await repo.get_by_id(server_id)
     if not server:
         raise HTTPException(404, "Workspace server not found")
-    server = await repo.update(server, body.model_dump(exclude_unset=True))
+    payload = body.model_dump(exclude_unset=True)
+    # Encrypt bridge token if a new one was supplied. An explicit empty
+    # string clears it (operator unsetting the bridge). When the key
+    # isn't in payload at all (UI didn't touch the field), leave the
+    # stored value alone.
+    if "bridge_token" in payload:
+        raw_bridge_token = payload.pop("bridge_token")
+        if raw_bridge_token:
+            payload["bridge_token_enc"] = encrypt_value(raw_bridge_token)
+        else:
+            payload["bridge_token_enc"] = None
+    server = await repo.update(server, payload)
     ac = await repo.get_agent_count(server.id)
     pc = await repo.get_project_count(server.id)
     return _server_to_out(server, ac, pc)

@@ -102,6 +102,14 @@ shell-frontend:
 migrate:
 	$(DC) exec -e PYTHONPATH=/app backend alembic upgrade head
 
+host-bridge:
+	@echo "Starting host bridge daemon on http://127.0.0.1:17777"
+	@echo "Token will be at ~/.agentickode/host-bridge.token"
+	python scripts/host_bridge.py
+
+host-bridge-token:
+	@python scripts/host_bridge.py --print-token
+
 migrate-new:
 	@test -n "$(MSG)" || (echo "Usage: make migrate-new MSG='add_users_table'" && exit 1)
 	$(DC) exec -e PYTHONPATH=/app backend alembic revision --autogenerate -m "$(MSG)"

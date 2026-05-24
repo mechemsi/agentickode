@@ -1,0 +1,6 @@
+# Dependencies for the host bridge daemon (scripts/host_bridge.py).
+# Install once on the WSL / host machine:
+#     pip install -r requirements-host.txt
+fastapi>=0.135.1
+uvicorn[standard]>=0.34.0
+websockets>=14.1
