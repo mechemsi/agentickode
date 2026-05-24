@@ -23,7 +23,6 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import WorkspaceServer
 from backend.models.chat import ChatSession
 from backend.services.chat.agent_process import (
     invoke_agent,
@@ -32,23 +31,6 @@ from backend.services.chat.agent_process import (
 )
 
 logger = logging.getLogger("agentickode.chat.service")
-
-
-async def _platform_worker_user(db: AsyncSession) -> str | None:
-    """Look up the local platform server's ``worker_user``, if any.
-
-    Chat invocations always run in-process on the backend host, so the
-    only relevant server is the local one (``server_type='local'``).
-    When the operator has set its ``worker_user`` via the UI we want
-    the chat agent to drop to that account instead of running as the
-    backend's process user (usually root in Docker).
-    """
-    stmt = (
-        select(WorkspaceServer.worker_user).where(WorkspaceServer.server_type == "local").limit(1)
-    )
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    return user if (isinstance(user, str) and user.strip()) else None
 
 
 class ChatService:
@@ -112,14 +94,12 @@ class ChatService:
         # Invoke agent (one-shot with session resume)
         agent_session_id = chat.agent_session_id or chat.session_id
 
-        worker_user = await _platform_worker_user(db)
         result = await invoke_agent(
             agent_name=chat.agent_name,
             message=message,
             session_id=agent_session_id,
             is_new_session=is_first,
             platform_url=platform_url,
-            worker_user=worker_user,
         )
 
         # Append assistant response
@@ -161,14 +141,12 @@ class ChatService:
         agent_session_id = chat.agent_session_id or chat.session_id
         response_parts: list[str] = []
 
-        worker_user = await _platform_worker_user(db)
         async for chunk in invoke_agent_streaming(
             agent_name=chat.agent_name,
             message=message,
             session_id=agent_session_id,
             is_new_session=is_first,
             platform_url=platform_url,
-            worker_user=worker_user,
         ):
             response_parts.append(chunk)
             yield chunk
