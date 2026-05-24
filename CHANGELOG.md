@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-05-24
+
+Default workflow simplified to five composable steps, agent allowlist
+narrowed to three CLIs, role machinery hidden from the UI ahead of
+removal, and the marketing site brought back in sync.
+
+### Added
+
+- **Default workflow** — Single five-step recommended shape:
+  `workspace_setup → init → implement (agent) → approval → finalization`.
+  `workspace_strategy=worktree` is forced on the `workspace_setup` step
+  so concurrent runs on the same project stay isolated. The `implement`
+  prompt explicitly instructs the agent to commit, push, and create a
+  PR/MR end-to-end. The `approval` step is a wait state where the
+  operator can chat with the agent to give additional rules.
+- **Two-template seed** — Only `default` and `example-composable` ship
+  out of the box. Fresh installs see exactly these two; existing
+  installs are migrated below.
+
+### Changed
+
+- **Agent allowlist** — UI surfaces only `claude`, `codex`, `opencode`.
+  `aider`, `gemini`, `kimi`, `openhands` are filtered out of every
+  agent picker (Chat, Settings, Agents page, per-server install
+  panel). Backend `AgentSettings` rows are unchanged so existing
+  chat sessions or runs pinned to those agents keep working; this is
+  a UI-only hide.
+- **Roles UI hidden** — Roles nav entry removed, role dropdowns
+  dropped from the step editor (`AgentBody` + `LegacyPhaseBody`).
+  Runtime resolver still works so existing templates execute
+  unchanged. Full removal tracked in [#19](https://github.com/mechemsi/agentickode/issues/19).
+- **www site** — Landing PipelineSection demo rewritten around the
+  5-step default; FeaturesSection / StatsSection updated to the
+  three-agent allowlist; docs sections on Role Configs removed;
+  workspace-servers.md gained a "Per-project and per-step overrides"
+  section documenting v0.5.1 `local_path` / `worker_user_override` /
+  `run_as` / `workspace.default_root`.
+
+### Migration
+
+- The default `default` workflow template is auto-upgraded in place
+  from the legacy 8-phase shape to the new 5-step shape **only** when
+  the row hasn't been edited by the operator (phase name sequence
+  matches the historical default exactly). Operator-edited rows are
+  left alone.
+- The five legacy label-routed system templates (`planner`, `hotfix`,
+  `small-task`, `pr-review`, `fix-pr`) are deleted from existing DBs on
+  backend boot. Only `is_system=true` rows are touched; operator
+  templates that happen to share a name are left alone. Historic
+  `task_runs` rows referencing these templates have their
+  `workflow_template_id` NULLed before delete so the FK cascade
+  doesn't fail (column is nullable; run history is preserved).
+- No new schema migration required — all changes are seed-level.
+
 ## [0.5.1] - 2026-05-24
 
 Workspace configuration patch — makes AutoDev usable from a developer host
