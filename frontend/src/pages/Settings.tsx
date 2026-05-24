@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { getHealth, getSSHKeys, createSSHKey, deleteSSHKey, getAppSettings, updateAppSetting, getSupportedAgents, createOllamaServer, deleteOllamaServer, getOllamaServers, refreshOllamaModels, updateOllamaServer } from "../api";
 import type { HealthResponse, OllamaServer, SSHKey } from "../types";
-import { AGENT_NAMES } from "../types";
+import { AGENT_NAMES, VISIBLE_AGENTS } from "../types";
 import type { ElementType } from "react";
 import { useConfirm } from "../components/shared/ConfirmDialog";
 import { useToast } from "../components/shared/Toast";
@@ -143,7 +143,11 @@ export default function Settings() {
     loadSettings();
     loadOllamaServers();
     getSupportedAgents()
-      .then((agents) => setAvailableAgents(agents.map((a) => a.name)))
+      .then((agents) =>
+        setAvailableAgents(
+          agents.map((a) => a.name).filter((n) => VISIBLE_AGENTS.has(n)),
+        ),
+      )
       .catch(() => {/* keep fallback AGENT_NAMES */});
     const interval = setInterval(loadHealth, 10000);
     return () => clearInterval(interval);

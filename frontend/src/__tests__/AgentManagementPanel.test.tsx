@@ -43,9 +43,9 @@ describe("AgentManagementPanel", () => {
               path: "/home/coder/.local/bin/claude",
             },
             {
-              agent_name: "aider",
-              display_name: "Aider",
-              description: "AI pair programming",
+              agent_name: "codex",
+              display_name: "Codex CLI",
+              description: "OpenAI's coding agent",
               agent_type: "cli_binary",
               installed: false,
               version: null,
@@ -59,7 +59,7 @@ describe("AgentManagementPanel", () => {
     render(<AgentManagementPanel serverId={1} />);
 
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
-    expect(screen.getByText("Aider")).toBeInTheDocument();
+    expect(screen.getByText("Codex CLI")).toBeInTheDocument();
     expect(screen.getByText("1.0.0")).toBeInTheDocument();
   });
 
@@ -136,9 +136,9 @@ describe("AgentManagementPanel", () => {
           user: "coder",
           agents: [
             {
-              agent_name: "aider",
-              display_name: "Aider",
-              description: "AI pair programming",
+              agent_name: "codex",
+              display_name: "Codex CLI",
+              description: "OpenAI's coding agent",
               agent_type: "cli_binary",
               installed: false,
               version: null,
@@ -159,7 +159,7 @@ describe("AgentManagementPanel", () => {
     fireEvent.click(screen.getByText("Install"));
 
     await waitFor(() => {
-      expect(mockInstallAgentStream).toHaveBeenCalledWith(1, "aider", expect.any(Function));
+      expect(mockInstallAgentStream).toHaveBeenCalledWith(1, "codex", expect.any(Function));
     });
   });
 

@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import LocalTerminal from "../components/chat/LocalTerminal";
+import { AGENT_NAMES, VISIBLE_AGENTS } from "../types";
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface ChatSession {
@@ -56,7 +57,9 @@ interface TerminalSession {
 
 type Mode = "terminal" | "chat";
 
-const FALLBACK_AGENTS = ["claude", "opencode", "gemini", "aider", "codex"];
+// Mirrors the platform-wide VISIBLE_AGENTS allowlist; used when the
+// /api/agents fetch fails so the picker still shows the supported set.
+const FALLBACK_AGENTS = [...AGENT_NAMES];
 
 // ─── Component ──────────────────────────────────────────────────────
 const LAST_SESSION_KEY = "agentickode_last_chat_session";
@@ -95,7 +98,9 @@ export default function Chat() {
       const res = await fetch("/api/agents");
       if (res.ok) {
         const data: AgentInfo[] = await res.json();
-        const enabled = data.filter((a) => a.enabled).map((a) => a.agent_name);
+        const enabled = data
+          .filter((a) => a.enabled && VISIBLE_AGENTS.has(a.agent_name))
+          .map((a) => a.agent_name);
         if (enabled.length > 0) setAgents(enabled);
       }
     } catch { /* use fallback */ }

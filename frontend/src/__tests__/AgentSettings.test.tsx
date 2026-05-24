@@ -165,16 +165,22 @@ describe("AgentSettings page", () => {
     });
   });
 
-  it("renders multiple agent cards", async () => {
+  it("renders multiple agent cards (filtered to visible allowlist)", async () => {
+    // Page filters by VISIBLE_AGENTS so hidden agents (aider/gemini)
+    // never appear; visible ones (codex/opencode) do.
     mockGetAgents.mockResolvedValue([
       makeAgent({ agent_name: "claude", display_name: "Claude CLI" }),
       makeAgent({ id: 2, agent_name: "aider", display_name: "Aider" }),
-      makeAgent({ id: 3, agent_name: "gemini", display_name: "Google Gemini CLI" }),
+      makeAgent({ id: 3, agent_name: "codex", display_name: "Codex CLI" }),
+      makeAgent({ id: 4, agent_name: "opencode", display_name: "OpenCode" }),
+      makeAgent({ id: 5, agent_name: "gemini", display_name: "Google Gemini CLI" }),
     ]);
     render(<AgentSettingsPage />, { wrapper: Wrapper });
     expect(await screen.findByText("Claude CLI")).toBeInTheDocument();
-    expect(await screen.findByText("Aider")).toBeInTheDocument();
-    expect(await screen.findByText("Google Gemini CLI")).toBeInTheDocument();
+    expect(await screen.findByText("Codex CLI")).toBeInTheDocument();
+    expect(await screen.findByText("OpenCode")).toBeInTheDocument();
+    expect(screen.queryByText("Aider")).not.toBeInTheDocument();
+    expect(screen.queryByText("Google Gemini CLI")).not.toBeInTheDocument();
   });
 
   it("shows empty state when no agents", async () => {

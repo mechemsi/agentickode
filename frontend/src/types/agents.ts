@@ -2,16 +2,19 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
+// Hard-coded allowlist of agents shown in pickers (chat session, step
+// editor, agent install, etc.). The backend may still know about more
+// agents in the DB — this is the user-facing surface only. To re-show
+// an agent, add it here and make sure its AgentSettings row exists.
 export const AGENT_NAMES = [
   "claude",
   "codex",
   "opencode",
-  "aider",
-  "gemini",
-  "kimi",
-  "openhands",
 ] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
+
+/** Set form of AGENT_NAMES for ``.has()`` checks when filtering API responses. */
+export const VISIBLE_AGENTS: ReadonlySet<string> = new Set(AGENT_NAMES);
 
 export interface RoleConfig {
   id: number;

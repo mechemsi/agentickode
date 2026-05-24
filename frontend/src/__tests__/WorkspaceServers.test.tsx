@@ -215,9 +215,9 @@ describe("WorkspaceServers", () => {
           path: "/usr/bin/claude",
         },
         {
-          agent_name: "aider",
-          display_name: "Aider",
-          description: "AI pair programming in the terminal",
+          agent_name: "codex",
+          display_name: "Codex CLI",
+          description: "OpenAI coding agent",
           agent_type: "cli_binary",
           installed: false,
           version: null,
@@ -235,7 +235,7 @@ describe("WorkspaceServers", () => {
       expect(mockGetAgentStatus).toHaveBeenCalledWith(1);
     });
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
-    expect(screen.getByText("Aider")).toBeInTheDocument();
+    expect(screen.getByText("Codex CLI")).toBeInTheDocument();
     expect(screen.getByText("Collapse")).toBeInTheDocument();
   });
 

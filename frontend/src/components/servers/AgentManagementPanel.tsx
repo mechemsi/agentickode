@@ -10,6 +10,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { getAgentStatus, installAgentStream, startAgentAuthLogin, stopAgentAuthLogin } from "../../api";
 import type { AgentInstallStatus, AgentManagementStatus } from "../../types";
+import { VISIBLE_AGENTS } from "../../types";
 
 function StatusBadge({ installed }: { installed: boolean }) {
   return (
@@ -392,7 +393,10 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
     );
   }
 
-  const agents = status?.by_user?.[0]?.agents ?? status?.agents ?? [];
+  // Filter to the platform-wide allowlist so this list matches the
+  // pickers in Chat / Settings / etc.
+  const allAgents = status?.by_user?.[0]?.agents ?? status?.agents ?? [];
+  const agents = allAgents.filter((a) => VISIBLE_AGENTS.has(a.agent_name));
 
   return (
     <div className="space-y-1">

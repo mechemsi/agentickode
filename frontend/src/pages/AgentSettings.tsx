@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Bot, ChevronDown, ChevronUp, Server } from "lucide-react";
 import { getAgents, getAgentAvailability, updateAgent } from "../api";
 import type { AgentSettings } from "../types";
+import { VISIBLE_AGENTS } from "../types";
 import { useToast } from "../components/shared/Toast";
 import { KVEditor, parseKV, kvToObject } from "../components/shared/KVEditor";
 import type { KVEntry } from "../components/shared/KVEditor";
@@ -466,7 +467,10 @@ export default function AgentSettingsPage() {
 
   const load = async () => {
     try {
-      setAgents(await getAgents());
+      const all = await getAgents();
+      // Hide agents that aren't on the platform-wide allowlist so
+      // this page matches the pickers in Chat / Settings / etc.
+      setAgents(all.filter((a) => VISIBLE_AGENTS.has(a.agent_name)));
       setError(null);
     } catch (e) {
       setError(String(e));
