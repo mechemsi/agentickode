@@ -20,6 +20,7 @@ from backend.models import TaskRun
 from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.container import ServiceContainer
 from backend.services.role_resolver import ResolvedRole
+from backend.services.workspace.usernames import validate_username
 from backend.worker.phases._helpers import get_project_config
 from backend.worker.steps.templating import render
 
@@ -83,10 +84,18 @@ async def run_agent_step(
     # its ``worker_user`` for the duration of this call. Other adapters
     # (Ollama HTTP, OpenHands API) don't have a per-call user — they
     # honor whatever the server-level user is.
-    run_as = params.get("run_as")
-    if not run_as:
+    #
+    # ``CLIAdapter`` later interpolates ``worker_user`` into ``runuser``
+    # / ``chown`` commands. We always shell-quote there, but validate
+    # the username up front so a misconfiguration fails loudly before
+    # any side-effect rather than producing a confusing shell error.
+    step_run_as = params.get("run_as")
+    if step_run_as:
+        run_as: str | None = validate_username(step_run_as, field="step.params.run_as")
+    else:
         project = await get_project_config(task_run, session)
-        run_as = project.worker_user_override if project else None
+        candidate = project.worker_user_override if project else None
+        run_as = validate_username(candidate, field="worker_user_override") if candidate else None
 
     result: dict[str, Any] = {
         "provider": adapter.provider_name,

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import TaskRun
 from backend.services.container import ServiceContainer
 from backend.services.workspace.command_executor import CommandExecutor
+from backend.services.workspace.usernames import validate_username
 from backend.worker.phases._helpers import get_project_config, get_ssh_for_run
 from backend.worker.steps.templating import render
 
@@ -63,10 +64,14 @@ async def run_bash_step(
     # server's ``worker_user`` here — that's already handled implicitly
     # by the ambient executor user (e.g. the agent adapter wraps once at
     # the boundary). Step-level wrapping is opt-in.
-    run_as = params.get("run_as")
-    if not run_as:
+    step_run_as = params.get("run_as")
+    if step_run_as:
+        run_as = validate_username(step_run_as, field="step.params.run_as")
+    else:
         project = await get_project_config(task_run, session)
         run_as = project.worker_user_override if project else None
+        if run_as:
+            validate_username(run_as, field="worker_user_override")
     # Only wrap if we'd actually change user and the executor can drop
     # privileges (running as root). ``runuser`` from a non-root caller
     # typically requires PAM/sudo configuration that isn't safe to

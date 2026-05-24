@@ -498,3 +498,120 @@ class TestWorkspaceSetup:
 
             mock_remote_git.clone.assert_not_called()
             mock_remote_git.run_git.assert_not_called()
+
+    async def test_skips_user_drop_when_already_running_as_target_user(
+        self, db_session, make_task_run, mock_services
+    ):
+        """If ``worker_user`` equals the executor's username, no chown/runuser fires."""
+        from backend.services.workspace.usernames import UsernameError  # noqa: F401
+
+        # Configure a local-type server whose ambient user already matches
+        # ``worker_user`` — common case on a developer's WSL host where the
+        # backend itself runs as ``domas`` and we want agents as ``domas``.
+        local_server = MagicMock()
+        local_server.workspace_root = "/home/workspace"
+        local_server.worker_user = "domas"
+        local_server.username = "domas"
+        local_server.server_type = "local"
+
+        local_ssh = MagicMock()
+        local_ssh.run_command = AsyncMock(return_value=("", "", 0))
+        local_ssh.hostname = "local"
+        local_ssh.port = 0
+        local_ssh.username = "domas"
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.workspace_setup.get_workspace_server",
+                new=AsyncMock(return_value=local_server),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.executor_for_server",
+                return_value=local_ssh,
+            ),
+            patch("backend.worker.phases.workspace_setup.RemoteGitOps") as mock_git_cls,
+            patch("backend.worker.phases.workspace_setup.RemoteSandbox"),
+            patch(
+                "backend.worker.phases.workspace_setup.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_auth_url",
+                new=AsyncMock(return_value=("https://authed@url", "https")),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_project_token",
+                new=AsyncMock(return_value=None),
+            ),
+            patch("backend.worker.phases.workspace_setup._validate_readiness", new=AsyncMock()),
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            # No ``chown`` / ``runuser`` should appear in the executor's
+            # call list — would-be user drop is a no-op when we're already
+            # the target user.
+            calls = [c.args[0] for c in local_ssh.run_command.call_args_list]
+            assert not any("chown" in c for c in calls), calls
+            assert not any("runuser" in c for c in calls), calls
+
+    async def test_rejects_unsafe_worker_user(self, db_session, make_task_run, mock_services):
+        """A server with an unsafe ``worker_user`` value fails fast."""
+        from backend.services.workspace.usernames import UsernameError
+
+        bad_server = MagicMock()
+        bad_server.workspace_root = "/home/workspace"
+        bad_server.worker_user = "evil;rm -rf /"
+        bad_server.username = "root"
+        bad_server.server_type = "remote"
+
+        bad_ssh = MagicMock()
+        bad_ssh.run_command = AsyncMock(return_value=("", "", 0))
+        bad_ssh.hostname = "h"
+        bad_ssh.port = 22
+        bad_ssh.username = "root"
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.workspace_setup.get_workspace_server",
+                new=AsyncMock(return_value=bad_server),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.executor_for_server",
+                return_value=bad_ssh,
+            ),
+            patch("backend.worker.phases.workspace_setup.RemoteGitOps"),
+            patch("backend.worker.phases.workspace_setup.RemoteSandbox"),
+            patch(
+                "backend.worker.phases.workspace_setup.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_auth_url",
+                new=AsyncMock(return_value=("https://x", "https")),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_project_token",
+                new=AsyncMock(return_value=None),
+            ),
+            pytest.raises(UsernameError, match="worker_user"),
+        ):
+            await workspace_setup.run(run, db_session, mock_services)

@@ -33,6 +33,7 @@ from backend.services.workspace.readiness_service import (
     format_fix_guide,
 )
 from backend.services.workspace.sandbox import RemoteSandbox
+from backend.services.workspace.usernames import validate_username
 from backend.services.workspace.worktree import WorktreeManager, make_worktree_paths
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import (
@@ -87,13 +88,25 @@ async def run(
     # ``chown`` decisions and the safe.directory git config. Step-level
     # ``params.run_as`` is applied later in step runners, not here.
     worker_user = (project.worker_user_override if project else None) or server.worker_user
+    # Reject unsafe usernames before any of them flow into runuser/chown
+    # strings below. Falsy values (None/"") are fine — they just mean
+    # "no user drop".
+    if worker_user:
+        validate_username(worker_user, field="worker_user")
 
     # ``runuser``-style chown / safe.directory wrapping is needed both for
     # SSH-as-root (the historical case) and for local platform servers
     # (``server_type='local'``) where ``LocalCommandService.username`` is
     # the backend's own OS user and never equals ``"root"`` in SSH terms.
+    # Skip when we're already running as the target user — ``runuser``
+    # from a non-root caller typically fails without PAM/sudo config.
     is_local_server = getattr(server, "server_type", None) == "local"
-    needs_user_drop = bool(worker_user) and (ssh.username == "root" or is_local_server)
+    can_drop_privileges = ssh.username == "root"
+    needs_user_drop = (
+        bool(worker_user)
+        and worker_user != ssh.username
+        and (can_drop_privileges or is_local_server)
+    )
 
     # --- Local-path shortcut: skip clone entirely ----------------------
     # When ``project.local_path`` is set we assume the operator has the
@@ -222,7 +235,8 @@ async def run(
     if needs_user_drop and not local_path:
         await _log(f"Setting workspace ownership to {worker_user}")
         owned_quoted = shlex.quote(workspace)
-        await ssh.run_command(f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60)
+        user_quoted = shlex.quote(worker_user)
+        await ssh.run_command(f"chown -R {user_quoted}:{user_quoted} {owned_quoted}", timeout=60)
 
     workspace_result: dict = {"workspace_path": workspace, "repos_cloned": repos_cloned}
 
@@ -253,8 +267,9 @@ async def run(
         # worktree add inherits the caller's uid). This is always safe
         # even with ``local_path`` — the worktree dir is new.
         if needs_user_drop:
+            user_quoted = shlex.quote(worker_user)
             await ssh.run_command(
-                f"chown -R {worker_user}:{worker_user} {shlex.quote(paths.worktree_dir)}",
+                f"chown -R {user_quoted}:{user_quoted} {shlex.quote(paths.worktree_dir)}",
                 timeout=60,
             )
 

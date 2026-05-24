@@ -10,6 +10,7 @@ import pytest
 
 from backend.models import PhaseExecution, ProjectConfig
 from backend.services.adapters.cli_adapter import CLIAdapter
+from backend.services.workspace.usernames import UsernameError
 from backend.worker.steps.agent_step import run_agent_step
 
 
@@ -325,3 +326,31 @@ class TestAgentStep:
 
         assert observed["wu"] == "developer"
         assert adapter.worker_user == "coder"
+
+    async def test_rejects_unsafe_step_run_as(self, db_session, mock_services, make_task_run):
+        """Unsafe ``params.run_as`` is refused before touching the adapter."""
+        project = ProjectConfig(
+            project_id="proj-as-inj", project_slug="asinj", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-as-inj")
+        db_session.add(run)
+        await db_session.commit()
+
+        ssh = MagicMock()
+        ssh.username = "root"
+        adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
+        adapter.generate = AsyncMock(return_value="ok")  # type: ignore[assignment]
+        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+
+        phase_config = {
+            "phase_name": "ask",
+            "kind": "agent",
+            "params": {"prompt": "hi", "run_as": "a;rm -rf /"},
+        }
+        with pytest.raises(UsernameError, match="step.params.run_as"):
+            await run_agent_step(run, db_session, mock_services, phase_config)
+
+        # Adapter state must not have been mutated.
+        assert adapter.worker_user == "coder"
+        adapter.generate.assert_not_called()

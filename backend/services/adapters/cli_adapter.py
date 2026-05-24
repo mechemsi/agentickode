@@ -256,7 +256,7 @@ class CLIAdapter:
             return True
         # Agent may be installed for worker user only (e.g. /home/coder/.local/bin)
         if self._worker_user:
-            wrapped = f"runuser -l {self._worker_user} -c {shlex.quote(check_cmd)}"
+            wrapped = f"runuser -l {shlex.quote(self._worker_user)} -c {shlex.quote(check_cmd)}"
             _, _, rc = await self._ssh.run_command(wrapped, timeout=10)
             return rc == 0
         return False
