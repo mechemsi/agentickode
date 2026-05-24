@@ -7,7 +7,6 @@
 import asyncio
 import logging
 import os
-import shlex
 import uuid
 from datetime import UTC, datetime
 
@@ -19,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.models import WorkspaceServer
 from backend.models.local_sessions import LocalTerminalSession
-from backend.services.workspace.host_bridge_service import host_bridge_from_server
 from backend.services.workspace.runuser_prefix import runuser_prefix, wrap_for_user
 from backend.worker.broadcaster import broadcaster
 
@@ -28,20 +26,17 @@ router = APIRouter(tags=["local-terminals"])
 
 
 async def _platform_worker_user(db: AsyncSession) -> str | None:
-    """Look up the local platform server's configured ``worker_user``."""
+    """Look up the local platform server's configured ``worker_user``.
+
+    Returns ``None`` when nothing is set — callers then behave as
+    before (everything runs as the backend's process user, typically
+    root in the Docker default).
+    """
     result = await db.execute(
         select(WorkspaceServer.worker_user).where(WorkspaceServer.server_type == "local").limit(1)
     )
     user = result.scalar_one_or_none()
     return user if (isinstance(user, str) and user.strip()) else None
-
-
-async def _platform_server(db: AsyncSession) -> WorkspaceServer | None:
-    """Return the local platform server row, if any."""
-    result = await db.execute(
-        select(WorkspaceServer).where(WorkspaceServer.server_type == "local").limit(1)
-    )
-    return result.scalar_one_or_none()
 
 
 class CreateSessionRequest(BaseModel):
@@ -102,67 +97,6 @@ async def create_local_session(
     session_id = uuid.uuid4().hex[:12]
     tmux_name = f"lt-{body.agent_name}-{session_id}"
     display_name = body.display_name or f"{body.agent_name} session"
-
-    # Prefer the host bridge if configured: tmux runs on the operator's
-    # host, with their PATH, Claude install, and project folders. Fall
-    # back to the legacy in-container path (with runuser wrapping for
-    # ``worker_user`` if set) when no bridge is configured.
-    platform = await _platform_server(db)
-    bridge = host_bridge_from_server(platform) if platform else None
-
-    if bridge is not None:
-        claude_session_id = str(uuid.uuid4())
-        if body.agent_name == "claude":
-            agent_launch = f"claude --permission-mode auto --session-id {claude_session_id}"
-        else:
-            agent_launch = body.agent_name
-
-        # Build a single shell snippet so the daemon executes it in one
-        # bash -lc call. ``send-keys`` won't fire until the new-session
-        # has settled, so a tiny ``sleep 0.2`` here avoids a race that
-        # otherwise sends the keystrokes into a half-initialized pane.
-        snippet = (
-            f"tmux new-session -d -s {tmux_name} -x 120 -y 40 && "
-            f"tmux set-option -t {tmux_name} mouse on && "
-            f"tmux set-option -t {tmux_name} history-limit 10000 && "
-            f"sleep 0.2 && "
-            f"tmux send-keys -t {tmux_name} {shlex.quote(agent_launch)} Enter"
-        )
-        stdout, stderr, rc = await bridge.run_command(snippet, timeout=20)
-        if rc != 0:
-            raise HTTPException(500, f"Failed to create tmux on host: {stderr or stdout}")
-
-        session = LocalTerminalSession(
-            session_id=session_id,
-            agent_name=body.agent_name,
-            tmux_name=tmux_name,
-            display_name=display_name,
-            last_command=agent_launch,
-            agent_session_id=claude_session_id if body.agent_name == "claude" else None,
-            status="active",
-        )
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
-        logger.info("Created local terminal session %s on host bridge (%s)", session_id, tmux_name)
-
-        await broadcaster.office_event(
-            {
-                "type": "agent_spawned",
-                "agent": {
-                    "id": f"local-{session_id}",
-                    "agent_type": body.agent_name,
-                    "status": "active",
-                    "activity": "coding",
-                    "project": "",
-                    "phase": "chat",
-                    "run_id": None,
-                    "display_name": display_name,
-                },
-                "room_id": "platform",
-            }
-        )
-        return session
 
     # Resolve the platform server's worker_user (if set) and compute
     # the ``runuser -l`` prefix once. Every tmux call below is wrapped

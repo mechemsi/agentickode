@@ -14,9 +14,6 @@ interface FormData {
   worker_user: string;
   workspace_root: string;
   setup_password: string;
-  bridge_url: string;
-  bridge_token: string;
-  has_bridge_token: boolean;
   [key: string]: unknown;
 }
 
@@ -29,9 +26,6 @@ const defaults: FormData = {
   worker_user: "coder",
   workspace_root: "",
   setup_password: "",
-  bridge_url: "",
-  bridge_token: "",
-  has_bridge_token: false,
 };
 
 export default function WorkspaceServerForm({
@@ -162,57 +156,13 @@ export default function WorkspaceServerForm({
           </span>
         </label>
       )}
-      {isLocal && (
-        <>
-          <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              <Globe className="w-3 h-3" />
-              Host bridge URL (run scripts/host_bridge.py on your host)
-            </span>
-            <input
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              value={form.bridge_url}
-              onChange={(e) => set("bridge_url", e.target.value)}
-              placeholder="http://host.docker.internal:17777"
-              data-testid="bridge-url-input"
-            />
-          </label>
-          <label className="flex flex-col gap-1 sm:col-span-2">
-            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
-              <Key className="w-3 h-3" />
-              {form.has_bridge_token ? "Bridge token (set)" : "Bridge token"}
-            </span>
-            <input
-              type="password"
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              value={form.bridge_token}
-              onChange={(e) => set("bridge_token", e.target.value)}
-              placeholder={
-                form.has_bridge_token
-                  ? "•••••••• (leave blank to keep)"
-                  : "Token from ~/.agentickode/host-bridge.token on the host"
-              }
-              autoComplete="off"
-              data-testid="bridge-token-input"
-            />
-            <span className="text-[10px] text-gray-500">
-              When both are set, chat / terminal / workflows run on your
-              host instead of inside the backend container.
-            </span>
-          </label>
-        </>
-      )}
       <div className="col-span-1 sm:col-span-2 flex gap-2 mt-2">
         <button
           onClick={() => {
-            const { setup_password, workspace_root, bridge_token, has_bridge_token, ...rest } = form;
-            void has_bridge_token;  // display-only, not submitted
+            const { setup_password, workspace_root, ...rest } = form;
             const data: Record<string, unknown> = { ...rest };
             if (workspace_root) data.workspace_root = workspace_root;
             if (setup_password) data.setup_password = setup_password;
-            // Only send the token when the operator typed a new value;
-            // an empty box on edit means "keep the existing one".
-            if (bridge_token) data.bridge_token = bridge_token;
             onSubmit(data);
           }}
           disabled={loading}

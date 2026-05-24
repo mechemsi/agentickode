@@ -144,25 +144,19 @@ class InvocationResult:
     stream_events: list[dict]
 
 
-def _mcp_config_json(platform_url: str) -> str:
-    """Serialize the MCP config that points Claude at our /mcp/sse endpoint."""
-    return json.dumps(
-        {
-            "mcpServers": {
-                "agentickode": {
-                    "type": "sse",
-                    "url": f"{platform_url}/mcp/sse",
-                }
-            }
-        }
-    )
-
-
 def _write_mcp_config(platform_url: str) -> str:
     """Write MCP config file pointing to the platform's SSE endpoint."""
+    mcp_config = {
+        "mcpServers": {
+            "agentickode": {
+                "type": "sse",
+                "url": f"{platform_url}/mcp/sse",
+            }
+        }
+    }
     config_fd, config_path = tempfile.mkstemp(suffix=".json", prefix="agentickode-mcp-")
     with os.fdopen(config_fd, "w") as f:
-        f.write(_mcp_config_json(platform_url))
+        json.dump(mcp_config, f)
     return config_path
 
 
@@ -442,72 +436,3 @@ def _parse_stream_output(stdout: str, agent_name: str) -> tuple[str, list[dict]]
             text_parts.append(line)
 
     return "\n".join(text_parts).strip(), events
-
-
-async def invoke_agent_via_bridge(
-    bridge,
-    agent_name: str,
-    message: str,
-    session_id: str,
-    *,
-    is_new_session: bool = True,
-    platform_url: str = "http://localhost:8000",
-    timeout: float = 120.0,
-) -> InvocationResult:
-    """Invoke an agent on the host via the host bridge daemon.
-
-    ``bridge`` is a :class:`HostBridgeService` instance. Behaves like
-    :func:`invoke_agent` but the actual subprocess runs on the host
-    (using the host's PATH, Claude install, and user) instead of in
-    the backend container.
-
-    The MCP config JSON is written to a host-side temp file via the
-    bridge's ``/write_tempfile`` endpoint so ``--mcp-config <path>``
-    resolves correctly. The user's message is piped via the bridge's
-    ``stdin`` parameter — no need to share /tmp between container
-    and host.
-    """
-    cmds = AGENT_COMMANDS.get(agent_name)
-    if not cmds:
-        return InvocationResult(
-            output=f"Unknown agent: {agent_name}", exit_code=1, stream_events=[]
-        )
-
-    mcp_path = await bridge.write_tempfile(_mcp_config_json(platform_url), suffix=".json")
-
-    template = cmds["new"] if is_new_session else cmds["resume"]
-    if agent_name == "claude":
-        # Drop ``-p {message}`` — the message arrives on stdin.
-        cmd_str = template.replace("-p {message}", "").format(
-            session_id=session_id, mcp_config=mcp_path
-        )
-        cmd_str = cmd_str.strip()
-    else:
-        # Non-Claude agents take a message file path on the command
-        # line. Write the message to a host-side temp file too.
-        msg_path = await bridge.write_tempfile(message, suffix=".txt")
-        cmd_str = template.format(message=msg_path, session_id=session_id, mcp_config=mcp_path)
-
-    logger.info(
-        "Invoking %s via bridge (session=%s, new=%s)",
-        agent_name,
-        session_id[:8],
-        is_new_session,
-    )
-
-    try:
-        stdout, _stderr, exit_code = await bridge.run_command_with_stdin(
-            cmd_str,
-            stdin=message if agent_name == "claude" else "",
-            timeout=int(timeout),
-            env={"AGENTICKODE_URL": platform_url},
-        )
-    except Exception as exc:
-        return InvocationResult(
-            output=f"Host bridge invocation failed: {exc}",
-            exit_code=1,
-            stream_events=[],
-        )
-
-    output_text, events = _parse_stream_output(stdout, agent_name)
-    return InvocationResult(output=output_text, exit_code=exit_code, stream_events=events)

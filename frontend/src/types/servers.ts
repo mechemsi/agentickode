@@ -28,8 +28,6 @@ export interface WorkspaceServer {
   project_count: number;
   server_group_id: number | null;
   server_group_name: string | null;
-  bridge_url: string | null;
-  has_bridge_token: boolean;
   created_at: string;
   updated_at: string;
 }

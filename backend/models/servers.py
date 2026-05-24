@@ -37,8 +37,6 @@ class WorkspaceServer(Base):
     worker_user_status = Column(Text, nullable=True)
     worker_user_error = Column(Text, nullable=True)
     worker_user_password = Column(Text, nullable=True)
-    bridge_url = Column(Text, nullable=True)
-    bridge_token_enc = Column(Text, nullable=True)
     max_concurrent_tasks = Column(Integer, nullable=False, server_default="1")
     setup_log = Column(JSONB, nullable=True)
     server_group_id = Column(
