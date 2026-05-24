@@ -25,6 +25,13 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [006 — Multi-Source Task Intake](decisions/006-multi-source-task-intake.md) | 2026-03 | Webhooks from Plane, GitHub, Gitea, GitLab for task ingestion |
 | [007 — Composable Step Workflows](decisions/007-composable-step-workflows.md) | 2026-05 | Generic bash + agent step kinds; legacy phases preserved as kind: legacy_phase; triggers as first-class |
 
+## Reference Docs
+
+| Doc | Summary |
+|-----|---------|
+| [Workflows reference (`docs/workflows.md`)](../docs/workflows.md) | Composable step kinds, triggers, templating, workspace strategies, migration from the legacy pipeline. Authoritative ref for ADR-007. |
+| [Worker pipeline (`docs/WORKER_PIPELINE.md`)](../docs/WORKER_PIPELINE.md) | Legacy 8-phase pipeline reference (deprecated; preserved as the `default` template — see `workflows.md`). |
+
 ## Runbooks
 
 | Doc | Summary |
