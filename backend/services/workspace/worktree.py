@@ -61,13 +61,18 @@ def make_worktree_paths(project_root: str, run_id: int) -> WorktreePaths:
     The timestamp suffix ensures retrying the same run does not collide
     with an orphaned worktree dir on disk. Branch and dir share the
     suffix so an operator can match them at a glance.
+
+    ``project_root`` is normalized (single trailing slash stripped) before
+    use so downstream string interpolation can't produce double slashes
+    and round-trips through ``WorktreePaths`` stay stable.
     """
     if not _PATH_RE.match(project_root):
         raise ValueError(f"unsafe project_root: {project_root!r}")
+    normalized_root = project_root.rstrip("/") or "/"
     ts = int(time.time())
     branch = f"run/{run_id}-{ts}"
-    worktree_dir = f"{project_root.rstrip('/')}/.worktrees/run-{run_id}-{ts}"
-    return WorktreePaths(branch=branch, worktree_dir=worktree_dir, project_root=project_root)
+    worktree_dir = f"{normalized_root}/.worktrees/run-{run_id}-{ts}"
+    return WorktreePaths(branch=branch, worktree_dir=worktree_dir, project_root=normalized_root)
 
 
 class WorktreeManager:
