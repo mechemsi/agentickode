@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,12 +15,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import TaskRun
 from backend.services.container import ServiceContainer
 from backend.services.workspace.command_executor import CommandExecutor
-from backend.worker.phases._helpers import get_ssh_for_run
+from backend.services.workspace.usernames import validate_username
+from backend.worker.phases._helpers import get_project_config, get_ssh_for_run
 from backend.worker.steps.templating import render
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 600
+
+
+def _wrap_runuser(cmd: str, user: str) -> str:
+    """Wrap ``cmd`` so it runs under ``user`` via ``runuser -l``.
+
+    Matches the wrapping pattern used in ``workspace_setup`` and
+    ``cli_adapter`` so step-level overrides behave the same as the
+    project- and server-level ones.
+    """
+    return f"runuser -l {shlex.quote(user)} -c {shlex.quote(cmd)}"
 
 
 async def run_bash_step(
@@ -46,6 +58,26 @@ async def run_bash_step(
 
     if executor is None:
         executor = await get_ssh_for_run(task_run, session)
+
+    # Resolve effective run-as user: step ``params.run_as`` wins over
+    # ``ProjectConfig.worker_user_override``. We do *not* fall back to the
+    # server's ``worker_user`` here — that's already handled implicitly
+    # by the ambient executor user (e.g. the agent adapter wraps once at
+    # the boundary). Step-level wrapping is opt-in.
+    step_run_as = params.get("run_as")
+    if step_run_as:
+        run_as = validate_username(step_run_as, field="step.params.run_as")
+    else:
+        project = await get_project_config(task_run, session)
+        run_as = project.worker_user_override if project else None
+        if run_as:
+            validate_username(run_as, field="worker_user_override")
+    # Only wrap if we'd actually change user and the executor can drop
+    # privileges (running as root). ``runuser`` from a non-root caller
+    # typically requires PAM/sudo configuration that isn't safe to
+    # assume — fall through and let the OS reject if misconfigured.
+    if run_as and run_as != executor.username and executor.username == "root":
+        rendered_cmd = _wrap_runuser(rendered_cmd, run_as)
 
     stdout, stderr, rc = await executor.run_command(rendered_cmd, timeout=timeout)
     result: dict[str, Any] = {

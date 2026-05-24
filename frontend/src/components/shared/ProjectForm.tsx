@@ -50,6 +50,8 @@ type FD = {
   git_provider_token: string;
   poll_enabled: boolean;
   poll_interval_minutes: number;
+  local_path: string;
+  worker_user_override: string;
   notion: NotionFields;
 };
 type Initial = Partial<Omit<ProjectConfig, "created_at" | "updated_at" | "workspace_config" | "ai_config">>;
@@ -118,6 +120,8 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     git_provider_token: "",
     poll_enabled: initial?.poll_enabled ?? false,
     poll_interval_minutes: initial?.poll_interval_minutes ?? 5,
+    local_path: initial?.local_path ?? "",
+    worker_user_override: initial?.worker_user_override ?? "",
     notion: {
       notion_api_key: "",
       notion_database_id: String(integrationCfg["notion_database_id"] ?? ""),
@@ -158,6 +162,10 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     const { notion, ...rest } = form;
     const data: Record<string, unknown> = { ...rest };
     if (!data.git_provider_token) delete data.git_provider_token;
+    // Treat blanks as "clear / no override" so the backend can store NULL.
+    // Trim first so a stray space doesn't become a real path.
+    data.local_path = (form.local_path || "").trim() || null;
+    data.worker_user_override = (form.worker_user_override || "").trim() || null;
 
     // Build integration_config for Notion. Only include fields with values so
     // partial updates don't overwrite stored settings with blanks.
@@ -241,6 +249,24 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       </Field>
       <Field label={`Access Token${initial?.has_git_provider_token ? " (set)" : ""}`} icon={Key}>
         <input className={CLS} type="password" placeholder={initial?.has_git_provider_token ? "••••••• (leave blank to keep)" : "Per-project access token (optional)"} value={form.git_provider_token} onChange={(e) => set("git_provider_token", e.target.value)} />
+      </Field>
+      <Field label="Local checkout path (skips clone)">
+        <input
+          className={CLS}
+          value={form.local_path}
+          onChange={(e) => set("local_path", e.target.value)}
+          placeholder="/home/you/projects/myapp (optional)"
+          data-testid="local-path-input"
+        />
+      </Field>
+      <Field label="Run-as user override">
+        <input
+          className={CLS}
+          value={form.worker_user_override}
+          onChange={(e) => set("worker_user_override", e.target.value)}
+          placeholder="Falls back to server default if blank"
+          data-testid="worker-user-override-input"
+        />
       </Field>
 
       {form.task_source === "notion" && (

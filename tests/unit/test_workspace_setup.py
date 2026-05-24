@@ -388,3 +388,230 @@ class TestWorkspaceSetup:
             await workspace_setup.run(run, db_session, mock_services)
 
             mock_remote_sb.start_sandbox.assert_called_once()
+
+    async def test_local_path_skips_clone(self, db_session, make_task_run, mock_services):
+        """Project with ``local_path`` set: no clone runs; workspace points at the path."""
+        from backend.models import ProjectConfig
+
+        # Replace the autouse-fixture's parent with one that has local_path set.
+        existing = await db_session.get(ProjectConfig, "proj-1")
+        existing.local_path = "/home/domas/projects/myapp"
+        await db_session.commit()
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch(
+                "backend.worker.phases.workspace_setup.validate_local_path",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        path="/home/domas/projects/myapp",
+                        exists=True,
+                        is_git_repo=True,
+                        is_clean=True,
+                    )
+                ),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.make_worktree_paths",
+                return_value=MagicMock(
+                    branch="run/1-123",
+                    worktree_dir="/home/domas/projects/myapp/.worktrees/run-1-123",
+                    project_root="/home/domas/projects/myapp",
+                ),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.WorktreeManager",
+            ) as mock_wm_cls,
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git.clone = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+            mock_wm_cls.return_value.create = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            # No clone, no fetch — local_path short-circuits both.
+            mock_remote_git.clone.assert_not_called()
+            mock_remote_git.run_git.assert_not_called()
+            # Worktree strategy auto-forced — manager.create was invoked.
+            mock_wm_cls.return_value.create.assert_awaited_once()
+            # Run now points at the worktree dir under local_path.
+            assert run.workspace_path == "/home/domas/projects/myapp/.worktrees/run-1-123"
+
+    async def test_local_path_dirty_raises_before_side_effects(
+        self, db_session, make_task_run, mock_services
+    ):
+        """Dirty working tree → LocalPathError propagates and no clone runs."""
+        from backend.models import ProjectConfig
+        from backend.services.workspace.local_path import LocalPathError
+
+        existing = await db_session.get(ProjectConfig, "proj-1")
+        existing.local_path = "/home/domas/projects/dirty"
+        await db_session.commit()
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch(
+                "backend.worker.phases.workspace_setup.validate_local_path",
+                new=AsyncMock(side_effect=LocalPathError("uncommitted changes — commit or stash")),
+            ),
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.clone = AsyncMock()
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            with pytest.raises(LocalPathError, match="uncommitted changes"):
+                await workspace_setup.run(run, db_session, mock_services)
+
+            mock_remote_git.clone.assert_not_called()
+            mock_remote_git.run_git.assert_not_called()
+
+    async def test_skips_user_drop_when_already_running_as_target_user(
+        self, db_session, make_task_run, mock_services
+    ):
+        """If ``worker_user`` equals the executor's username, no chown/runuser fires."""
+        from backend.services.workspace.usernames import UsernameError  # noqa: F401
+
+        # Configure a local-type server whose ambient user already matches
+        # ``worker_user`` — common case on a developer's WSL host where the
+        # backend itself runs as ``domas`` and we want agents as ``domas``.
+        local_server = MagicMock()
+        local_server.workspace_root = "/home/workspace"
+        local_server.worker_user = "domas"
+        local_server.username = "domas"
+        local_server.server_type = "local"
+
+        local_ssh = MagicMock()
+        local_ssh.run_command = AsyncMock(return_value=("", "", 0))
+        local_ssh.hostname = "local"
+        local_ssh.port = 0
+        local_ssh.username = "domas"
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.workspace_setup.get_workspace_server",
+                new=AsyncMock(return_value=local_server),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.executor_for_server",
+                return_value=local_ssh,
+            ),
+            patch("backend.worker.phases.workspace_setup.RemoteGitOps") as mock_git_cls,
+            patch("backend.worker.phases.workspace_setup.RemoteSandbox"),
+            patch(
+                "backend.worker.phases.workspace_setup.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_auth_url",
+                new=AsyncMock(return_value=("https://authed@url", "https")),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_project_token",
+                new=AsyncMock(return_value=None),
+            ),
+            patch("backend.worker.phases.workspace_setup._validate_readiness", new=AsyncMock()),
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            # No ``chown`` / ``runuser`` should appear in the executor's
+            # call list — would-be user drop is a no-op when we're already
+            # the target user.
+            calls = [c.args[0] for c in local_ssh.run_command.call_args_list]
+            assert not any("chown" in c for c in calls), calls
+            assert not any("runuser" in c for c in calls), calls
+
+    async def test_rejects_unsafe_worker_user(self, db_session, make_task_run, mock_services):
+        """A server with an unsafe ``worker_user`` value fails fast."""
+        from backend.services.workspace.usernames import UsernameError
+
+        bad_server = MagicMock()
+        bad_server.workspace_root = "/home/workspace"
+        bad_server.worker_user = "evil;rm -rf /"
+        bad_server.username = "root"
+        bad_server.server_type = "remote"
+
+        bad_ssh = MagicMock()
+        bad_ssh.run_command = AsyncMock(return_value=("", "", 0))
+        bad_ssh.hostname = "h"
+        bad_ssh.port = 22
+        bad_ssh.username = "root"
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.workspace_setup.get_workspace_server",
+                new=AsyncMock(return_value=bad_server),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.executor_for_server",
+                return_value=bad_ssh,
+            ),
+            patch("backend.worker.phases.workspace_setup.RemoteGitOps"),
+            patch("backend.worker.phases.workspace_setup.RemoteSandbox"),
+            patch(
+                "backend.worker.phases.workspace_setup.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_auth_url",
+                new=AsyncMock(return_value=("https://x", "https")),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.get_project_token",
+                new=AsyncMock(return_value=None),
+            ),
+            pytest.raises(UsernameError, match="worker_user"),
+        ):
+            await workspace_setup.run(run, db_session, mock_services)

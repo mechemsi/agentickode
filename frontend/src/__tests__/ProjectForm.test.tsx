@@ -190,6 +190,40 @@ describe("ProjectForm", () => {
     expect(screen.getByText("Enable periodic issue polling")).toBeInTheDocument();
   });
 
+  it("submits local_path and worker_user_override when filled", () => {
+    const onSubmit = vi.fn();
+    render(
+      <ProjectForm initial={editInitial} onSubmit={onSubmit} onCancel={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByTestId("local-path-input"), {
+      target: { value: "/home/me/projects/myapp" },
+    });
+    fireEvent.change(screen.getByTestId("worker-user-override-input"), {
+      target: { value: "developer" },
+    });
+    fireEvent.click(screen.getByText("Save"));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        local_path: "/home/me/projects/myapp",
+        worker_user_override: "developer",
+      }),
+    );
+  });
+
+  it("submits null when local_path / worker_user_override are blank", () => {
+    const onSubmit = vi.fn();
+    render(
+      <ProjectForm initial={editInitial} onSubmit={onSubmit} onCancel={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByText("Save"));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        local_path: null,
+        worker_user_override: null,
+      }),
+    );
+  });
+
   it("submits integration_config when Notion fields are filled", () => {
     const onSubmit = vi.fn();
     const initialNotion = { ...editInitial, task_source: "notion" };

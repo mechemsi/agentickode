@@ -22,6 +22,8 @@ class ProjectConfig(Base):
     workspace_config = Column(JSONB, nullable=True)
     ai_config = Column(JSONB, nullable=True)
     workspace_path = Column(Text, nullable=True)
+    local_path = Column(Text, nullable=True)
+    worker_user_override = Column(Text, nullable=True)
     git_provider_token_enc = Column(Text, nullable=True)
     autonomy_config = Column(JSONB, nullable=True, default=dict)
     integration_config = Column(JSONB, nullable=False, default=dict, server_default="{}")

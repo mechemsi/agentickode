@@ -140,6 +140,41 @@ class TestCreateWorkspaceServer:
         assert data["status"] == "setting_up"
         assert data["worker_user"] == "coder"
 
+    async def test_create_honors_default_workspace_root_setting(self, client: AsyncClient):
+        """When ``workspace.default_root`` is set, new servers inherit it."""
+        # Seed the setting via the existing app-settings endpoint.
+        set_resp = await client.put(
+            "/api/app-settings/workspace.default_root",
+            json={"value": "/data/workspaces"},
+        )
+        assert set_resp.status_code == 200
+
+        resp = await client.post(
+            "/api/workspace-servers",
+            json={"name": "inherits-root", "hostname": "10.0.0.2"},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["workspace_root"] == "/data/workspaces"
+
+    async def test_create_explicit_workspace_root_overrides_setting(self, client: AsyncClient):
+        """Body-supplied ``workspace_root`` wins over the platform setting."""
+        await client.put(
+            "/api/app-settings/workspace.default_root",
+            json={"value": "/data/workspaces"},
+        )
+
+        resp = await client.post(
+            "/api/workspace-servers",
+            json={
+                "name": "explicit-root",
+                "hostname": "10.0.0.3",
+                "workspace_root": "/srv/work",
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["workspace_root"] == "/srv/work"
+
     async def test_create_has_no_agents_initially(self, client: AsyncClient):
         """Newly created server should have no agents (setup runs in background)."""
         resp = await client.post(

@@ -142,4 +142,25 @@ describe("Settings", () => {
       await screen.findByText("No SSH keys found. Keys are auto-generated on container start."),
     ).toBeInTheDocument();
   });
+
+  it("hydrates and saves the default workspace root", async () => {
+    const user = userEvent.setup();
+    mockGetAppSettings.mockResolvedValue({
+      "workspace.default_root": "/data/workspaces",
+    });
+    renderSettings();
+    const input = (await screen.findByTestId(
+      "default-workspace-root-input",
+    )) as HTMLInputElement;
+    expect(input.value).toBe("/data/workspaces");
+
+    await user.clear(input);
+    await user.type(input, "/srv/work");
+    await user.click(screen.getByText("Save"));
+
+    expect(mockUpdateAppSetting).toHaveBeenCalledWith(
+      "workspace.default_root",
+      "/srv/work",
+    );
+  });
 });

@@ -118,6 +118,8 @@ describe("TypeScript interfaces", () => {
       git_provider: "gitea",
       has_git_provider_token: false,
       workspace_path: null,
+      local_path: null,
+      worker_user_override: null,
       workspace_config: null,
       ai_config: null,
       workspace_server_ids: [],

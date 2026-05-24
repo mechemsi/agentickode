@@ -33,6 +33,8 @@ export interface ProjectConfig {
   ai_config: Record<string, unknown> | null;
   workspace_server_ids: number[];
   workspace_path: string | null;
+  local_path: string | null;
+  worker_user_override: string | null;
   has_git_provider_token: boolean;
   autonomy_config: AutonomyConfig | null;
   integration_config: Record<string, unknown>;

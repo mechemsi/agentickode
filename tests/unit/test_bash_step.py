@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from backend.models import PhaseExecution, ProjectConfig
+from backend.services.workspace.usernames import UsernameError
 from backend.worker.steps.bash_step import run_bash_step
 
 
@@ -139,3 +140,140 @@ class TestBashStep:
         await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
 
         executor.run_command.assert_awaited_once_with("sleep 1", timeout=30)
+
+    async def test_run_as_wraps_command_with_runuser(
+        self, db_session, mock_services, make_task_run
+    ):
+        """Step ``params.run_as`` wraps the rendered command in ``runuser -l``."""
+        project = ProjectConfig(
+            project_id="proj-bs-ra", project_slug="bsra", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-ra")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "root"
+
+        phase_config = {"params": {"command": "echo hi", "run_as": "domas"}}
+        await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        executed = executor.run_command.call_args[0][0]
+        assert executed.startswith("runuser -l domas -c ")
+        assert "echo hi" in executed
+
+    async def test_project_worker_user_override_used_when_no_step_run_as(
+        self, db_session, mock_services, make_task_run
+    ):
+        """Falls back to ``ProjectConfig.worker_user_override`` when step omits ``run_as``."""
+        project = ProjectConfig(
+            project_id="proj-bs-pwu",
+            project_slug="bspwu",
+            repo_owner="o",
+            repo_name="r",
+            worker_user_override="developer",
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-pwu")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "root"
+
+        phase_config = {"params": {"command": "id"}}
+        await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        executed = executor.run_command.call_args[0][0]
+        assert "runuser -l developer -c" in executed
+
+    async def test_no_wrap_when_executor_already_target_user(
+        self, db_session, mock_services, make_task_run
+    ):
+        """Skip wrapping when executor already runs as the requested user."""
+        project = ProjectConfig(
+            project_id="proj-bs-eq", project_slug="bseq", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-eq")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "domas"
+
+        phase_config = {"params": {"command": "echo hi", "run_as": "domas"}}
+        await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        assert executor.run_command.call_args[0][0] == "echo hi"
+
+    async def test_no_wrap_when_executor_non_root(self, db_session, mock_services, make_task_run):
+        """Skip wrapping when executor isn't root — ``runuser`` would fail anyway."""
+        project = ProjectConfig(
+            project_id="proj-bs-nr", project_slug="bsnr", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-nr")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "deploy"
+
+        phase_config = {"params": {"command": "echo hi", "run_as": "other"}}
+        await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        # Command stays unwrapped — let the OS surface a clear error if
+        # the deploy user happens to have passwordless sudo to ``other``.
+        assert executor.run_command.call_args[0][0] == "echo hi"
+
+    async def test_rejects_unsafe_step_run_as(self, db_session, mock_services, make_task_run):
+        """``params.run_as`` containing shell metacharacters is refused up front."""
+        project = ProjectConfig(
+            project_id="proj-bs-inj", project_slug="bsinj", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-inj")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "root"
+
+        phase_config = {"params": {"command": "echo hi", "run_as": "a;rm -rf /"}}
+        with pytest.raises(UsernameError, match="step.params.run_as"):
+            await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        executor.run_command.assert_not_called()
+
+    async def test_rejects_unsafe_project_worker_user_override(
+        self, db_session, mock_services, make_task_run
+    ):
+        """A misconfigured ``ProjectConfig.worker_user_override`` is refused."""
+        project = ProjectConfig(
+            project_id="proj-bs-bad",
+            project_slug="bsbad",
+            repo_owner="o",
+            repo_name="r",
+            worker_user_override="a`whoami`",
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-bs-bad")
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AsyncMock()
+        executor.run_command = AsyncMock(return_value=("", "", 0))
+        executor.username = "root"
+
+        phase_config = {"params": {"command": "id"}}
+        with pytest.raises(UsernameError, match="worker_user_override"):
+            await run_bash_step(run, db_session, mock_services, phase_config, executor=executor)
+
+        executor.run_command.assert_not_called()

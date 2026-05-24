@@ -26,15 +26,22 @@ from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.http_client import get_http_client
 from backend.services.workspace.command_executor import CommandExecutor, executor_for_server
+from backend.services.workspace.local_path import LocalPathError, validate_local_path
 from backend.services.workspace.readiness_service import (
     TTL_DAYS,
     WorkspaceReadinessService,
     format_fix_guide,
 )
 from backend.services.workspace.sandbox import RemoteSandbox
+from backend.services.workspace.usernames import validate_username
 from backend.services.workspace.worktree import WorktreeManager, make_worktree_paths
 from backend.worker.broadcaster import broadcaster, make_log_metadata
-from backend.worker.phases._helpers import get_auth_url, get_project_token, get_workspace_server
+from backend.worker.phases._helpers import (
+    get_auth_url,
+    get_project_config,
+    get_project_token,
+    get_workspace_server,
+)
 
 logger = logging.getLogger("agentickode.phases.workspace_setup")
 
@@ -73,27 +80,72 @@ async def run(
     remote_git = RemoteGitOps(ssh)
     remote_sandbox = RemoteSandbox(ssh)
 
+    project = await get_project_config(task_run, session)
     ws_cfg = task_run.workspace_config or {}
     ws_type = ws_cfg.get("workspace_type", "existing")
 
-    # Resolve full workspace path: prepend workspace_root for relative paths.
-    raw_path = task_run.workspace_path
-    if raw_path.startswith("/"):
-        workspace = raw_path
-    else:
-        workspace_root = server.workspace_root or "/home/workspace"
-        workspace = f"{workspace_root}/{raw_path}".rstrip("/")
-    task_run.workspace_path = workspace
+    # Effective worker user: project override > server default. Used for
+    # ``chown`` decisions and the safe.directory git config. Step-level
+    # ``params.run_as`` is applied later in step runners, not here.
+    worker_user = (project.worker_user_override if project else None) or server.worker_user
+    # Reject unsafe usernames before any of them flow into runuser/chown
+    # strings below. Falsy values (None/"") are fine — they just mean
+    # "no user drop".
+    if worker_user:
+        validate_username(worker_user, field="worker_user")
 
-    worker_user = server.worker_user
-    repos_cloned: list[str] = []
+    # ``runuser``-style chown / safe.directory wrapping is needed both for
+    # SSH-as-root (the historical case) and for local platform servers
+    # (``server_type='local'``) where ``LocalCommandService.username`` is
+    # the backend's own OS user and never equals ``"root"`` in SSH terms.
+    # Skip when we're already running as the target user — ``runuser``
+    # from a non-root caller typically fails without PAM/sudo config.
+    is_local_server = getattr(server, "server_type", None) == "local"
+    can_drop_privileges = ssh.username == "root"
+    needs_user_drop = (
+        bool(worker_user)
+        and worker_user != ssh.username
+        and (can_drop_privileges or is_local_server)
+    )
+
+    # --- Local-path shortcut: skip clone entirely ----------------------
+    # When ``project.local_path`` is set we assume the operator has the
+    # repo checked out on the workspace server. We validate (must exist,
+    # be a git repo, working tree clean) and use it as the workspace
+    # directly. ``ws_type``-specific branches are skipped — there's
+    # nothing to clone or scaffold.
+    local_path = project.local_path if project else None
+    if local_path:
+        await _log(f"Using project.local_path={local_path}, skipping clone")
+        try:
+            status = await validate_local_path(ssh, local_path)
+        except LocalPathError as exc:
+            await _log(str(exc), level="error")
+            raise
+        workspace = status.path
+        task_run.workspace_path = workspace
+        repos_cloned: list[str] = [workspace]
+        # We deliberately skip the workspace-wide chown below: chown'ing
+        # the user's working copy would change ownership of their files.
+        # The per-worktree chown still runs when strategy=worktree, which
+        # only touches ``.worktrees/run-X-Y``.
+    else:
+        # Resolve full workspace path: prepend workspace_root for relative paths.
+        raw_path = task_run.workspace_path
+        if raw_path.startswith("/"):
+            workspace = raw_path
+        else:
+            workspace_root = server.workspace_root or "/home/workspace"
+            workspace = f"{workspace_root}/{raw_path}".rstrip("/")
+        task_run.workspace_path = workspace
+        repos_cloned = []
 
     await _log(f"Workspace type={ws_type}, path={workspace}")
 
     # Mark workspace safe for git to avoid "dubious ownership" errors
     # when repo is cloned as root but operated by worker user
     await remote_git._mark_safe_directory(workspace)
-    if worker_user and ssh.username == "root":
+    if needs_user_drop:
         safe_cmd = (
             f"runuser -l {shlex.quote(worker_user)} -c "
             f"'git config --global --add safe.directory {shlex.quote(workspace)}'"
@@ -101,7 +153,12 @@ async def run(
         with contextlib.suppress(Exception):
             await ssh.run_command(safe_cmd, timeout=10)
 
-    if ws_type == "existing":
+    if local_path:
+        # Nothing to clone or scaffold — the operator's checkout *is* the
+        # workspace. We still run the worktree branch below so concurrent
+        # runs stay isolated under ``<local_path>/.worktrees/``.
+        pass
+    elif ws_type == "existing":
         branch = str(task_run.default_branch)
 
         # Ensure clone exists and is up-to-date
@@ -172,11 +229,14 @@ async def run(
     else:
         raise ValueError(f"Unknown workspace_type: {ws_type}")
 
-    # Ensure worker user can access workspace (clone runs as root)
-    if worker_user and ssh.username == "root":
+    # Ensure worker user can access workspace (clone runs as root). Skip
+    # when ``local_path`` is in use — that's the operator's working copy
+    # and we must not rewrite ownership of their files.
+    if needs_user_drop and not local_path:
         await _log(f"Setting workspace ownership to {worker_user}")
         owned_quoted = shlex.quote(workspace)
-        await ssh.run_command(f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60)
+        user_quoted = shlex.quote(worker_user)
+        await ssh.run_command(f"chown -R {user_quoted}:{user_quoted} {owned_quoted}", timeout=60)
 
     workspace_result: dict = {"workspace_path": workspace, "repos_cloned": repos_cloned}
 
@@ -187,6 +247,12 @@ async def run(
     # rest of the pipeline at it, and remember the paths so finalization
     # can tear it down idempotently.
     strategy = _resolve_workspace_strategy(ws_cfg, phase_config)
+    # When operating on the operator's own checkout, default to worktree
+    # isolation. Without this, two concurrent runs would both check out
+    # branches on the user's working tree and stomp on each other.
+    if local_path and strategy != "worktree":
+        await _log("local_path is set — forcing workspace_strategy=worktree for isolation")
+        strategy = "worktree"
     if strategy == "worktree":
         base_clone = workspace
         paths = make_worktree_paths(project_root=base_clone, run_id=task_run.id)
@@ -194,14 +260,16 @@ async def run(
             f"Creating worktree {paths.worktree_dir} on branch {paths.branch} "
             f"(strategy=worktree)"
         )
-        manager = WorktreeManager(ssh, worker_user=worker_user if ssh.username == "root" else None)
+        manager = WorktreeManager(ssh, worker_user=worker_user if needs_user_drop else None)
         await manager.create(paths)
 
         # Re-chown the new worktree so the worker user owns it (git
-        # worktree add inherits the caller's uid).
-        if worker_user and ssh.username == "root":
+        # worktree add inherits the caller's uid). This is always safe
+        # even with ``local_path`` — the worktree dir is new.
+        if needs_user_drop:
+            user_quoted = shlex.quote(worker_user)
             await ssh.run_command(
-                f"chown -R {worker_user}:{worker_user} {shlex.quote(paths.worktree_dir)}",
+                f"chown -R {user_quoted}:{user_quoted} {shlex.quote(paths.worktree_dir)}",
                 timeout=60,
             )
 
