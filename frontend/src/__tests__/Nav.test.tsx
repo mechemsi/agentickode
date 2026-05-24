@@ -13,7 +13,9 @@ describe("Nav", () => {
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Projects")).toBeInTheDocument();
     expect(screen.getByText("Servers")).toBeInTheDocument();
-    expect(screen.getByText("Roles")).toBeInTheDocument();
+    // Roles nav entry intentionally hidden — tracking removal in
+    // https://github.com/mechemsi/agentickode/issues/19.
+    expect(screen.queryByText("Roles")).not.toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 

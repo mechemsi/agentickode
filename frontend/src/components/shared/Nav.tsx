@@ -25,7 +25,10 @@ const links = [
   { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/workspace-servers", label: "Servers", icon: Server },
-  { to: "/roles", label: "Roles", icon: Cpu },
+  // Roles page hidden — tracked for removal in
+  // https://github.com/mechemsi/agentickode/issues/19. The /roles route
+  // is still mounted so backups/imports that reference role configs
+  // can be inspected manually for now.
   { to: "/gpu-dashboard", label: "GPU", icon: Activity },
   { to: "/agents", label: "Agents", icon: Bot },
   { to: "/workflows", label: "Workflows", icon: GitBranch },

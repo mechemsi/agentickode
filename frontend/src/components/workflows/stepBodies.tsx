@@ -4,7 +4,12 @@
 
 import type { PhaseConfig } from '../../types';
 
-const AGENT_ROLES = ['coder', 'planner', 'reviewer', 'fast'];
+// Roles are deprecated and slated for removal; see
+// https://github.com/mechemsi/agentickode/issues/19. We keep the
+// ``step.role`` field on the data model so existing templates and the
+// runtime resolver still work — we just don't surface a picker in the
+// step editor anymore. New agent steps default to ``role: "coder"`` via
+// the step factory.
 
 function getParamString(step: PhaseConfig, key: string): string {
   const v = step.params?.[key];
@@ -54,18 +59,6 @@ export function LegacyPhaseBody({
             </option>
           ))}
         </select>
-      </div>
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">Role</label>
-        <input
-          type="text"
-          value={step.role ?? ''}
-          onChange={(e) =>
-            onChange({ ...step, role: e.target.value || null })
-          }
-          placeholder="default"
-          className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-        />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="inline-flex items-center gap-2 text-xs text-gray-300">
@@ -158,37 +151,16 @@ export function AgentBody({ step, onParam, onChange }: BodyProps) {
   const mode = getParamString(step, 'mode') || 'generate';
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Role</label>
-          <select
-            value={step.role ?? 'coder'}
-            onChange={(e) =>
-              onChange({ ...step, role: e.target.value || null })
-            }
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          >
-            {AGENT_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-            {step.role && !AGENT_ROLES.includes(step.role) && (
-              <option value={step.role}>{step.role} (custom)</option>
-            )}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Mode</label>
-          <select
-            value={mode}
-            onChange={(e) => onParam('mode', e.target.value)}
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          >
-            <option value="generate">Generate</option>
-            <option value="task">Task</option>
-          </select>
-        </div>
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Mode</label>
+        <select
+          value={mode}
+          onChange={(e) => onParam('mode', e.target.value)}
+          className="w-full sm:w-1/2 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+        >
+          <option value="generate">Generate</option>
+          <option value="task">Task</option>
+        </select>
       </div>
       <div>
         <label className="block text-xs text-gray-400 mb-1">Prompt</label>
