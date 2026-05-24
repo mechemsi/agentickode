@@ -21,6 +21,7 @@ from backend.services.git import RemoteGitOps, get_git_provider
 from backend.services.git.ops import get_repo_https_url
 from backend.services.http_client import get_http_client
 from backend.services.workspace.sandbox import RemoteSandbox
+from backend.services.workspace.worktree import WorktreeManager, WorktreePaths
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import (
     close_run_session,
@@ -72,6 +73,14 @@ async def run(
     remote_sandbox = RemoteSandbox(ssh)
     await remote_sandbox.stop_sandbox(task_run.workspace_path)
 
+    # Tear down per-run worktree (when workspace_setup created one). We
+    # do this BEFORE the generic ``rm -rf`` because rm-ing a registered
+    # worktree dir without ``git worktree remove`` leaves the parent
+    # repo's ``.git/worktrees/<name>`` admin entry behind — better to let
+    # git handle removal cleanly. When ``keep_workspace=true`` on the
+    # phase config the dir is preserved so an operator can inspect it.
+    await _cleanup_worktree_if_any(task_run, ssh, phase_config)
+
     # Remove task-scoped workspace directory to free disk space.
     # Only delete if path ends with the task run ID (safety guard against
     # accidentally removing a shared base directory).
@@ -84,6 +93,50 @@ async def run(
         await ssh.run_command(f"rm -rf {shlex.quote(ws_path)}", timeout=60)
 
     await broadcaster.log(task_run.id, "Cleanup complete", phase="finalization")
+
+
+async def _cleanup_worktree_if_any(task_run: TaskRun, ssh, phase_config: dict | None) -> None:
+    """Remove the per-run worktree if workspace_setup created one.
+
+    No-op when:
+      * workspace_setup did not record worktree paths (default strategy)
+      * phase_config sets ``keep_workspace: true`` (debugging escape hatch)
+
+    Errors are swallowed — finalization should never fail because of a
+    cleanup hiccup; the orphan-cleanup scheduler will sweep stragglers.
+    """
+    worktree_meta = (task_run.workspace_result or {}).get("worktree_paths")
+    if not isinstance(worktree_meta, dict):
+        return
+    keep = bool((phase_config or {}).get("keep_workspace"))
+    if keep:
+        await broadcaster.log(
+            task_run.id,
+            f"Keeping worktree {worktree_meta.get('worktree_dir')} for debugging",
+            phase="finalization",
+        )
+        return
+    try:
+        paths = WorktreePaths(**worktree_meta)
+    except TypeError:
+        logger.warning(
+            "run #%d: worktree_paths metadata has unexpected shape: %r",
+            task_run.id,
+            worktree_meta,
+        )
+        return
+    try:
+        await WorktreeManager(ssh).remove(paths)
+        await broadcaster.log(
+            task_run.id, f"Removed worktree {paths.worktree_dir}", phase="finalization"
+        )
+    except Exception as exc:
+        logger.warning(
+            "run #%d: worktree cleanup failed for %s: %s",
+            task_run.id,
+            paths.worktree_dir,
+            exc,
+        )
 
 
 async def _push_to_pr_branch(task_run: TaskRun, pr_branch: str, session: AsyncSession) -> None:

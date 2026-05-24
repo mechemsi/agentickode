@@ -6,10 +6,27 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.worker.phases import finalization
 
 
 class TestFinalization:
+    @pytest.fixture(autouse=True)
+    async def _project_parent(self, db_session):
+        """All tests use proj-1; create the FK parent once per test."""
+        from backend.models import ProjectConfig
+
+        db_session.add(
+            ProjectConfig(
+                project_id="proj-1",
+                project_slug="x",
+                repo_owner="o",
+                repo_name="r",
+            )
+        )
+        await db_session.commit()
+
     async def test_logs_pr_url_and_cleans_up(self, db_session, make_task_run, mock_services):
         run = make_task_run(
             pr_url="https://gitea.test/org/repo/pulls/1",
@@ -126,6 +143,122 @@ class TestFinalization:
         cmd_arg = mock_ssh.run_command.call_args.args[0]
         assert "rm -rf" in cmd_arg
         assert str(run.id) in cmd_arg
+
+    async def test_worktree_removed_when_workspace_result_has_paths(
+        self, db_session, make_task_run, mock_services
+    ):
+        """worktree_paths in workspace_result triggers WorktreeManager.remove()."""
+        run = make_task_run(pr_url="https://gitea.test/org/repo/pulls/5")
+        run.workspace_result = {
+            "workspace_path": "/srv/repo/.worktrees/run-99-100",
+            "base_clone_path": "/srv/repo",
+            "worktree_paths": {
+                "branch": "run/99-100",
+                "worktree_dir": "/srv/repo/.worktrees/run-99-100",
+                "project_root": "/srv/repo",
+            },
+        }
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_ssh = AsyncMock()
+        mock_ssh.run_command = AsyncMock(return_value=("", "", 0))
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=mock_ssh),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.WorktreeManager") as mock_wm_cls,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+            mock_wm = mock_wm_cls.return_value
+            mock_wm.remove = AsyncMock()
+
+            await finalization.run(run, db_session, mock_services)
+
+            mock_wm.remove.assert_awaited_once()
+            removed_paths = mock_wm.remove.call_args.args[0]
+            assert removed_paths.worktree_dir == "/srv/repo/.worktrees/run-99-100"
+            assert removed_paths.branch == "run/99-100"
+
+    async def test_worktree_kept_when_keep_workspace_true(
+        self, db_session, make_task_run, mock_services
+    ):
+        """phase_config.keep_workspace=True preserves the worktree."""
+        run = make_task_run(pr_url="https://gitea.test/org/repo/pulls/6")
+        run.workspace_result = {
+            "workspace_path": "/srv/repo/.worktrees/run-100-200",
+            "worktree_paths": {
+                "branch": "run/100-200",
+                "worktree_dir": "/srv/repo/.worktrees/run-100-200",
+                "project_root": "/srv/repo",
+            },
+        }
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_ssh = AsyncMock()
+        mock_ssh.run_command = AsyncMock(return_value=("", "", 0))
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=mock_ssh),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.WorktreeManager") as mock_wm_cls,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+
+            await finalization.run(
+                run, db_session, mock_services, phase_config={"keep_workspace": True}
+            )
+
+            mock_wm_cls.assert_not_called()
+
+    async def test_worktree_cleanup_error_swallowed(self, db_session, make_task_run, mock_services):
+        """A failing worktree remove must not break finalization."""
+        run = make_task_run(pr_url="https://gitea.test/org/repo/pulls/7")
+        run.workspace_result = {
+            "worktree_paths": {
+                "branch": "run/101-300",
+                "worktree_dir": "/srv/repo/.worktrees/run-101-300",
+                "project_root": "/srv/repo",
+            },
+        }
+        db_session.add(run)
+        await db_session.commit()
+
+        mock_ssh = AsyncMock()
+        mock_ssh.run_command = AsyncMock(return_value=("", "", 0))
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=mock_ssh),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.WorktreeManager") as mock_wm_cls,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+            mock_wm_cls.return_value.remove = AsyncMock(side_effect=RuntimeError("git died"))
+
+            # Should NOT raise — finalization continues.
+            await finalization.run(run, db_session, mock_services)
 
     async def test_shared_workspace_not_deleted(self, db_session, make_task_run, mock_services):
         """Workspace paths that don't end with /{run.id} are not deleted."""
