@@ -16,6 +16,7 @@ class WorkflowTemplate(Base):
     name = Column(Text, unique=True, nullable=False)
     description = Column(Text, nullable=False, default="")
     label_rules = Column(JSONB, nullable=False, default=list)
+    triggers = Column(JSONB, nullable=False, default=list, server_default="[]")
     phases = Column(JSONB, nullable=False, default=list)
     is_default = Column(Boolean, nullable=False, default=False)
     is_system = Column(Boolean, nullable=False, default=False)

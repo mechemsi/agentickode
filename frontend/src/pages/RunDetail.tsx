@@ -18,6 +18,7 @@ import RunCostSummary from "../components/runs/RunCostSummary";
 import ApprovalButtons from "../components/runs/ApprovalButtons";
 import CodingResultsPanel from "../components/runs/CodingResultsPanel";
 import ComparisonResultsPanel from "../components/runs/ComparisonResultsPanel";
+import GenericStepResult from "../components/runs/GenericStepResult";
 import PlanReviewPanel from "../components/runs/PlanReviewPanel";
 import CollapsibleJSON from "../components/shared/CollapsibleJSON";
 import Info from "../components/shared/Info";
@@ -27,7 +28,7 @@ import PhaseTimeline from "../components/runs/PhaseTimeline";
 import RunTerminalDrawer from "../components/runs/RunTerminalDrawer";
 import StatusBadge from "../components/shared/StatusBadge";
 import SafeHtml from "../components/shared/SafeHtml";
-import type { ComparisonResults, TaskRunDetail as TRD } from "../types";
+import type { ComparisonResults, StepKind, TaskRunDetail as TRD } from "../types";
 
 function phaseLabel(p: string): string {
   return p
@@ -285,7 +286,14 @@ export default function RunDetail() {
         run.phase_executions
           .filter((pe) => pe.result)
           .map((pe) => (
-            <PhaseResult key={pe.id} phaseName={pe.phase_name} data={pe.result!} runId={runId} onRefresh={load} />
+            <PhaseResult
+              key={pe.id}
+              phaseName={pe.phase_name}
+              kind={(pe.phase_config?.kind as StepKind | undefined) ?? "legacy_phase"}
+              data={pe.result!}
+              runId={runId}
+              onRefresh={load}
+            />
           ))
       ) : (
         <>
@@ -322,7 +330,24 @@ export default function RunDetail() {
   );
 }
 
-function PhaseResult({ phaseName, data, runId, onRefresh }: { phaseName: string; data: Record<string, unknown>; runId: number; onRefresh: () => void }) {
+function PhaseResult({
+  phaseName,
+  kind,
+  data,
+  runId,
+  onRefresh,
+}: {
+  phaseName: string;
+  kind: StepKind;
+  data: Record<string, unknown>;
+  runId: number;
+  onRefresh: () => void;
+}) {
+  // Generic kinds (bash / agent) get their own kind-specific viewer.
+  if (kind === "bash" || kind === "agent") {
+    return <GenericStepResult phaseName={phaseName} kind={kind} data={data} />;
+  }
+  // Legacy-phase: keep the rich per-phase panels.
   if (phaseName === "coding") {
     if (data.comparison_mode) {
       return (
@@ -338,7 +363,7 @@ function PhaseResult({ phaseName, data, runId, onRefresh }: { phaseName: string;
   if (phaseName === "reviewing") {
     return <ReviewResultPanel data={data} />;
   }
-  const title = phaseName.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const title = phaseName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return <CollapsibleJSON title={`${title} Result`} data={data} />;
 }
 

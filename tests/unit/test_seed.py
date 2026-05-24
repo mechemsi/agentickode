@@ -103,6 +103,29 @@ class TestSeedAll:
         for t in result.scalars().all():
             assert t.phases, f"{t.name} has no phases"
 
+    async def test_example_composable_template_uses_bash_and_agent_kinds(self, seeded_db):
+        """example-composable demonstrates the ADR-007 step model."""
+        result = await seeded_db.execute(
+            select(WorkflowTemplate).where(WorkflowTemplate.name == "example-composable")
+        )
+        tpl = result.scalar_one()
+        assert tpl.label_rules == [], "example-composable should be manual-trigger only"
+
+        kinds_by_name = {p["phase_name"]: p.get("kind", "legacy_phase") for p in tpl.phases}
+        assert kinds_by_name == {
+            "workspace_setup": "legacy_phase",
+            "init": "legacy_phase",
+            "build": "bash",
+            "implement": "agent",
+            "deploy": "bash",
+        }
+        # Bash step has a command in params; agent step has a prompt
+        build = next(p for p in tpl.phases if p["phase_name"] == "build")
+        assert build["params"]["command"] == "make build"
+        implement = next(p for p in tpl.phases if p["phase_name"] == "implement")
+        assert "{{run.title}}" in implement["params"]["prompt"]
+        assert implement["params"]["mode"] == "task"
+
     async def test_seeds_role_configs(self, seeded_db):
         result = await seeded_db.execute(select(RoleConfig).where(RoleConfig.is_system.is_(True)))
         configs = result.scalars().all()

@@ -32,6 +32,32 @@ class TestPhaseExecutionRepo:
         assert result[1].phase_name == "approval"
         assert result[1].trigger_mode == "wait_for_approval"
 
+    async def test_create_for_run_preserves_step_kind(self, db_session, make_task_run):
+        """phase_config dict is stored verbatim — the `kind` discriminator
+        added in Task 1.1 must round-trip so the pipeline dispatcher
+        (Task 1.5) can branch on it."""
+        project = ProjectConfig(
+            project_id="proj-pe-kind", project_slug="pek", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-pe-kind")
+        db_session.add(run)
+        await db_session.commit()
+
+        repo = PhaseExecutionRepository(db_session)
+        phases = [
+            {"phase_name": "build", "kind": "bash", "params": {"command": "make build"}},
+            {"phase_name": "fix", "kind": "agent", "params": {"prompt": "fix it"}},
+            {"phase_name": "planning"},  # no kind → legacy default semantics
+        ]
+        result = await repo.create_for_run(run.id, phases)
+        await db_session.commit()
+
+        assert result[0].phase_config["kind"] == "bash"
+        assert result[0].phase_config["params"]["command"] == "make build"
+        assert result[1].phase_config["kind"] == "agent"
+        assert result[2].phase_config.get("kind") is None  # legacy template, dispatch defaults
+
     async def test_get_by_run(self, db_session, make_task_run):
         project = ProjectConfig(
             project_id="proj-pe2", project_slug="pe2", repo_owner="o", repo_name="r"

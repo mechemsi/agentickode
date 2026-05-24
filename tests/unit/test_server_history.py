@@ -6,7 +6,11 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from backend.models import AgentInvocation, TaskRun, WorkspaceServer
+
+pytestmark = pytest.mark.usefixtures("seed_proj1")
 
 
 async def _seed(db_session, server_id: int, run_id: int, count: int = 5):

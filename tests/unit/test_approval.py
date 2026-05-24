@@ -6,6 +6,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.worker.phases import approval
 
 
@@ -38,6 +40,21 @@ def _approval_patches():
 
 
 class TestApproval:
+    @pytest.fixture(autouse=True)
+    async def _project_parent(self, db_session):
+        """Seed proj-1 ProjectConfig so make_task_run's default FK is satisfied."""
+        from backend.models import ProjectConfig
+
+        db_session.add(
+            ProjectConfig(
+                project_id="proj-1",
+                project_slug="x",
+                repo_owner="o",
+                repo_name="r",
+            )
+        )
+        await db_session.commit()
+
     async def test_pushes_and_creates_pr(self, db_session, make_task_run, mock_services):
         run = make_task_run(
             review_result={"approved": True, "issues": [], "suggestions": ["test it"]},

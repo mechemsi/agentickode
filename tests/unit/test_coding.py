@@ -14,6 +14,25 @@ from backend.worker.phases import coding
 
 
 class TestCoding:
+    @pytest.fixture(autouse=True)
+    async def _project_parent(self, db_session):
+        """Seed proj-1 ProjectConfig + ws id=1,42 so make_task_run + AgentInvocation FKs are satisfied."""
+        from backend.models import ProjectConfig, WorkspaceServer
+
+        db_session.add(
+            ProjectConfig(
+                project_id="proj-1",
+                project_slug="x",
+                repo_owner="o",
+                repo_name="r",
+            )
+        )
+        for sid in range(1, 50):
+            db_session.add(
+                WorkspaceServer(id=sid, name=f"ws-{sid}", hostname=f"10.0.0.{sid % 255}")
+            )
+        await db_session.commit()
+
     async def test_executes_subtasks(self, db_session, make_task_run, mock_services):
         run = make_task_run(
             planning_result={

@@ -20,6 +20,8 @@ from backend.worker.broadcaster import broadcaster
 logger = logging.getLogger("agentickode.phases.task_creation")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Create child task runs from subtasks",
 }
 

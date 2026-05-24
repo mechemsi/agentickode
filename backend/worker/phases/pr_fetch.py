@@ -22,6 +22,8 @@ from backend.worker.phases._helpers import get_project_token
 logger = logging.getLogger("agentickode.phases.pr_fetch")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Fetch PR diff and comments from git provider",
 }
 

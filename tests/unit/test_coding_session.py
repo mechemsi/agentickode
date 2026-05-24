@@ -6,6 +6,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.services.role_resolver import ResolvedRole
 from backend.worker.phases import coding
 from backend.worker.phases._coding_utils import (
@@ -95,6 +97,8 @@ class TestGetPreviousSessionId:
 
 
 class TestCodingSessionGeneration:
+    pytestmark = pytest.mark.usefixtures("seed_proj1")
+
     async def test_session_id_generated_for_session_capable_agent(
         self, db_session, make_task_run, mock_services
     ):

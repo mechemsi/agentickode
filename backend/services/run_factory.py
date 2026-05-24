@@ -30,10 +30,15 @@ def create_task_run(
     task_source: str,
     task_source_meta: dict,
     use_claude: bool = False,
+    workflow_template_id: int | None = None,
 ) -> TaskRun:
     """Create a TaskRun from a project config and task details.
 
     Reused by webhooks, scheduler, monitoring, and messaging sources.
+
+    ``workflow_template_id`` lets the caller pre-bind the run to a template
+    resolved via ``TriggerMatcher`` so the pipeline skips its label-match
+    fallback.
     """
     execution_mode = "structured"
     if project.autonomy_config and isinstance(project.autonomy_config, dict):
@@ -55,4 +60,5 @@ def create_task_run(
         use_claude_api=use_claude,
         workspace_config=project.workspace_config,
         execution_mode=execution_mode,
+        workflow_template_id=workflow_template_id,
     )

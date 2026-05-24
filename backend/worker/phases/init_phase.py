@@ -22,6 +22,7 @@ logger = logging.getLogger("agentickode.phases.init")
 
 PHASE_META = {
     "name": "init",
+    "kind": "builtin",
     "description": "Create feature branch and fetch context",
 }
 

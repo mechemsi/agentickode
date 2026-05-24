@@ -199,7 +199,7 @@ describe("NewRun", () => {
   it("shows advanced options when toggle is clicked", async () => {
     renderNewRun();
     fireEvent.click(screen.getByText("Advanced Options"));
-    expect(screen.getByText("Per-Phase Agent Overrides")).toBeInTheDocument();
+    expect(screen.getByText("Per-Step Agent Overrides")).toBeInTheDocument();
     expect(screen.getByText("coding")).toBeInTheDocument();
     expect(screen.getByText("reviewing")).toBeInTheDocument();
   });

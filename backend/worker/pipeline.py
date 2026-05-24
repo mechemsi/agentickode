@@ -24,6 +24,8 @@ from backend.services.workspace.ssh_service import SSHCommandError
 from backend.worker.broadcaster import broadcaster
 from backend.worker.phases._helpers import close_run_session
 from backend.worker.phases.registry import discover_phases
+from backend.worker.steps import agent_step as _agent_step_mod
+from backend.worker.steps import bash_step as _bash_step_mod
 
 logger = logging.getLogger("agentickode.pipeline")
 
@@ -58,7 +60,14 @@ def _get_phase_modules() -> dict:
     return _phase_modules
 
 
-# Legacy JSONB column mapping: phase_name → TaskRun attribute
+# Legacy JSONB column mapping: phase_name → TaskRun attribute.
+#
+# Deprecated in 0.5.0 (ADR-007): we no longer write to these columns on phase
+# completion — the authoritative result is ``PhaseExecution.result``. The map
+# is retained for one release so existing code paths that READ these columns
+# (run detail view fallback, analytics queries) continue to work for runs
+# that completed before the cut-over. The columns themselves will be
+# dropped in 0.7.0; the read fallbacks should be removed in 0.6.0.
 _LEGACY_RESULT_MAP = {
     "workspace_setup": "workspace_result",
     "planning": "planning_result",
@@ -71,6 +80,48 @@ _LEGACY_RESULT_MAP = {
 def _get_phase_module(phase_name: str):
     """Resolve a phase module by name from the registry."""
     return _get_phase_modules().get(phase_name)
+
+
+class UnknownStepKindError(Exception):
+    """Raised when ``phase_config['kind']`` doesn't match a known dispatcher.
+
+    Distinct from generic exceptions raised inside a step runner so the
+    pipeline can mark the phase ``"skipped"`` rather than retry-and-fail
+    the whole run when a template is misconfigured.
+    """
+
+
+async def _dispatch_step(
+    run: TaskRun,
+    session: AsyncSession,
+    services: ServiceContainer,
+    phase_exec: PhaseExecution,
+) -> dict[str, Any] | str | None:
+    """Dispatch a phase execution to its runner based on ``phase_config['kind']``.
+
+    Returns whatever the runner returns. Raises ``UnknownStepKindError`` for
+    unknown kinds or missing legacy modules; the caller marks the phase
+    ``"skipped"`` on that signal rather than failing the run.
+
+    Step modules are accessed via the bound module references so that tests
+    can ``monkeypatch.setattr`` the functions on their source modules.
+    """
+    cfg = phase_exec.phase_config or {}
+    kind = cfg.get("kind", "legacy_phase")
+
+    if kind == "bash":
+        return await _bash_step_mod.run_bash_step(run, session, services, cfg)
+
+    if kind == "agent":
+        return await _agent_step_mod.run_agent_step(run, session, services, cfg)
+
+    if kind == "legacy_phase":
+        phase_mod = _get_phase_module(phase_exec.phase_name)
+        if phase_mod is None:
+            raise UnknownStepKindError(f"Unknown legacy phase: {phase_exec.phase_name}")
+        return await phase_mod.run(run, session, services, phase_config=cfg)
+
+    raise UnknownStepKindError(f"Unknown step kind: {kind!r} for phase {phase_exec.phase_name!r}")
 
 
 async def _get_project_execution_mode(run: TaskRun, session: AsyncSession) -> str:
@@ -239,8 +290,15 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
             break
 
         phase_name = phase_exec.phase_name
-        phase_mod = _get_phase_module(phase_name)
-        if phase_mod is None:
+
+        # Legacy-phase fast skip: if kind=='legacy_phase' (default) AND the
+        # named module doesn't exist, skip with a warning. Non-legacy kinds
+        # (bash/agent/...) intentionally bypass this check.
+        cfg = phase_exec.phase_config or {}
+        if (
+            cfg.get("kind", "legacy_phase") == "legacy_phase"
+            and _get_phase_module(phase_name) is None
+        ):
             logger.warning("Unknown phase '%s', skipping", phase_name)
             await pe_repo.update_status(phase_exec, "skipped")
             continue
@@ -275,9 +333,15 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
         await broadcaster.log(run.id, f"Starting phase: {phase_name}", phase=phase_name)
 
         try:
-            result = await phase_mod.run(
-                run, session, services, phase_config=phase_exec.phase_config
-            )
+            result = await _dispatch_step(run, session, services, phase_exec)
+        except UnknownStepKindError as e:
+            # Unknown kind / unknown legacy phase fell through — skip the
+            # phase (don't fail the run) so a misconfigured template doesn't
+            # take down an otherwise-valid pipeline.
+            logger.warning("Cannot dispatch phase '%s': %s", phase_name, e)
+            await pe_repo.update_status(phase_exec, "skipped", error_message=str(e))
+            await session.commit()
+            continue
         except Exception as e:
             logger.exception(f"Run #{run.id} failed in {phase_name}")
 
@@ -346,10 +410,9 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
         result_data = result if isinstance(result, dict) else None
         await pe_repo.update_status(phase_exec, "completed", result=result_data)
 
-        # Populate legacy JSONB columns for backward compat
-        legacy_attr = _LEGACY_RESULT_MAP.get(phase_name)
-        if legacy_attr and result_data:
-            setattr(run, legacy_attr, result_data)
+        # Per ADR-007 we no longer mirror result_data into the legacy
+        # TaskRun.*_result columns — PhaseExecution.result is authoritative.
+        # Read-path fallbacks for old runs stay in place until 0.6.0.
 
         await broadcaster.log(run.id, f"Phase complete: {phase_name}", phase=phase_name)
         await broadcaster.event(run.id, "phase_completed", {"phase": phase_name})

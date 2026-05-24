@@ -33,6 +33,8 @@ from backend.worker.phases._reviewing_loop import run_review_loop
 logger = logging.getLogger("agentickode.phases.reviewing")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "AI code review with auto-fix retry loop",
     "default_role": "reviewer",
     "default_agent_mode": "generate",

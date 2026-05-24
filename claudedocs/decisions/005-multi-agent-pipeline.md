@@ -1,8 +1,10 @@
 # ADR-005: Multi-Agent Pipeline (Planner / Coder / Reviewer)
 
+> **Superseded by [ADR-007: Composable Step Workflows](007-composable-step-workflows.md).** See ADR-007 for the current design; this document is retained for historical context.
+
 ## Status
 
-Accepted
+Superseded by ADR-007
 
 ## Context
 

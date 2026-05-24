@@ -2,9 +2,9 @@
 
 # AgenticKode
 
-### Turn issues into pull requests with AI agents
+### Composable AI workflows triggered by your tools
 
-**Create an issue. AgenticKode clones your repo, plans the work, writes the code, runs tests, opens a PR, and waits for your approval. Run a structured 8-phase pipeline or let agents work autonomously — either way, fully self-hosted, you stay in control.**
+**Compose `bash` and `agent` steps into workflows that run when an issue is filed, a webhook fires, or a cron tick lands. AgenticKode handles the workspace, the prompt rendering, the retries, and the human-approval gate. Self-hosted, pluggable, and honest about what your agent actually does.**
 
 <br>
 
@@ -39,55 +39,65 @@ Most AI coding tools are chat-based — you type prompts, copy-paste code, manua
 
 **What makes AgenticKode different:**
 
-- **Two workflow modes** — Structured 8-phase pipeline for maximum control, or autonomous mode where agents work independently and deliver a PR.
-- **Issue-to-PR automation** — Not a chatbot. A full automation platform that takes an issue and delivers a PR with code, tests, and review.
+- **Composable `bash` + `agent` steps with first-class triggers** — Workflows are arrays of steps. Each step is either a shell command on the workspace or an agent invocation with a rendered prompt. Both share the same rules (timeout, retry, failure_mode, trigger_mode). The legacy 8-phase shape is preserved as one of several seeded templates ([ADR-007](claudedocs/decisions/007-composable-step-workflows.md)).
+- **Trigger-driven, not just manual** — Templates declare what fires them: GitHub/Gitea/GitLab/Plane/Notion webhooks, schedule (cron), labels, PR events, or manual.
 - **Self-hosted & private** — Your code never leaves your infrastructure. Run it on your own servers with your own models.
-- **7+ AI agents** — Claude CLI, Codex, Gemini, Aider, OpenCode, Kimi, Copilot, Ollama, OpenHands — all with auto-install. Mix and match per role.
-- **Smart workspaces** — Multi-server assignment, server groups, automatic load balancing, parallel runs, persistent CLI sessions with tmux.
-- **Human-in-the-loop** — Every PR requires your approval. You see the plan before coding starts. You control every phase.
-- **Multi-agent comparison** — Run the same task with different agents in parallel, compare the results, pick the winner.
-- **Works with your stack** — GitHub, GitLab, Gitea, Bitbucket. Plane, GitHub Issues, GitLab Issues. Slack, Discord, Telegram notifications.
+- **7+ AI agents** — Claude CLI, Codex, Gemini, Aider, OpenCode, Kimi, Copilot, Ollama, OpenHands — all with auto-install. Mix and match per step.
+- **Smart workspaces** — Multi-server assignment, server groups, automatic load balancing, parallel runs, persistent CLI sessions with tmux, optional per-run worktrees.
+- **Human-in-the-loop where it matters** — Any step can be marked `trigger_mode: wait_for_approval` and park the run for human review. Otherwise the workflow runs end-to-end.
+- **Multi-agent comparison** — Run the same workflow with different agents in parallel, compare the results, pick the winner.
+- **Works with your stack** — GitHub, GitLab, Gitea, Bitbucket. Plane, GitHub Issues, GitLab Issues, Notion. Slack, Discord, Telegram notifications.
 
 ## How It Works
 
-AgenticKode offers two workflow modes:
-
-| Mode | How It Works | Best For |
-|------|-------------|----------|
-| **Pipeline Mode** | 8-phase sequential pipeline with per-phase controls, approval gates, and live streaming | Structured tasks where you want full visibility and control over each step |
-| **Autonomous Mode** | Agent works independently — analyzes context, writes code, runs tests, opens PR | Fast turnaround where you trust the agent and just want to review the result |
-
-### Pipeline Mode
+Every task runs a **workflow** — a user-composed sequence of `bash` and `agent` steps. Two built-in steps (`workspace_setup`, `init`) always run first; the rest is defined per-template and routed to the worker by triggers.
 
 ```
-┌─────────────┐     ┌──────────────────────────────────────────────────────────────────┐     ┌──────────────┐
-│             │     │                     AgenticKode Pipeline                              │     │              │
-│  Issue      │────>│  Setup → Init → Plan → Code → Test → Review → Approve → Done    │────>│  Pull        │
-│  Created    │     │   ↑                                                      ↑       │     │  Request     │
-│             │     │   └── live logs, phase controls, cost tracking ──────────┘       │     │              │
-└─────────────┘     └──────────────────────────────────────────────────────────────────┘     └──────────────┘
+┌─────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐
+│  Trigger    │ -> │  Template    │ -> │  Workspace   │ -> │  Steps               │
+│  matcher    │    │  (steps[])   │    │  setup+init  │    │  bash | agent | ...  │
+└─────────────┘    └──────────────┘    └──────────────┘    └──────────────────────┘
+   ^                                                              │
+   │   webhook · schedule · label · PR event · manual             ▼
+   │                                                       PR · message · done
+   └─── GitHub · Gitea · GitLab · Plane · Notion · cron ──────────┘
 ```
 
-### The 8-Phase Pipeline
+| Concept | What it is | Configured per |
+|---------|------------|----------------|
+| **Trigger** | Declarative rule that fires a workflow when something happens | Template |
+| **Workspace strategy** | `shared_clone` (default) or `worktree` (per-run, timestamped) | Template / project |
+| **Step kind** | `bash`, `agent`, or `legacy_phase` — what the step actually does | Step |
+| **Step rules** | `timeout_seconds`, `retry_count`, `failure_mode`, `trigger_mode` | Step |
+| **Templating** | `{{run.title}}`, `{{run.description}}`, `{{steps.NAME.field}}` available in any string field | Step |
 
-| Phase | What Happens | You Control |
-|-------|-------------|-------------|
-| **1. Workspace Setup** | Clones repo, creates feature branch | Automatic |
-| **2. Init** | Analyzes project structure, gathers context | Automatic |
-| **3. Planning** | AI decomposes issue into subtasks | Review plan before proceeding |
-| **4. Coding** | AI writes code for each subtask | Watch live, retry if needed |
-| **5. Testing** | Runs test suite, reports coverage | Auto or manual trigger |
-| **6. Reviewing** | AI reviews its own code changes | See review feedback |
-| **7. Approval** | Creates PR, waits for your approval | Approve, reject, or send back |
-| **8. Finalization** | Sends notifications, cleans up | Automatic |
+### Step Kinds
 
-Each phase can be configured independently: auto-advance, wait for manual trigger, or require human approval. Watch everything happen in real time with live log streaming.
+| Kind | What it does | Typical use |
+|------|--------------|-------------|
+| **`bash`** | Runs a shell command on the workspace server via `CommandExecutor`. Captures stdout/stderr/exit. | Build, test, lint, `gh pr create`, anything CLI. |
+| **`agent`** | Invokes a role (planner / coder / reviewer / custom) through `RoleResolver` with a rendered prompt. Supports `mode: generate` or `mode: task`, session continuity (`session_id`, `new_session`), and per-step `agent_override`. | Decompose work, write code, review a diff, summarize logs, anything LLM-shaped. |
+| **`legacy_phase`** | Invokes one of the original domain modules (`planning`, `coding`, `testing`, `reviewing`, `approval`, `finalization`, `pr_fetch`, `task_creation`, `agent_loop`). Kept indefinitely for back-compat. | The `default` workflow template uses this kind for every step — existing templates keep running unchanged. |
+
+### Triggers
+
+A template's `triggers[]` array declares when the workflow auto-fires:
+
+| Type | Fires when | Example |
+|------|------------|---------|
+| **`label`** | An incoming task carries a matching label | `{type: label, value: bug}` |
+| **`issue_event`** | A webhook reports an issue lifecycle event | `{type: issue_event, action: opened}` |
+| **`pr_event`** | A webhook reports a PR event | `{type: pr_event, action: review_requested}` |
+| **`schedule`** | A cron tick lands | `{type: schedule, cron: "0 * * * *"}` |
+| **`manual`** | A user (or the API) creates a run against this template | `{type: manual}` |
+
+Webhooks from GitHub, Gitea, GitLab, Plane, and Notion all funnel through a single `TriggerMatcher` service that routes the incoming event to the template whose triggers match.
 
 <div align="center">
 
-<img src="docs/screenshots/run-detail-top.png" alt="Run Detail - Phase Timeline" width="100%">
+<img src="docs/screenshots/run-detail-top.png" alt="Run Detail - Step Timeline" width="100%">
 
-*Run detail view with phase timeline, task metadata, PR link, and action buttons*
+*Run detail view with step timeline, task metadata, PR link, and action buttons*
 
 </div>
 
@@ -137,17 +147,17 @@ AgenticKode's plugin architecture makes it easy to add new agents:
 - **API agents**: Implement the `RoleAdapter` Protocol (4 methods: `provider_name`, `generate`, `run_task`, `is_available`) and register in the `AdapterFactory`.
 - **Per-agent config**: Each agent has configurable timeouts, retry limits, environment variables, and CLI flags — all manageable from the UI.
 
-#### Mix & Match Per Role
+#### Mix & Match Per Step
 
-Use different agents for different roles in the same pipeline run:
+Use different agents for different steps in the same workflow:
 
 ```
-Planning  →  Ollama (qwen2.5-coder:32b)     # Fast, free, local
-Coding    →  Claude CLI                       # Best code quality
-Reviewing →  Ollama (qwen2.5-coder:14b)      # Cost-effective review
+plan    →  agent[role: planner]   →  Ollama (qwen2.5-coder:32b)   # Fast, free, local
+code    →  agent[role: coder]     →  Claude CLI                    # Best code quality
+review  →  agent[role: reviewer]  →  Ollama (qwen2.5-coder:14b)   # Cost-effective review
 ```
 
-**Workflow templates**: Create templates that auto-select agents based on issue labels. `bug` label routes to one agent configuration, `feature` to another. Each template can override agents per-phase.
+**Workflow templates**: Create templates that auto-fire on triggers (`label: bug`, `issue_event: opened`, `schedule: "0 * * * *"`, etc.). Each step inside a template can override the agent, prompt, and timeout independently. See [ADR-007](claudedocs/decisions/007-composable-step-workflows.md) for the design rationale.
 
 <img src="docs/screenshots/workflows.png" alt="Workflow Templates" width="100%">
 
@@ -189,7 +199,7 @@ Manage long-running AI agent sessions with tmux-based persistence:
 
 ### Autonomous Mode
 
-For tasks that don't need phase-by-phase control:
+For tasks that don't need step-by-step control:
 
 - **Context builder**: Agent analyzes project structure and relevant files before starting
 - **Configurable autonomy**: Set autonomy levels — how much freedom the agent gets
@@ -242,7 +252,7 @@ AgenticKode includes a dedicated dashboard for managing your Ollama LLM servers:
 - **Register multiple Ollama servers** — connect to Ollama instances across your infrastructure
 - **Health monitoring** — automatic status checks with last-seen timestamps
 - **Model discovery** — auto-fetch available models from each server
-- **Role assignment** — assign specific servers and models to pipeline roles (planner, coder, reviewer)
+- **Role assignment** — assign specific servers and models to roles (planner, coder, reviewer, custom)
 
 #### GPU Monitoring
 - **Real-time GPU status** — see VRAM usage per loaded model across all servers
@@ -250,7 +260,7 @@ AgenticKode includes a dedicated dashboard for managing your Ollama LLM servers:
 - **Running model list** — view all currently loaded models with memory footprint and expiry timers
 
 #### Model Control
-- **Preload models** — load models into GPU memory before pipeline runs to eliminate cold-start delays
+- **Preload models** — load models into GPU memory before workflow runs to eliminate cold-start delays
 - **Unload models** — free GPU memory by unloading models you're not using
 - **Keep-alive configuration** — control how long models stay loaded after last use
 
@@ -259,14 +269,14 @@ This lets you optimize GPU utilization across multiple servers — preload your 
 ### Real-Time Monitoring
 
 - **Live log streaming** via WebSocket — see exactly what the AI agent is doing
-- **Phase timeline** — clickable visualization of pipeline progress
+- **Step timeline** — clickable visualization of workflow progress
 - **Cost tracking** — per-invocation token counting and cost estimation
 - **Analytics dashboard** — 14-day rolling charts of runs, costs, and success rates
 - **Health monitoring** — database, Redis, Ollama, OpenHands status at a glance
 
 ### Project Configuration
 
-- **Per-project instructions** — Global prompts plus phase-specific instructions (e.g., "always use pytest", "follow our naming conventions")
+- **Per-project instructions** — Global prompts plus step-specific instructions (e.g., "always use pytest", "follow our naming conventions")
 - **Encrypted secrets** — Store API keys and credentials that get injected into agent prompts securely
 - **Comparison mode** — Run multiple agents on the same task, compare outputs side-by-side, pick the best result
 
@@ -284,7 +294,7 @@ This lets you optimize GPU utilization across multiple servers — preload your 
 - **Backup & restore** — Full config export/import with optional AES encryption
 - **GPU dashboard** — Monitor Ollama server GPU utilization and manage models
 - **Queue scheduling** — Control concurrent run limits and prioritization
-- **Retry & restart** — Retry failed phases or restart entire runs
+- **Retry & restart** — Retry failed steps or restart entire runs
 
 ## Architecture
 
@@ -299,12 +309,13 @@ This lets you optimize GPU utilization across multiple servers — preload your 
 │                                                   │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────┐ │
 │  │ REST API    │  │ Worker Engine│  │ Services│  │
-│  │ Routes      │  │ 8-Phase      │  │         │  │
-│  │ WebSocket   │  │ Pipeline     │  │ Git     │  │
-│  │ SSE         │  │ Broadcaster  │  │ Agents  │  │
-│  │ Webhooks    │  │ Queue        │  │ SSH     │  │
-│  └─────────────┘  └──────────────┘  │ Notify  │  │
-│                                      └─────────┘ │
+│  │ Routes      │  │ Step runner  │  │         │  │
+│  │ WebSocket   │  │ (bash/agent/ │  │ Git     │  │
+│  │ SSE         │  │  legacy)     │  │ Agents  │  │
+│  │ Webhooks ─→ │  │ Trigger      │  │ SSH     │  │
+│  │  Trigger    │  │ matcher      │  │ Notify  │  │
+│  │  matcher    │  │ Broadcaster  │  │         │  │
+│  └─────────────┘  └──────────────┘  └─────────┘ │
 ├──────────────────┬──────────────────────────────┤
 │   PostgreSQL 16  │         Redis 7               │
 │   JSONB storage  │     Cache & queues            │
@@ -321,7 +332,7 @@ This lets you optimize GPU utilization across multiple servers — preload your 
 
 - **Protocol-driven**: `GitProvider` and `RoleAdapter` Protocols make everything pluggable
 - **Repository pattern**: Clean separation between API routes and database access
-- **Dependency injection**: `ServiceContainer` provides services to worker phases
+- **Dependency injection**: `ServiceContainer` provides services to worker steps
 - **Async-first**: Built on async SQLAlchemy, httpx, and FastAPI for high concurrency
 
 ## Quick Start
@@ -360,7 +371,7 @@ docker compose -f docker-compose.dev.yml up -d
 1. **Add a workspace server** — Go to Servers, add your remote machine's SSH details
 2. **Create a project** — Add your repo URL and git provider credentials
 3. **Create a run** — Pick a project, describe the task (or connect webhooks for automatic triggering)
-4. **Watch it work** — Follow the live pipeline, review the plan, approve the PR
+4. **Watch it work** — Follow the live workflow, review the plan, approve the PR
 
 ## Configuration
 
@@ -378,7 +389,7 @@ docker compose -f docker-compose.dev.yml up -d
 | `GITHUB_TOKEN` | GitHub personal access token | — |
 | `GITEA_URL` / `GITEA_TOKEN` | Gitea server URL and token | — |
 | `GITLAB_TOKEN` | GitLab personal access token | — |
-| `MAX_CONCURRENT_RUNS` | Max parallel pipeline runs | `3` |
+| `MAX_CONCURRENT_RUNS` | Max parallel workflow runs | `3` |
 | `APPROVAL_TIMEOUT_HOURS` | Hours before approval times out | `24` |
 | `ENCRYPTION_KEY` | AES key for backup encryption | — |
 
@@ -420,8 +431,8 @@ agentickode/
 │   │   ├── workspace/    # SSH, agent discovery, worker users, sessions
 │   │   ├── notifications/# Slack, Discord, Telegram, webhooks
 │   │   └── backup/       # Export/import with encryption
-│   ├── worker/           # Pipeline engine
-│   │   └── phases/       # 8 phase implementations
+│   ├── worker/           # Workflow engine + step runners (bash, agent)
+│   │   └── phases/       # legacy phase implementations (deprecated; see ADR-007)
 │   ├── repositories/     # Database access layer
 │   ├── models/           # SQLAlchemy models (16+ entities)
 │   └── schemas/          # Pydantic request/response schemas
@@ -445,9 +456,11 @@ agentickode/
 | Document | Description |
 |----------|-------------|
 | [`CLAUDE.md`](CLAUDE.md) | AI agent instructions and project conventions |
-| [`docs/WORKER_PIPELINE.md`](docs/WORKER_PIPELINE.md) | Complete worker pipeline technical reference |
+| [`docs/workflows.md`](docs/workflows.md) | Composable workflow reference — step kinds, triggers, templating, migration |
+| [`docs/WORKER_PIPELINE.md`](docs/WORKER_PIPELINE.md) | Legacy 8-phase pipeline reference (preserved for back-compat; see `workflows.md`) |
+| [`claudedocs/decisions/007-composable-step-workflows.md`](claudedocs/decisions/007-composable-step-workflows.md) | ADR-007 — design rationale for the composable model |
 | [`docs/guides/09-webhook-setup.md`](docs/guides/09-webhook-setup.md) | Webhook setup for GitHub, GitLab, Gitea, Plane |
-| [`docs/guides/decisions/`](docs/guides/decisions/) | Architecture decision records |
+| [`claudedocs/decisions/`](claudedocs/decisions/) | Architecture decision records |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution guidelines |
 | [`SECURITY.md`](SECURITY.md) | Security vulnerability reporting |
 
@@ -462,7 +475,7 @@ agentickode/
 - [x] Per-server git connections
 - [x] 7 CLI agent integrations with auto-install
 - [ ] One-click deployment templates (Docker Hub, Railway, Coolify)
-- [ ] Plugin system for custom pipeline phases
+- [ ] Plugin system for custom step kinds beyond `bash` and `agent`
 - [ ] Multi-tenant support with team permissions
 - [ ] Built-in code review with inline commenting
 - [ ] Mobile-responsive UI

@@ -2,351 +2,65 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
   ChevronUp,
   GitBranch,
   Plus,
-  Settings,
   Shield,
   Trash2,
-} from "lucide-react";
+} from 'lucide-react';
 import {
-  getWorkflowTemplates,
-  getAgents,
-  getRoleAssignments,
-  getPhases,
   createWorkflowTemplate,
-  updateWorkflowTemplate,
   deleteWorkflowTemplate,
-} from "../api";
-import type { AgentSettings, PhaseConfig, PhaseInfo, RoleAssignment, WorkflowTemplate } from "../types";
-import { useConfirm } from "../components/shared/ConfirmDialog";
-import { useToast } from "../components/shared/Toast";
-import { KVEditor, parseKV, kvToObject } from "../components/shared/KVEditor";
-import type { KVEntry } from "../components/shared/KVEditor";
-
-const getEffectiveMode = (
-  phase: PhaseConfig,
-  phaseModes: Record<string, "generate" | "task">,
-): "generate" | "task" => {
-  if (phase.agent_mode === "generate" || phase.agent_mode === "task") return phase.agent_mode;
-  return phaseModes[phase.phase_name] ?? "generate";
-};
-
-const MODE_COMMANDS: Record<string, { key: string; label: string }[]> = {
-  generate: [
-    { key: "generate", label: "One-shot generate" },
-    { key: "generate_session_start", label: "Session start" },
-    { key: "generate_continue", label: "Session continue" },
-  ],
-  task: [
-    { key: "task", label: "One-shot task" },
-    { key: "task_session_start", label: "Session start" },
-    { key: "task_continue", label: "Session continue" },
-  ],
-};
-
-/** Mini command-flow display showing which command template keys will be used. */
-function CommandFlowDisplay({
-  phase,
-  agentDefaults,
-  phaseModes,
-}: {
-  phase: PhaseConfig;
-  agentDefaults: AgentSettings | null;
-  phaseModes: Record<string, "generate" | "task">;
-}) {
-  const mode = getEffectiveMode(phase, phaseModes);
-  const commands = MODE_COMMANDS[mode] ?? [];
-  const agentCmds = agentDefaults?.command_templates ?? {};
-  const phaseCmds = phase.command_templates ?? {};
-
-  return (
-    <div className="mt-3">
-      <label className="block text-xs text-gray-400 mb-1.5">
-        Command Flow <span className="text-gray-600 font-normal">— mode: <span className="text-blue-400">{mode}</span></span>
-      </label>
-      <div className="space-y-1">
-        {commands.map(({ key }) => {
-          const isOverridden = key in phaseCmds;
-          const resolved = phaseCmds[key] ?? agentCmds[key as keyof typeof agentCmds] ?? null;
-          const isSession = key.includes("session") || key.includes("continue");
-          const supportsSession = agentDefaults?.supports_session ?? false;
-          return (
-            <div
-              key={key}
-              className={`flex items-start gap-2 px-2 py-1 rounded text-[11px] font-mono ${
-                isSession && !supportsSession ? "opacity-40" : ""
-              }`}
-            >
-              <span className="text-gray-500 shrink-0 w-40 truncate" title={key}>
-                {key}
-              </span>
-              <span className="text-gray-400 flex-1 truncate" title={resolved ? String(resolved) : "(using default)"}>
-                {resolved ? String(resolved) : <span className="text-gray-600 italic">(using default)</span>}
-              </span>
-              {isOverridden && (
-                <span className="text-yellow-400 text-[9px] px-1 py-0.5 bg-yellow-500/10 rounded shrink-0">
-                  overridden
-                </span>
-              )}
-              {isSession && !supportsSession && (
-                <span className="text-gray-600 text-[9px] shrink-0">no sessions</span>
-              )}
-            </div>
-          );
-        })}
-        {/* Always show check */}
-        <div className="flex items-start gap-2 px-2 py-1 rounded text-[11px] font-mono">
-          <span className="text-gray-500 shrink-0 w-40 truncate">check</span>
-          <span className="text-gray-400 flex-1 truncate" title={String(phaseCmds["check"] ?? agentCmds["check" as keyof typeof agentCmds] ?? "")}>
-            {phaseCmds["check"] ?? agentCmds["check" as keyof typeof agentCmds] ?? <span className="text-gray-600 italic">(using default)</span>}
-          </span>
-          {("check" in phaseCmds) && (
-            <span className="text-yellow-400 text-[9px] px-1 py-0.5 bg-yellow-500/10 rounded shrink-0">
-              overridden
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Read-only list of key→value pairs shown as inherited defaults. */
-function InheritedKV({ entries, label }: { entries: [string, string][]; label: string }) {
-  if (!entries.length) return null;
-  return (
-    <div className="mt-1 space-y-0.5">
-      <span className="text-[10px] text-gray-500">{label}</span>
-      {entries.map(([k, v]) => (
-        <div key={k} className="flex gap-2 items-center opacity-50">
-          <span className="flex-1 px-2 py-0.5 text-[11px] bg-gray-900/60 border border-gray-800 rounded text-gray-400 font-mono truncate">
-            {k}
-          </span>
-          <span className="flex-1 px-2 py-0.5 text-[11px] bg-gray-900/60 border border-gray-800 rounded text-gray-400 font-mono truncate">
-            {String(v)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PhaseAdvancedConfig({
-  phase,
-  onSave,
-  agentDefaults,
-  phaseModes,
-}: {
-  phase: PhaseConfig;
-  onSave: (updates: Partial<PhaseConfig>) => void;
-  agentDefaults: AgentSettings | null;
-  phaseModes: Record<string, "generate" | "task">;
-}) {
-  const [timeout, setTimeout] = useState<string>(
-    phase.timeout_seconds != null ? String(phase.timeout_seconds) : "",
-  );
-  const [cliFlags, setCliFlags] = useState<KVEntry[]>(
-    parseKV(phase.cli_flags as Record<string, string>),
-  );
-  const [envVars, setEnvVars] = useState<KVEntry[]>(
-    parseKV(phase.environment_vars as Record<string, string>),
-  );
-  const [cmdTemplates, setCmdTemplates] = useState<KVEntry[]>(
-    parseKV(phase.command_templates as Record<string, string>),
-  );
-  const isCodingPhase = phase.phase_name === "coding";
-  const [executionMode, setExecutionMode] = useState<"agent_default" | "consolidated" | "batch" | "separate">(
-    phase.params?.consolidated === true
-      ? "consolidated"
-      : phase.params?.consolidated === false
-        ? (phase.params?.subtask_mode === "separate" ? "separate" : "batch")
-        : "agent_default",
-  );
-
-  const handleSave = () => {
-    const updates: Partial<PhaseConfig> = {};
-    const t = timeout.trim();
-    updates.timeout_seconds = t ? parseInt(t, 10) || null : null;
-
-    const flags = kvToObject(cliFlags);
-    updates.cli_flags = Object.keys(flags).length ? flags : null;
-
-    const env = kvToObject(envVars);
-    updates.environment_vars = Object.keys(env).length ? env : null;
-
-    const cmd = kvToObject(cmdTemplates);
-    updates.command_templates = Object.keys(cmd).length ? cmd : null;
-
-    if (isCodingPhase) {
-      const existingParams = { ...(phase.params || {}) };
-      if (executionMode === "agent_default") {
-        delete existingParams.consolidated;
-        delete existingParams.subtask_mode;
-      } else if (executionMode === "consolidated") {
-        existingParams.consolidated = true;
-        delete existingParams.subtask_mode;
-      } else {
-        existingParams.consolidated = false;
-        existingParams.subtask_mode = executionMode;
-      }
-      updates.params = existingParams;
-    }
-
-    onSave(updates);
-  };
-
-  // Build inherited entries from agent settings
-  const inheritedCmds: [string, string][] = agentDefaults?.command_templates
-    ? Object.entries(agentDefaults.command_templates).map(([k, v]) => [k, String(v)])
-    : [];
-  const inheritedFlags: [string, string][] = agentDefaults?.cli_flags
-    ? Object.entries(agentDefaults.cli_flags).map(([k, v]) => [k, String(v)])
-    : [];
-  const inheritedEnv: [string, string][] = agentDefaults?.environment_vars
-    ? Object.entries(agentDefaults.environment_vars).map(([k, v]) => [k, String(v)])
-    : [];
-
-  return (
-    <div className="border-t border-gray-700/40 px-3 pb-3 pt-2 space-y-3">
-      {agentDefaults && (
-        <p className="text-[10px] text-gray-500">
-          Inheriting from agent: <span className="text-gray-400 font-medium">{agentDefaults.display_name}</span>
-          {agentDefaults.default_timeout ? ` (timeout: ${agentDefaults.default_timeout}s)` : ""}
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">
-            Timeout (seconds)
-          </label>
-          <input
-            type="number"
-            value={timeout}
-            onChange={(e) => setTimeout(e.target.value)}
-            placeholder={agentDefaults?.default_timeout ? `${agentDefaults.default_timeout} (from agent)` : "No default"}
-            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-          />
-        </div>
-        {isCodingPhase && (
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">
-              Execution Mode
-            </label>
-            <select
-              value={executionMode}
-              onChange={(e) => setExecutionMode(e.target.value as typeof executionMode)}
-              className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-            >
-              <option value="agent_default">Agent default{agentDefaults?.consolidated_default != null ? ` (${agentDefaults.consolidated_default ? "consolidated" : "multi-step"})` : ""}</option>
-              <option value="consolidated">Consolidated — single invocation</option>
-              <option value="batch">Batch — all subtasks in one prompt</option>
-              <option value="separate">Separate — one call per subtask</option>
-            </select>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">
-          CLI Flags <span className="text-gray-600 font-normal">— merged over agent defaults</span>
-        </label>
-        <KVEditor
-          entries={cliFlags}
-          onChange={setCliFlags}
-          keyPlaceholder="--flag"
-          valuePlaceholder="value"
-        />
-        <InheritedKV entries={inheritedFlags} label="Inherited from agent:" />
-      </div>
-
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">
-          Environment Variables <span className="text-gray-600 font-normal">— merged over agent defaults</span>
-        </label>
-        <KVEditor
-          entries={envVars}
-          onChange={setEnvVars}
-          maskValues
-          keyPlaceholder="VAR_NAME"
-          valuePlaceholder="value"
-        />
-        <InheritedKV entries={inheritedEnv} label="Inherited from agent:" />
-      </div>
-
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">
-          Command Templates <span className="text-gray-600 font-normal">— override agent commands</span>
-        </label>
-        <KVEditor
-          entries={cmdTemplates}
-          onChange={setCmdTemplates}
-          keyPlaceholder="command_name"
-          valuePlaceholder="template string"
-        />
-        <InheritedKV entries={inheritedCmds} label="Inherited from agent:" />
-      </div>
-
-      <CommandFlowDisplay phase={phase} agentDefaults={agentDefaults} phaseModes={phaseModes} />
-
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-        >
-          Save Overrides
-        </button>
-      </div>
-    </div>
-  );
-}
+  getPhases,
+  getStepKinds,
+  getWorkflowTemplates,
+  updateWorkflowTemplate,
+} from '../api';
+import type {
+  PhaseConfig,
+  PhaseInfo,
+  StepKindDescriptor,
+  WorkflowTemplate,
+} from '../types';
+import { useConfirm } from '../components/shared/ConfirmDialog';
+import { useToast } from '../components/shared/Toast';
+import { StepListEditor } from '../components/workflows';
 
 export default function WorkflowTemplates() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
-  const [agentSettings, setAgentSettings] = useState<AgentSettings[]>([]);
-  const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
   const [availablePhases, setAvailablePhases] = useState<PhaseInfo[]>([]);
-  const [roles, setRoles] = useState<string[]>([]);
+  const [stepKinds, setStepKinds] = useState<StepKindDescriptor[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [expandedPhase, setExpandedPhase] = useState<string | null>(null); // "templateId-phaseIdx"
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
   const toast = useToast();
 
-  // Derived: phase name → default agent mode (from API)
-  const phaseModes: Record<string, "generate" | "task"> = {};
-  for (const p of availablePhases) {
-    if (p.default_agent_mode) phaseModes[p.name] = p.default_agent_mode;
-  }
-
   // New template form
-  const [newName, setNewName] = useState("");
-  const [newDesc, setNewDesc] = useState("");
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+
+  const legacyPhaseNames = useMemo(() => {
+    const descriptor = stepKinds.find((s) => s.kind === 'legacy_phase');
+    if (descriptor?.values && descriptor.values.length > 0) {
+      return descriptor.values;
+    }
+    return availablePhases.map((p) => p.name);
+  }, [stepKinds, availablePhases]);
 
   const load = async () => {
     try {
-      const [t, r, as_, ph] = await Promise.all([
+      const [t, ph, sk] = await Promise.all([
         getWorkflowTemplates(),
-        getRoleAssignments(),
-        getAgents(),
         getPhases(),
+        getStepKinds().catch(() => [] as StepKindDescriptor[]),
       ]);
       setTemplates(t);
-      setRoleAssignments(r);
-      setAgentSettings(as_);
       setAvailablePhases(ph);
-      const dbRoles = r.map((ra: RoleAssignment) => ra.role);
-      const defaultRoles = ph
-        .filter((p: PhaseInfo) => p.default_role)
-        .map((p: PhaseInfo) => p.default_role!);
-      setRoles([...new Set([...defaultRoles, ...dbRoles])].sort());
+      setStepKinds(sk);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -364,10 +78,11 @@ export default function WorkflowTemplates() {
     try {
       const defaultPhases: PhaseConfig[] = availablePhases.map((p) => ({
         phase_name: p.name,
+        kind: 'legacy_phase',
         enabled: true,
         role: null,
         uses_agent: p.default_role ? true : null,
-        trigger_mode: p.name === "approval" ? "wait_for_approval" : "auto",
+        trigger_mode: p.name === 'approval' ? 'wait_for_approval' : 'auto',
         notify_source: false,
         timeout_seconds: null,
         params: {},
@@ -378,8 +93,8 @@ export default function WorkflowTemplates() {
         phases: defaultPhases,
       });
       toast.success(`Template "${newName}" created`);
-      setNewName("");
-      setNewDesc("");
+      setNewName('');
+      setNewDesc('');
       setShowForm(false);
       await load();
     } catch (e) {
@@ -389,10 +104,10 @@ export default function WorkflowTemplates() {
 
   const handleDelete = async (t: WorkflowTemplate) => {
     const ok = await confirm({
-      title: "Delete Workflow",
+      title: 'Delete Workflow',
       message: `Delete workflow "${t.name}"? This cannot be undone.`,
-      confirmLabel: "Delete",
-      variant: "danger",
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
     if (!ok) return;
     try {
@@ -404,150 +119,31 @@ export default function WorkflowTemplates() {
     }
   };
 
-  const handleTogglePhase = async (t: WorkflowTemplate, idx: number) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], enabled: !phases[idx].enabled };
+  const persistPhases = async (t: WorkflowTemplate, phases: PhaseConfig[]) => {
+    // Optimistically update local state so the editor stays responsive.
+    setTemplates((prev) =>
+      prev.map((tmpl) => (tmpl.id === t.id ? { ...tmpl, phases } : tmpl)),
+    );
     try {
       await updateWorkflowTemplate(t.id, { phases });
-      await load();
     } catch (e) {
       toast.error(String(e));
-    }
-  };
-
-  const handleRoleChange = async (
-    t: WorkflowTemplate,
-    idx: number,
-    value: string,
-  ) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], role: value || null };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
+      // Reload to revert on failure.
       await load();
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  const handleTriggerMode = async (
-    t: WorkflowTemplate,
-    idx: number,
-    value: string,
-  ) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], trigger_mode: value };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  const handleNotifySource = async (
-    t: WorkflowTemplate,
-    idx: number,
-  ) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], notify_source: !phases[idx].notify_source };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  const handlePhaseAdvancedSave = async (
-    t: WorkflowTemplate,
-    idx: number,
-    updates: Partial<PhaseConfig>,
-  ) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], ...updates };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-      toast.success("Phase settings saved");
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  /** Resolve which AgentSettings applies to a phase via role → agent mapping. */
-  const resolveAgentDefaults = (phase: PhaseConfig): AgentSettings | null => {
-    const phaseInfo = availablePhases.find((p) => p.name === phase.phase_name);
-    const role = phase.role || phaseInfo?.default_role;
-    if (!role) return null;
-    const ra = roleAssignments.find((r) => r.role === role);
-    const agentName = ra?.agent_name ?? null;
-    if (!agentName) return null;
-    return agentSettings.find((s) => s.agent_name === agentName) ?? null;
-  };
-
-  const isAgentPhase = (phase: PhaseConfig): boolean => {
-    if (phase.uses_agent != null) return phase.uses_agent;
-    const phaseInfo = availablePhases.find((p) => p.name === phase.phase_name);
-    return !!phaseInfo?.default_role;
-  };
-
-  const handleAgentModeChange = async (t: WorkflowTemplate, idx: number, mode: string) => {
-    const phases = [...t.phases];
-    phases[idx] = { ...phases[idx], agent_mode: mode === "" ? null : mode as "generate" | "task" };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  const handleUsesAgentToggle = async (t: WorkflowTemplate, idx: number) => {
-    const phases = [...t.phases];
-    const current = isAgentPhase(phases[idx]);
-    phases[idx] = { ...phases[idx], uses_agent: !current };
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-    } catch (e) {
-      toast.error(String(e));
-    }
-  };
-
-  const togglePhaseAdvanced = (templateId: number, phaseIdx: number) => {
-    const key = `${templateId}-${phaseIdx}`;
-    setExpandedPhase(expandedPhase === key ? null : key);
-  };
-
-  const handleMovePhase = async (
-    t: WorkflowTemplate,
-    idx: number,
-    direction: "up" | "down",
-  ) => {
-    const phases = [...t.phases];
-    const newIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= phases.length) return;
-    [phases[idx], phases[newIdx]] = [phases[newIdx], phases[idx]];
-    try {
-      await updateWorkflowTemplate(t.id, { phases });
-      await load();
-    } catch (e) {
-      toast.error(String(e));
     }
   };
 
   const handleLabelRuleChange = async (
     t: WorkflowTemplate,
     ruleIdx: number,
-    field: "match_all" | "match_any",
+    field: 'match_all' | 'match_any',
     value: string,
   ) => {
     const rules = [...(t.label_rules || [])];
     rules[ruleIdx] = {
       ...rules[ruleIdx],
       [field]: value
-        .split(",")
+        .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
     };
@@ -633,8 +229,8 @@ export default function WorkflowTemplates() {
             <button
               onClick={() => {
                 setShowForm(false);
-                setNewName("");
-                setNewDesc("");
+                setNewName('');
+                setNewDesc('');
               }}
               className="px-3 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
@@ -675,8 +271,8 @@ export default function WorkflowTemplates() {
                   </span>
                 )}
                 <span className="text-xs text-gray-500">
-                  {t.phases.filter((p) => p.enabled).length}/{t.phases.length}{" "}
-                  phases
+                  {t.phases.filter((p) => p.enabled).length}/{t.phases.length}{' '}
+                  steps
                 </span>
               </div>
               {expanded === t.id ? (
@@ -688,7 +284,9 @@ export default function WorkflowTemplates() {
 
             {expanded === t.id && (
               <div className="border-t border-gray-800/60 p-4 space-y-4">
-                <p className="text-xs text-gray-500">{t.description}</p>
+                {t.description && (
+                  <p className="text-xs text-gray-500">{t.description}</p>
+                )}
 
                 {/* Label Rules */}
                 <div>
@@ -732,12 +330,12 @@ export default function WorkflowTemplates() {
                           </label>
                           <input
                             type="text"
-                            defaultValue={(rule.match_all || []).join(", ")}
+                            defaultValue={(rule.match_all || []).join(', ')}
                             onBlur={(e) =>
                               handleLabelRuleChange(
                                 t,
                                 ri,
-                                "match_all",
+                                'match_all',
                                 e.target.value,
                               )
                             }
@@ -750,12 +348,12 @@ export default function WorkflowTemplates() {
                           </label>
                           <input
                             type="text"
-                            defaultValue={(rule.match_any || []).join(", ")}
+                            defaultValue={(rule.match_any || []).join(', ')}
                             onBlur={(e) =>
                               handleLabelRuleChange(
                                 t,
                                 ri,
-                                "match_any",
+                                'match_any',
                                 e.target.value,
                               )
                             }
@@ -767,133 +365,16 @@ export default function WorkflowTemplates() {
                   ))}
                 </div>
 
-                {/* Phases */}
+                {/* Steps composer */}
                 <div>
                   <label className="block text-xs text-gray-400 font-medium mb-2">
-                    Phases
+                    Steps
                   </label>
-                  <div className="space-y-1">
-                    {t.phases.map((phase, pi) => {
-                      const advKey = `${t.id}-${pi}`;
-                      const hasOverrides = !!(phase.cli_flags && Object.keys(phase.cli_flags).length)
-                        || !!(phase.environment_vars && Object.keys(phase.environment_vars).length)
-                        || !!(phase.command_templates && Object.keys(phase.command_templates).length)
-                        || !!(phase.timeout_seconds);
-                      return (
-                      <div key={pi} className={`rounded-lg ${phase.enabled ? "bg-gray-800/50" : "bg-gray-800/20"}`}>
-                        <div className="flex items-center gap-3 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={phase.enabled}
-                          onChange={() => handleTogglePhase(t, pi)}
-                          className="rounded border-gray-600"
-                        />
-                        <span
-                          className={`text-sm flex-1 ${phase.enabled ? "text-white" : "text-gray-600"}`}
-                        >
-                          {phase.phase_name}
-                        </span>
-                        <label className="inline-flex items-center gap-1 text-xs text-gray-500 cursor-pointer" title="Use AI agent for this phase">
-                          <input
-                            type="checkbox"
-                            checked={isAgentPhase(phase)}
-                            onChange={() => handleUsesAgentToggle(t, pi)}
-                            className="rounded border-gray-600"
-                          />
-                          Agent
-                        </label>
-                        {isAgentPhase(phase) && (
-                          <select
-                            value={phase.agent_mode || ""}
-                            onChange={(e) => handleAgentModeChange(t, pi, e.target.value)}
-                            className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-400 focus:outline-none"
-                            title="Agent execution mode"
-                          >
-                            <option value="">Default ({phaseModes[phase.phase_name] ?? "generate"})</option>
-                            <option value="generate">Generate</option>
-                            <option value="task">Task</option>
-                          </select>
-                        )}
-                        {isAgentPhase(phase) && (
-                          <select
-                            value={phase.role || ""}
-                            onChange={(e) =>
-                              handleRoleChange(t, pi, e.target.value)
-                            }
-                            className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-400 focus:outline-none"
-                          >
-                            <option value="">Default role</option>
-                            {roles.map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <select
-                          value={phase.trigger_mode || "auto"}
-                          onChange={(e) =>
-                            handleTriggerMode(t, pi, e.target.value)
-                          }
-                          className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-400 focus:outline-none"
-                        >
-                          <option value="auto">Auto</option>
-                          <option value="wait_for_trigger">Wait for Trigger</option>
-                          <option value="wait_for_approval">Wait for Approval</option>
-                        </select>
-                        <label className="inline-flex items-center gap-1 text-xs text-gray-500 cursor-pointer" title="Notify task source on completion">
-                          <input
-                            type="checkbox"
-                            checked={phase.notify_source ?? false}
-                            onChange={() => handleNotifySource(t, pi)}
-                            className="rounded border-gray-600"
-                          />
-                          Notify
-                        </label>
-                        {isAgentPhase(phase) && (
-                          <button
-                            onClick={() => togglePhaseAdvanced(t.id, pi)}
-                            className={`p-1 transition-colors ${
-                              expandedPhase === advKey
-                                ? "text-blue-400"
-                                : hasOverrides
-                                  ? "text-yellow-400 hover:text-yellow-300"
-                                  : "text-gray-500 hover:text-white"
-                            }`}
-                            title="Phase command overrides"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <div className="flex gap-0.5">
-                          <button
-                            onClick={() => handleMovePhase(t, pi, "up")}
-                            disabled={pi === 0}
-                            className="p-1 text-gray-500 hover:text-white disabled:opacity-30"
-                          >
-                            <ArrowUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleMovePhase(t, pi, "down")}
-                            disabled={pi === t.phases.length - 1}
-                            className="p-1 text-gray-500 hover:text-white disabled:opacity-30"
-                          >
-                            <ArrowDown className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        </div>
-                        {expandedPhase === advKey && isAgentPhase(phase) && (
-                          <PhaseAdvancedConfig
-                            phase={phase}
-                            onSave={(updates) => handlePhaseAdvancedSave(t, pi, updates)}
-                            agentDefaults={resolveAgentDefaults(phase)}
-                            phaseModes={phaseModes}
-                          />
-                        )}
-                      </div>
-                      );
-                    })}
-                  </div>
+                  <StepListEditor
+                    steps={t.phases}
+                    onChange={(next) => persistPhases(t, next)}
+                    legacyPhaseNames={legacyPhaseNames}
+                  />
                 </div>
 
                 {!t.is_default && !t.is_system && (

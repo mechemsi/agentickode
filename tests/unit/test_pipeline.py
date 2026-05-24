@@ -269,3 +269,119 @@ class TestExecutePipeline:
             await execute_pipeline(run, db_session, mock_services)
 
             mods["init"].run.assert_not_called()
+
+    async def test_dispatches_bash_step(
+        self, db_session, make_task_run, mock_services, monkeypatch
+    ):
+        """phase_config['kind']=='bash' invokes run_bash_step instead of legacy module lookup."""
+        from backend.models import PhaseExecution, ProjectConfig
+        from backend.worker import pipeline as pipeline_mod
+
+        project = ProjectConfig(
+            project_id="proj-d1", project_slug="d1", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-d1")
+        db_session.add(run)
+        await db_session.commit()
+
+        pe = PhaseExecution(
+            run_id=run.id,
+            phase_name="run-build",
+            order_index=0,
+            status="pending",
+            phase_config={"kind": "bash", "params": {"command": "make build"}},
+        )
+        db_session.add(pe)
+        await db_session.commit()
+
+        bash_called: dict = {}
+
+        async def fake_bash(run_, session_, services_, cfg_):
+            bash_called["called"] = True
+            bash_called["cfg"] = cfg_
+            return {"exit_code": 0, "stdout": "built"}
+
+        monkeypatch.setattr("backend.worker.steps.bash_step.run_bash_step", fake_bash)
+
+        with patch("backend.worker.pipeline.broadcaster", new=_mock_broadcaster()):
+            await pipeline_mod.execute_pipeline(run, db_session, mock_services)
+
+        assert bash_called.get("called") is True
+        assert bash_called["cfg"]["kind"] == "bash"
+        await db_session.refresh(pe)
+        assert pe.status == "completed"
+        assert pe.result == {"exit_code": 0, "stdout": "built"}
+
+    async def test_dispatches_agent_step(
+        self, db_session, make_task_run, mock_services, monkeypatch
+    ):
+        """phase_config['kind']=='agent' invokes run_agent_step."""
+        from backend.models import PhaseExecution, ProjectConfig
+        from backend.worker import pipeline as pipeline_mod
+
+        project = ProjectConfig(
+            project_id="proj-d2", project_slug="d2", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-d2")
+        db_session.add(run)
+        await db_session.commit()
+
+        pe = PhaseExecution(
+            run_id=run.id,
+            phase_name="ask-agent",
+            order_index=0,
+            status="pending",
+            phase_config={"kind": "agent", "params": {"prompt": "hi"}},
+        )
+        db_session.add(pe)
+        await db_session.commit()
+
+        agent_called: dict = {}
+
+        async def fake_agent(run_, session_, services_, cfg_):
+            agent_called["called"] = True
+            return {"response": "hello"}
+
+        monkeypatch.setattr("backend.worker.steps.agent_step.run_agent_step", fake_agent)
+
+        with patch("backend.worker.pipeline.broadcaster", new=_mock_broadcaster()):
+            await pipeline_mod.execute_pipeline(run, db_session, mock_services)
+
+        assert agent_called.get("called") is True
+        await db_session.refresh(pe)
+        assert pe.status == "completed"
+        assert pe.result == {"response": "hello"}
+
+    async def test_skips_unknown_kind(self, db_session, make_task_run, mock_services):
+        """Unknown kind value is logged and the phase marked skipped (not failed)."""
+        from backend.models import PhaseExecution, ProjectConfig
+        from backend.worker import pipeline as pipeline_mod
+
+        project = ProjectConfig(
+            project_id="proj-d3", project_slug="d3", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-d3")
+        db_session.add(run)
+        await db_session.commit()
+
+        pe = PhaseExecution(
+            run_id=run.id,
+            phase_name="bad",
+            order_index=0,
+            status="pending",
+            phase_config={"kind": "nonexistent"},
+        )
+        db_session.add(pe)
+        await db_session.commit()
+
+        with patch("backend.worker.pipeline.broadcaster", new=_mock_broadcaster()):
+            await pipeline_mod.execute_pipeline(run, db_session, mock_services)
+
+        await db_session.refresh(pe)
+        assert pe.status == "skipped"
+        assert "nonexistent" in (pe.error_message or "")
+        await db_session.refresh(run)
+        assert run.status != "failed"  # unknown kind doesn't fail the run

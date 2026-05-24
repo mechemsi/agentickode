@@ -69,6 +69,21 @@ def _ws_patches():
 
 
 class TestWorkspaceSetup:
+    @pytest.fixture(autouse=True)
+    async def _project_parent(self, db_session):
+        """All tests use proj-1 by default; create the FK parent once per test."""
+        from backend.models import ProjectConfig
+
+        db_session.add(
+            ProjectConfig(
+                project_id="proj-1",
+                project_slug="x",
+                repo_owner="o",
+                repo_name="r",
+            )
+        )
+        await db_session.commit()
+
     async def test_existing_workspace_already_cloned(
         self, db_session, make_task_run, mock_services
     ):
@@ -239,6 +254,105 @@ class TestWorkspaceSetup:
 
             with pytest.raises(ValueError, match="Unknown workspace_type"):
                 await workspace_setup.run(run, db_session, mock_services)
+
+    async def test_worktree_strategy_creates_worktree_and_mutates_workspace_path(
+        self, db_session, make_task_run, mock_services
+    ):
+        """With strategy=worktree, workspace_path + branch_name point at the new worktree."""
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing", "strategy": "worktree"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch("backend.worker.phases.workspace_setup.WorktreeManager") as mock_wm_cls,
+            patch("backend.worker.phases.workspace_setup.make_worktree_paths") as mock_make_paths,
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.mkdir = AsyncMock()
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            # Simulate make_worktree_paths returning a deterministic dataclass.
+            from backend.services.workspace.worktree import WorktreePaths
+
+            paths = WorktreePaths(
+                branch="run/123-1700000000",
+                worktree_dir="/workspaces/ws/.worktrees/run-123-1700000000",
+                project_root="/workspaces/ws",
+            )
+            mock_make_paths.return_value = paths
+
+            mock_wm = mock_wm_cls.return_value
+            mock_wm.create = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            mock_wm.create.assert_awaited_once_with(paths)
+            assert run.workspace_path == "/workspaces/ws/.worktrees/run-123-1700000000"
+            assert run.branch_name == "run/123-1700000000"
+            assert run.workspace_result is not None
+            assert run.workspace_result["base_clone_path"] == "/workspaces/ws"
+            assert (
+                run.workspace_result["workspace_path"]
+                == "/workspaces/ws/.worktrees/run-123-1700000000"
+            )
+            assert run.workspace_result["worktree_paths"] == {
+                "branch": paths.branch,
+                "worktree_dir": paths.worktree_dir,
+                "project_root": paths.project_root,
+            }
+
+    async def test_default_strategy_does_not_create_worktree(
+        self, db_session, make_task_run, mock_services
+    ):
+        """Without strategy=worktree (default), WorktreeManager is never invoked."""
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        original_branch = run.branch_name
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch("backend.worker.phases.workspace_setup.WorktreeManager") as mock_wm_cls,
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.mkdir = AsyncMock()
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            # WorktreeManager never instantiated -> no constructor call.
+            mock_wm_cls.assert_not_called()
+            # branch_name + workspace_path unchanged from the original clone path.
+            assert run.workspace_path == "/workspaces/ws"
+            assert run.branch_name == original_branch
+            assert "worktree_paths" not in (run.workspace_result or {})
 
     async def test_cluster_with_sandbox(self, db_session, make_task_run, mock_services):
         run = make_task_run(

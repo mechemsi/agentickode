@@ -156,23 +156,42 @@ if $HAS_BACKEND; then
             TEST_FILES="$TEST_FILES $found"
         fi
     done
-    # Also include directly staged test files
-    STAGED_TESTS=$(echo "$BACKEND_PY" | grep -E '^tests/' || true)
+    # Also include directly staged test files — but skip conftest/fixtures
+    # (pytest would exit 5 "no tests collected" on them, which the hook would
+    # then treat as a failure)
+    STAGED_TESTS=$(
+        echo "$BACKEND_PY" | { grep -E '^tests/' || true; } \
+            | { grep -vE '(^|/)(conftest|fixtures?)\.py$' || true; }
+    )
     if [ -n "$STAGED_TESTS" ]; then
         TEST_FILES="$TEST_FILES $STAGED_TESTS"
     fi
     # Deduplicate and limit to 20 test files max to keep pre-commit fast
     TEST_FILES=$(echo "$TEST_FILES" | tr ' ' '\n' | sort -u | head -20 | tr '\n' ' ')
 
-    if [ -n "$TEST_FILES" ]; then
+    # pytest exit codes: 0 = pass, 5 = no tests collected (treat as pass for
+    # pre-commit since we never want a no-tests-found edit to block a commit)
+    run_pytest() {
+        local cmd="$1"
+        shift
+        $cmd pytest "$@" -x -q 2>&1
+        local rc=$?
+        [ $rc -eq 0 ] || [ $rc -eq 5 ]
+    }
+
+    # Whitespace-strip TEST_FILES before checking — the sort/tr pipeline above
+    # can leave a single trailing space which trips ``[ -n "$x" ]`` and would
+    # make pytest run the WHOLE suite (no args = all tests).
+    TEST_FILES_STRIPPED="${TEST_FILES// /}"
+    if [ -n "$TEST_FILES_STRIPPED" ]; then
         if [ -n "$RUN_BE" ]; then
-            if $RUN_BE pytest $TEST_FILES -x -q 2>&1; then
+            if run_pytest "$RUN_BE" $TEST_FILES; then
                 ok "Related tests pass"
             else
                 fail "Test failures in: $TEST_FILES"
             fi
         else
-            if pytest $TEST_FILES -x -q 2>&1; then
+            if run_pytest "" $TEST_FILES; then
                 ok "Related tests pass"
             else
                 fail "Test failures in: $TEST_FILES"
@@ -184,7 +203,7 @@ if $HAS_BACKEND; then
 
     # 2e. Complexity check (warning only, non-blocking)
     if command -v radon &>/dev/null || [ -n "$RUN_BE" ]; then
-        PY_FILE_ARGS=$(echo "$BACKEND_PY" | grep -E '^backend/' | tr '\n' ' ')
+        PY_FILE_ARGS=$(echo "$BACKEND_PY" | { grep -E '^backend/' || true; } | tr '\n' ' ')
         if [ -n "$PY_FILE_ARGS" ]; then
             if [ -n "$RUN_BE" ]; then
                 COMPLEXITY_OUT=$($RUN_BE python scripts/check_complexity.py C $PY_FILE_ARGS 2>&1) || true

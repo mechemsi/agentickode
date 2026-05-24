@@ -21,6 +21,8 @@ from backend.worker.phases._helpers import get_ssh_for_run
 logger = logging.getLogger("agentickode.phases.testing")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Run tests on remote workspace",
 }
 

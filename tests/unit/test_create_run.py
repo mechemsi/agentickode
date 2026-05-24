@@ -57,7 +57,23 @@ class TestCreateRun:
         )
         assert resp.status_code == 404
 
-    async def test_create_run_with_workflow_template_id(self, client: AsyncClient, project):
+    async def test_create_run_with_workflow_template_id(
+        self, client: AsyncClient, project, db_session
+    ):
+        # Seed the template so the FK on TaskRun.workflow_template_id is
+        # satisfied under PRAGMA foreign_keys=ON.
+        from backend.models import WorkflowTemplate
+
+        tpl = WorkflowTemplate(
+            id=42,
+            name="templated",
+            description="",
+            label_rules=[],
+            phases=[],
+        )
+        db_session.add(tpl)
+        await db_session.commit()
+
         resp = await client.post(
             "/api/runs",
             json={

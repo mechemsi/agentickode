@@ -41,6 +41,8 @@ logger = logging.getLogger("agentickode.phases.agent_loop")
 
 PHASE_META = {
     "name": "agent_loop",
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Autonomous agent loop — Claude Code drives exploration, planning, and execution",
     "default_role": None,
     "default_agent_mode": "task",
