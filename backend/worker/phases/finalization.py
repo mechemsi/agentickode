@@ -33,6 +33,8 @@ from backend.worker.phases._helpers import (
 logger = logging.getLogger("agentickode.phases.finalization")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Confirm PR and clean up resources",
 }
 

@@ -35,6 +35,8 @@ from backend.worker.phases._prompt_resolver import resolve_prompts
 logger = logging.getLogger("agentickode.phases.planning")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Decompose task into subtasks via AI agent",
     "default_role": "planner",
     "default_agent_mode": "generate",

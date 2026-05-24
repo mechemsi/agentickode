@@ -60,7 +60,14 @@ def _get_phase_modules() -> dict:
     return _phase_modules
 
 
-# Legacy JSONB column mapping: phase_name → TaskRun attribute
+# Legacy JSONB column mapping: phase_name → TaskRun attribute.
+#
+# Deprecated in 0.5.0 (ADR-007): we no longer write to these columns on phase
+# completion — the authoritative result is ``PhaseExecution.result``. The map
+# is retained for one release so existing code paths that READ these columns
+# (run detail view fallback, analytics queries) continue to work for runs
+# that completed before the cut-over. The columns themselves will be
+# dropped in 0.7.0; the read fallbacks should be removed in 0.6.0.
 _LEGACY_RESULT_MAP = {
     "workspace_setup": "workspace_result",
     "planning": "planning_result",
@@ -403,10 +410,9 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
         result_data = result if isinstance(result, dict) else None
         await pe_repo.update_status(phase_exec, "completed", result=result_data)
 
-        # Populate legacy JSONB columns for backward compat
-        legacy_attr = _LEGACY_RESULT_MAP.get(phase_name)
-        if legacy_attr and result_data:
-            setattr(run, legacy_attr, result_data)
+        # Per ADR-007 we no longer mirror result_data into the legacy
+        # TaskRun.*_result columns — PhaseExecution.result is authoritative.
+        # Read-path fallbacks for old runs stay in place until 0.6.0.
 
         await broadcaster.log(run.id, f"Phase complete: {phase_name}", phase=phase_name)
         await broadcaster.event(run.id, "phase_completed", {"phase": phase_name})

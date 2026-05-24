@@ -39,6 +39,7 @@ from backend.worker.phases._helpers import get_auth_url, get_project_token, get_
 logger = logging.getLogger("agentickode.phases.workspace_setup")
 
 PHASE_META = {
+    "kind": "builtin",
     "description": "Set up workspace on remote server",
 }
 

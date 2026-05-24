@@ -61,6 +61,8 @@ async def list_phases():
             "description": info.description,
             "default_role": info.default_role,
             "default_agent_mode": info.default_agent_mode,
+            "kind": info.kind,
+            "deprecated_in": info.deprecated_in,
         }
         for info in sorted(discover_phases().values(), key=lambda i: i.name)
     ]

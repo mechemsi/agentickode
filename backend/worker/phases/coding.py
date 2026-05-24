@@ -41,6 +41,8 @@ from backend.worker.phases._prompt_resolver import resolve_prompts
 logger = logging.getLogger("agentickode.phases.coding")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Execute subtasks via AI coding agent",
     "default_role": "coder",
     "default_agent_mode": "task",

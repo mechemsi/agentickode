@@ -76,6 +76,32 @@ class TestDiscoverPhases:
         for name, info in phases.items():
             assert info.description, f"Phase '{name}' has no description"
 
+    def test_workspace_setup_and_init_are_builtin(self):
+        """workspace_setup and init are the immutable prelude (ADR-007)."""
+        phases = discover_phases()
+        assert phases["workspace_setup"].kind == "builtin"
+        assert phases["init"].kind == "builtin"
+        assert phases["workspace_setup"].deprecated_in is None
+        assert phases["init"].deprecated_in is None
+
+    def test_other_phases_marked_legacy_phase_deprecated_in_0_5_0(self):
+        """All phases after the prelude are kind=legacy_phase, deprecated_in=0.5.0."""
+        phases = discover_phases()
+        for name in (
+            "planning",
+            "coding",
+            "testing",
+            "reviewing",
+            "approval",
+            "finalization",
+            "pr_fetch",
+            "task_creation",
+            "agent_loop",
+        ):
+            info = phases[name]
+            assert info.kind == "legacy_phase", f"{name} kind is {info.kind!r}"
+            assert info.deprecated_in == "0.5.0", f"{name} deprecated_in is {info.deprecated_in!r}"
+
     def test_returns_phase_info_instances(self):
         """All values are PhaseInfo dataclass instances."""
         phases = discover_phases()

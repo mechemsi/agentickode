@@ -35,7 +35,11 @@ def _phase(name: str, **overrides: object) -> dict:
 DEFAULT_WORKFLOW_TEMPLATES: list[dict] = [
     {
         "name": "default",
-        "description": "Full end-to-end AI task workflow",
+        "description": (
+            "Legacy 8-phase pipeline (workspace_setup → init → planning → coding → "
+            "testing → reviewing → approval → finalization). Kept for back-compat; "
+            "new workflows should use composable bash + agent steps (ADR-007)."
+        ),
         "is_default": True,
         "is_system": True,
         "label_rules": [],

@@ -26,6 +26,8 @@ from backend.worker.phases._helpers import get_auth_url, get_project_token, get_
 logger = logging.getLogger("agentickode.phases.approval")
 
 PHASE_META = {
+    "kind": "legacy_phase",
+    "deprecated_in": "0.5.0",
     "description": "Push branch and create pull request",
 }
 
