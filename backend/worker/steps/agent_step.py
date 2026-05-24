@@ -17,8 +17,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import TaskRun
+from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.container import ServiceContainer
 from backend.services.role_resolver import ResolvedRole
+from backend.worker.phases._helpers import get_project_config
 from backend.worker.steps.templating import render
 
 logger = logging.getLogger(__name__)
@@ -76,6 +78,16 @@ async def run_agent_step(
     )
     adapter = resolved.adapter
 
+    # Resolve effective run-as: step ``params.run_as`` wins over project
+    # override. When the adapter is a ``CLIAdapter`` we temporarily flip
+    # its ``worker_user`` for the duration of this call. Other adapters
+    # (Ollama HTTP, OpenHands API) don't have a per-call user — they
+    # honor whatever the server-level user is.
+    run_as = params.get("run_as")
+    if not run_as:
+        project = await get_project_config(task_run, session)
+        run_as = project.worker_user_override if project else None
+
     result: dict[str, Any] = {
         "provider": adapter.provider_name,
         "role": role,
@@ -85,17 +97,31 @@ async def run_agent_step(
         "session_id": None,
     }
 
-    if mode == "task":
-        workspace = task_run.workspace_path
-        if not workspace:
-            raise ValueError("agent step mode='task' requires task_run.workspace_path to be set")
-        response = await adapter.run_task(workspace, rendered_prompt, **kwargs)
-        result["response"] = response
-        if isinstance(response, dict) and response.get("session_id"):
-            result["session_id"] = response["session_id"]
-        return result
+    previous_worker_user: str | None = None
+    overrode = False
+    if run_as and isinstance(adapter, CLIAdapter):
+        previous_worker_user = adapter.worker_user
+        adapter.worker_user = run_as
+        overrode = True
+    try:
+        if mode == "task":
+            workspace = task_run.workspace_path
+            if not workspace:
+                raise ValueError(
+                    "agent step mode='task' requires task_run.workspace_path to be set"
+                )
+            response = await adapter.run_task(workspace, rendered_prompt, **kwargs)
+            result["response"] = response
+            if isinstance(response, dict) and response.get("session_id"):
+                result["session_id"] = response["session_id"]
+            return result
 
-    # default: generate
-    response_text = await adapter.generate(rendered_prompt, **kwargs)
-    result["response"] = response_text
-    return result
+        # default: generate
+        response_text = await adapter.generate(rendered_prompt, **kwargs)
+        result["response"] = response_text
+        return result
+    finally:
+        # Always restore the adapter's worker_user so concurrent runs
+        # sharing the same adapter instance aren't affected by this step.
+        if overrode and isinstance(adapter, CLIAdapter):
+            adapter.worker_user = previous_worker_user

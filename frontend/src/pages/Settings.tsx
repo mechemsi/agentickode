@@ -60,6 +60,9 @@ export default function Settings() {
   const [defaultAgents, setDefaultAgents] = useState<string[]>([]);
   const [agentsDirty, setAgentsDirty] = useState(false);
   const [savingAgents, setSavingAgents] = useState(false);
+  const [defaultWorkspaceRoot, setDefaultWorkspaceRoot] = useState<string>("");
+  const [workspaceRootDirty, setWorkspaceRootDirty] = useState(false);
+  const [savingWorkspaceRoot, setSavingWorkspaceRoot] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<string[]>([...AGENT_NAMES]);
   const [healthLoading, setHealthLoading] = useState(true);
   const [ollamaServers, setOllamaServers] = useState<OllamaServer[]>([]);
@@ -91,8 +94,24 @@ export default function Settings() {
       if (Array.isArray(settings.default_agents)) {
         setDefaultAgents(settings.default_agents as string[]);
       }
+      if (typeof settings["workspace.default_root"] === "string") {
+        setDefaultWorkspaceRoot(settings["workspace.default_root"] as string);
+      }
     } catch {
       /* ignore */
+    }
+  };
+
+  const saveDefaultWorkspaceRoot = async () => {
+    setSavingWorkspaceRoot(true);
+    try {
+      await updateAppSetting("workspace.default_root", defaultWorkspaceRoot.trim());
+      toast.success("Default workspace root saved");
+      setWorkspaceRootDirty(false);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setSavingWorkspaceRoot(false);
     }
   };
 
@@ -279,6 +298,42 @@ export default function Settings() {
       {/* Platform Crons */}
       <div className="mt-8">
         <PlatformCrons />
+      </div>
+
+      {/* Workspace defaults */}
+      <div className="mt-8" data-testid="workspace-defaults">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Server className="w-5 h-5 text-blue-400" />
+            Workspace
+          </h2>
+          {workspaceRootDirty && (
+            <button
+              onClick={saveDefaultWorkspaceRoot}
+              disabled={savingWorkspaceRoot}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {savingWorkspaceRoot ? "Saving..." : "Save"}
+            </button>
+          )}
+        </div>
+        <label className="flex flex-col gap-1 max-w-md">
+          <span className="text-xs text-gray-400">Default workspace root for new servers</span>
+          <input
+            data-testid="default-workspace-root-input"
+            className="bg-gray-900/60 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-gray-100"
+            value={defaultWorkspaceRoot}
+            placeholder="/workspaces"
+            onChange={(e) => {
+              setDefaultWorkspaceRoot(e.target.value);
+              setWorkspaceRootDirty(true);
+            }}
+          />
+        </label>
+        <p className="text-xs text-gray-500 mt-2">
+          When set, new workspace servers inherit this path. Existing servers are not changed.
+        </p>
       </div>
 
       {/* Default Agents for New Servers */}

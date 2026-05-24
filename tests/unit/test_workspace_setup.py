@@ -388,3 +388,113 @@ class TestWorkspaceSetup:
             await workspace_setup.run(run, db_session, mock_services)
 
             mock_remote_sb.start_sandbox.assert_called_once()
+
+    async def test_local_path_skips_clone(self, db_session, make_task_run, mock_services):
+        """Project with ``local_path`` set: no clone runs; workspace points at the path."""
+        from backend.models import ProjectConfig
+
+        # Replace the autouse-fixture's parent with one that has local_path set.
+        existing = await db_session.get(ProjectConfig, "proj-1")
+        existing.local_path = "/home/domas/projects/myapp"
+        await db_session.commit()
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch(
+                "backend.worker.phases.workspace_setup.validate_local_path",
+                new=AsyncMock(
+                    return_value=MagicMock(
+                        path="/home/domas/projects/myapp",
+                        exists=True,
+                        is_git_repo=True,
+                        is_clean=True,
+                    )
+                ),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.make_worktree_paths",
+                return_value=MagicMock(
+                    branch="run/1-123",
+                    worktree_dir="/home/domas/projects/myapp/.worktrees/run-1-123",
+                    project_root="/home/domas/projects/myapp",
+                ),
+            ),
+            patch(
+                "backend.worker.phases.workspace_setup.WorktreeManager",
+            ) as mock_wm_cls,
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.has_repo = AsyncMock(return_value=True)
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git.clone = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+            mock_wm_cls.return_value.create = AsyncMock()
+
+            await workspace_setup.run(run, db_session, mock_services)
+
+            # No clone, no fetch — local_path short-circuits both.
+            mock_remote_git.clone.assert_not_called()
+            mock_remote_git.run_git.assert_not_called()
+            # Worktree strategy auto-forced — manager.create was invoked.
+            mock_wm_cls.return_value.create.assert_awaited_once()
+            # Run now points at the worktree dir under local_path.
+            assert run.workspace_path == "/home/domas/projects/myapp/.worktrees/run-1-123"
+
+    async def test_local_path_dirty_raises_before_side_effects(
+        self, db_session, make_task_run, mock_services
+    ):
+        """Dirty working tree → LocalPathError propagates and no clone runs."""
+        from backend.models import ProjectConfig
+        from backend.services.workspace.local_path import LocalPathError
+
+        existing = await db_session.get(ProjectConfig, "proj-1")
+        existing.local_path = "/home/domas/projects/dirty"
+        await db_session.commit()
+
+        run = make_task_run(
+            workspace_path="/workspaces/ws",
+            workspace_config={"workspace_type": "existing"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        p_server, p_ssh, p_git, p_sandbox, p_bc, p_auth, p_token, p_ready = _ws_patches()
+        with (
+            p_server,
+            p_ssh,
+            p_git as mock_git_cls,
+            p_sandbox,
+            p_bc,
+            p_auth,
+            p_token,
+            p_ready,
+            patch(
+                "backend.worker.phases.workspace_setup.validate_local_path",
+                new=AsyncMock(side_effect=LocalPathError("uncommitted changes — commit or stash")),
+            ),
+        ):
+            mock_remote_git = mock_git_cls.return_value
+            mock_remote_git.clone = AsyncMock()
+            mock_remote_git.run_git = AsyncMock()
+            mock_remote_git._mark_safe_directory = AsyncMock()
+
+            with pytest.raises(LocalPathError, match="uncommitted changes"):
+                await workspace_setup.run(run, db_session, mock_services)
+
+            mock_remote_git.clone.assert_not_called()
+            mock_remote_git.run_git.assert_not_called()

@@ -98,6 +98,18 @@ def get_phase_role(
     return _default_roles.get(phase_name, phase_name)
 
 
+async def get_project_config(task_run: TaskRun, session: AsyncSession) -> ProjectConfig | None:
+    """Load the ProjectConfig row for this run's project.
+
+    Returns ``None`` if no row exists (legacy runs / tests). Callers that
+    only need a couple of fields (``local_path``, ``worker_user_override``)
+    can treat ``None`` as "no override" and fall through to server defaults.
+    """
+    stmt = select(ProjectConfig).where(ProjectConfig.project_id == task_run.project_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def get_workspace_server_id(task_run: TaskRun, session: AsyncSession) -> int | None:
     """Resolve workspace_server_id for a task run.
 

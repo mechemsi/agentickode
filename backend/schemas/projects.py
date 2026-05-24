@@ -39,6 +39,8 @@ class ProjectConfigCreate(BaseModel):
     ai_config: dict[str, Any] | None = None
     workspace_server_ids: list[int] = []
     workspace_path: str | None = None
+    local_path: str | None = None
+    worker_user_override: str | None = None
     git_provider_token: str | None = None
     integration_config: dict[str, Any] | None = None
     poll_enabled: bool = False
@@ -64,6 +66,8 @@ class ProjectConfigUpdate(BaseModel):
     ai_config: dict[str, Any] | None = None
     workspace_server_ids: list[int] | None = None
     workspace_path: str | None = None
+    local_path: str | None = None
+    worker_user_override: str | None = None
     git_provider_token: str | None = None
     autonomy_config: AutonomyConfig | None = None
     integration_config: dict[str, Any] | None = None
@@ -91,6 +95,8 @@ class ProjectConfigOut(BaseModel):
     ai_config: dict[str, Any] | None
     workspace_server_ids: list[int] = []
     workspace_path: str | None = None
+    local_path: str | None = None
+    worker_user_override: str | None = None
     has_git_provider_token: bool = False
     autonomy_config: dict[str, Any] | None = None
     integration_config: dict[str, Any] = {}

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import async_session, get_db
 from backend.models import WorkspaceServer
+from backend.repositories.app_setting_repo import AppSettingRepository
 from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.schemas import (
     DiscoveredAgentOut,
@@ -22,6 +23,11 @@ from backend.schemas import (
 )
 from backend.services.workspace.command_executor import executor_for_server
 from backend.services.workspace.setup_service import ServerSetupService
+
+# Key used to override the per-server ``workspace_root`` default at create
+# time. Operators can set this once via the existing /app-settings API so
+# every new server inherits a non-``/workspaces`` root.
+WORKSPACE_ROOT_SETTING_KEY = "workspace.default_root"
 
 router = APIRouter(tags=["workspace-servers"])
 
@@ -159,7 +165,16 @@ async def create_workspace_server(
 
     data = body.model_dump(exclude={"setup_password"})
     if not data.get("workspace_root"):
-        data["workspace_root"] = "/workspaces"  # Default until setup overwrites
+        # Honor a platform-wide override before falling back to the
+        # historical default. Operators on shared hosts (e.g. WSL) can
+        # set ``workspace.default_root`` once and every new server picks
+        # it up.
+        settings_repo = AppSettingRepository(db)
+        configured_root = await settings_repo.get(WORKSPACE_ROOT_SETTING_KEY)
+        if isinstance(configured_root, str) and configured_root.strip():
+            data["workspace_root"] = configured_root.strip()
+        else:
+            data["workspace_root"] = "/workspaces"  # Default until setup overwrites
     data["status"] = "setting_up"
     server = WorkspaceServer(**data)
     server = await repo.create(server)

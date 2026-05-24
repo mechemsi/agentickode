@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.models import PhaseExecution, ProjectConfig
+from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.worker.steps.agent_step import run_agent_step
 
 
@@ -225,3 +226,102 @@ class TestAgentStep:
             await run_agent_step(run, db_session, mock_services, phase_config)
 
         adapter.run_task.assert_not_called()
+
+    async def test_run_as_temporarily_overrides_cli_adapter_worker_user(
+        self, db_session, mock_services, make_task_run
+    ):
+        """``params.run_as`` flips ``CLIAdapter.worker_user`` for the call only."""
+        project = ProjectConfig(
+            project_id="proj-as-ra", project_slug="asra", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-as-ra")
+        db_session.add(run)
+        await db_session.commit()
+
+        observed: dict[str, str | None] = {}
+
+        async def fake_generate(prompt, **kwargs):
+            observed["worker_user_during_call"] = adapter.worker_user
+            return "ok"
+
+        # A real CLIAdapter so the worker_user property exists; SSH is a mock.
+        ssh = MagicMock()
+        ssh.username = "root"
+        adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
+        adapter.generate = fake_generate  # type: ignore[assignment]
+        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+
+        phase_config = {
+            "phase_name": "ask",
+            "kind": "agent",
+            "params": {"prompt": "hi", "run_as": "domas"},
+        }
+        await run_agent_step(run, db_session, mock_services, phase_config)
+
+        # During the call the adapter saw the overridden user; after, the
+        # original value is restored so concurrent runs are unaffected.
+        assert observed["worker_user_during_call"] == "domas"
+        assert adapter.worker_user == "coder"
+
+    async def test_run_as_restored_even_when_call_raises(
+        self, db_session, mock_services, make_task_run
+    ):
+        """``adapter.worker_user`` is restored in the ``finally`` block on errors."""
+        project = ProjectConfig(
+            project_id="proj-as-rr", project_slug="asrr", repo_owner="o", repo_name="r"
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-as-rr")
+        db_session.add(run)
+        await db_session.commit()
+
+        ssh = MagicMock()
+        ssh.username = "root"
+        adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
+        adapter.generate = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[assignment]
+        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+
+        phase_config = {
+            "phase_name": "ask",
+            "kind": "agent",
+            "params": {"prompt": "hi", "run_as": "other"},
+        }
+        with pytest.raises(RuntimeError, match="boom"):
+            await run_agent_step(run, db_session, mock_services, phase_config)
+
+        assert adapter.worker_user == "coder"
+
+    async def test_project_worker_user_override_used_when_no_step_run_as(
+        self, db_session, mock_services, make_task_run
+    ):
+        """Falls back to ``ProjectConfig.worker_user_override`` when step omits ``run_as``."""
+        project = ProjectConfig(
+            project_id="proj-as-pwu",
+            project_slug="aspwu",
+            repo_owner="o",
+            repo_name="r",
+            worker_user_override="developer",
+        )
+        db_session.add(project)
+        run = make_task_run(project_id="proj-as-pwu")
+        db_session.add(run)
+        await db_session.commit()
+
+        observed: dict[str, str | None] = {}
+
+        async def fake_generate(prompt, **kwargs):
+            observed["wu"] = adapter.worker_user
+            return "ok"
+
+        ssh = MagicMock()
+        ssh.username = "root"
+        adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
+        adapter.generate = fake_generate  # type: ignore[assignment]
+        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+
+        phase_config = {"phase_name": "ask", "kind": "agent", "params": {"prompt": "hi"}}
+        await run_agent_step(run, db_session, mock_services, phase_config)
+
+        assert observed["wu"] == "developer"
+        assert adapter.worker_user == "coder"
