@@ -32,6 +32,7 @@ from backend.services.workspace.readiness_service import (
     format_fix_guide,
 )
 from backend.services.workspace.sandbox import RemoteSandbox
+from backend.services.workspace.worktree import WorktreeManager, make_worktree_paths
 from backend.worker.broadcaster import broadcaster, make_log_metadata
 from backend.worker.phases._helpers import get_auth_url, get_project_token, get_workspace_server
 
@@ -176,12 +177,75 @@ async def run(
         owned_quoted = shlex.quote(workspace)
         await ssh.run_command(f"chown -R {worker_user}:{worker_user} {owned_quoted}", timeout=60)
 
-    task_run.workspace_result = {"workspace_path": workspace, "repos_cloned": repos_cloned}
+    workspace_result: dict = {"workspace_path": workspace, "repos_cloned": repos_cloned}
+
+    # Optional worktree-per-run strategy. Opt-in via either
+    # ``task_run.workspace_config['strategy']`` (project-level) or
+    # ``phase_config['params']['workspace_strategy']`` (per-template).
+    # When set we create a fresh worktree off the base clone, point the
+    # rest of the pipeline at it, and remember the paths so finalization
+    # can tear it down idempotently.
+    strategy = _resolve_workspace_strategy(ws_cfg, phase_config)
+    if strategy == "worktree":
+        base_clone = workspace
+        paths = make_worktree_paths(project_root=base_clone, run_id=task_run.id)
+        await _log(
+            f"Creating worktree {paths.worktree_dir} on branch {paths.branch} "
+            f"(strategy=worktree)"
+        )
+        manager = WorktreeManager(ssh, worker_user=worker_user if ssh.username == "root" else None)
+        await manager.create(paths)
+
+        # Re-chown the new worktree so the worker user owns it (git
+        # worktree add inherits the caller's uid).
+        if worker_user and ssh.username == "root":
+            await ssh.run_command(
+                f"chown -R {worker_user}:{worker_user} {shlex.quote(paths.worktree_dir)}",
+                timeout=60,
+            )
+
+        # Mutate the run so every downstream phase sees the worktree as
+        # *the* workspace + uses the per-run branch when committing.
+        task_run.workspace_path = paths.worktree_dir
+        task_run.branch_name = paths.branch
+        workspace_result["base_clone_path"] = base_clone
+        workspace_result["workspace_path"] = paths.worktree_dir
+        workspace_result["worktree_paths"] = {
+            "branch": paths.branch,
+            "worktree_dir": paths.worktree_dir,
+            "project_root": paths.project_root,
+        }
+        # Pass the worktree to readiness checks below.
+        workspace = paths.worktree_dir
+        await _log(f"Worktree active: {paths.worktree_dir}")
+
+    task_run.workspace_result = workspace_result
     await session.commit()
     await _log(f"Workspace cloned: {len(repos_cloned)} repo(s)")
 
     # --- Workspace readiness validation ---
     await _validate_readiness(task_run, session, ssh, workspace, worker_user, ws_cfg, _log)
+
+
+def _resolve_workspace_strategy(ws_cfg: dict, phase_config: dict | None) -> str:
+    """Return the workspace strategy for this run, default ``shared_clone``.
+
+    Priority (most specific wins):
+    1. ``task_run.workspace_config['strategy']`` — project-level
+    2. ``phase_config['params']['workspace_strategy']`` — per-template
+
+    Anything other than ``"worktree"`` falls through to the existing
+    shared-clone behavior so existing templates keep working.
+    """
+    explicit = (ws_cfg or {}).get("strategy")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    if phase_config:
+        params = phase_config.get("params") or {}
+        from_phase = params.get("workspace_strategy")
+        if isinstance(from_phase, str) and from_phase:
+            return from_phase
+    return "shared_clone"
 
 
 async def _validate_readiness(
