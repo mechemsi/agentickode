@@ -16,11 +16,27 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.models import WorkspaceServer
 from backend.models.local_sessions import LocalTerminalSession
+from backend.services.workspace.runuser_prefix import runuser_prefix, wrap_for_user
 from backend.worker.broadcaster import broadcaster
 
 logger = logging.getLogger("agentickode.api.local_terminals")
 router = APIRouter(tags=["local-terminals"])
+
+
+async def _platform_worker_user(db: AsyncSession) -> str | None:
+    """Look up the local platform server's configured ``worker_user``.
+
+    Returns ``None`` when nothing is set — callers then behave as
+    before (everything runs as the backend's process user, typically
+    root in the Docker default).
+    """
+    result = await db.execute(
+        select(WorkspaceServer.worker_user).where(WorkspaceServer.server_type == "local").limit(1)
+    )
+    user = result.scalar_one_or_none()
+    return user if (isinstance(user, str) and user.strip()) else None
 
 
 class CreateSessionRequest(BaseModel):
@@ -58,10 +74,14 @@ async def list_local_sessions(db: AsyncSession = Depends(get_db)):
     )
     sessions = result.scalars().all()
 
-    # Verify active sessions still have tmux running
+    # Verify active sessions still have tmux running. Use the platform
+    # worker_user's tmux socket so sessions started under that user
+    # are detected correctly.
+    worker_user = await _platform_worker_user(db)
+    prefix = await runuser_prefix(worker_user)
     verified = []
     for s in sessions:
-        if s.status == "active" and not await _tmux_exists(s.tmux_name):
+        if s.status == "active" and not await _tmux_exists(s.tmux_name, prefix):
             s.status = "closed"
         verified.append(s)
     await db.commit()
@@ -78,10 +98,24 @@ async def create_local_session(
     tmux_name = f"lt-{body.agent_name}-{session_id}"
     display_name = body.display_name or f"{body.agent_name} session"
 
+    # Resolve the platform server's worker_user (if set) and compute
+    # the ``runuser -l`` prefix once. Every tmux call below is wrapped
+    # with this prefix so the tmux server, its shell, and the agent
+    # inside all run as the worker user — not as the backend's process
+    # user (typically root in Docker).
+    worker_user = await _platform_worker_user(db)
+    prefix = await runuser_prefix(worker_user)
+
+    # PATH search order: when running as the worker user we want their
+    # ``~/.local/bin``; otherwise fall back to root's.
+    if worker_user and prefix:
+        agent_path = f"/home/{worker_user}/.local/bin:/home/{worker_user}/.local/share/claude/bin"
+    else:
+        agent_path = "/root/.local/bin:/root/.local/share/claude/bin"
     env = {
         **os.environ,
         "TERM": "xterm-256color",
-        "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+        "PATH": f"{agent_path}:{os.environ.get('PATH', '')}",
     }
 
     # Create tmux with a shell, then launch agent inside it.
@@ -92,8 +126,9 @@ async def create_local_session(
     else:
         agent_launch = body.agent_name
 
+    new_session = wrap_for_user(f"tmux new-session -d -s {tmux_name} -x 120 -y 40", prefix)
     proc = await asyncio.create_subprocess_shell(
-        f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
+        new_session,
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -103,18 +138,18 @@ async def create_local_session(
         stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
         raise HTTPException(500, f"Failed to create tmux session: {stderr}")
 
-    # Enable mouse scrolling and increase scrollback
-    await asyncio.create_subprocess_shell(
+    # Enable mouse scrolling and increase scrollback (same user as new-session
+    # so it talks to the same tmux server).
+    setup_opts = wrap_for_user(
         f"tmux set-option -t {tmux_name} mouse on && "
         f"tmux set-option -t {tmux_name} history-limit 10000",
-        env=env,
+        prefix,
     )
+    await asyncio.create_subprocess_shell(setup_opts, env=env)
 
-    # Send the agent launch command into the shell
-    await asyncio.create_subprocess_shell(
-        f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
-        env=env,
-    )
+    # Send the agent launch command into the shell.
+    send_cmd = wrap_for_user(f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter", prefix)
+    await asyncio.create_subprocess_shell(send_cmd, env=env)
 
     session = LocalTerminalSession(
         session_id=session_id,
@@ -185,23 +220,31 @@ async def resume_local_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # If tmux is already running, just mark active
-    if await _tmux_exists(session.tmux_name):
+    worker_user = await _platform_worker_user(db)
+    prefix = await runuser_prefix(worker_user)
+
+    # If tmux is already running (under the right user), just mark active
+    if await _tmux_exists(session.tmux_name, prefix):
         session.status = "active"
         session.last_activity_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(session)
         return session
 
+    if worker_user and prefix:
+        agent_path = f"/home/{worker_user}/.local/bin:/home/{worker_user}/.local/share/claude/bin"
+    else:
+        agent_path = "/root/.local/bin:/root/.local/share/claude/bin"
     env = {
         **os.environ,
         "TERM": "xterm-256color",
-        "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+        "PATH": f"{agent_path}:{os.environ.get('PATH', '')}",
     }
 
     # Re-create tmux session with the same name
+    new_session = wrap_for_user(f"tmux new-session -d -s {session.tmux_name} -x 120 -y 40", prefix)
     proc = await asyncio.create_subprocess_shell(
-        f"tmux new-session -d -s {session.tmux_name} -x 120 -y 40",
+        new_session,
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -212,21 +255,20 @@ async def resume_local_session(
         raise HTTPException(500, f"Failed to create tmux session: {stderr}")
 
     # Enable mouse scrolling and increase scrollback
-    await asyncio.create_subprocess_shell(
+    setup_opts = wrap_for_user(
         f"tmux set-option -t {session.tmux_name} mouse on && "
         f"tmux set-option -t {session.tmux_name} history-limit 10000",
-        env=env,
+        prefix,
     )
+    await asyncio.create_subprocess_shell(setup_opts, env=env)
 
     # Re-launch the agent — use --resume if we have a Claude session ID
     if session.agent_session_id and session.agent_name == "claude":
         agent_cmd = f"claude --permission-mode auto --resume {session.agent_session_id}"
     else:
         agent_cmd = session.last_command or session.agent_name
-    await asyncio.create_subprocess_shell(
-        f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter",
-        env=env,
-    )
+    send_cmd = wrap_for_user(f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter", prefix)
+    await asyncio.create_subprocess_shell(send_cmd, env=env)
 
     session.status = "active"
     session.closed_at = None
@@ -251,10 +293,13 @@ async def close_local_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # Kill tmux
-    await asyncio.create_subprocess_shell(
-        f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true"
+    # Kill tmux (as the same user who created it, so we hit the right socket)
+    worker_user = await _platform_worker_user(db)
+    prefix = await runuser_prefix(worker_user)
+    kill_cmd = wrap_for_user(
+        f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true", prefix
     )
+    await asyncio.create_subprocess_shell(kill_cmd)
 
     await db.delete(session)
     await db.commit()
@@ -272,10 +317,15 @@ async def close_local_session(
     return {"status": "deleted"}
 
 
-async def _tmux_exists(tmux_name: str) -> bool:
-    """Check if a tmux session exists."""
+async def _tmux_exists(tmux_name: str, prefix: str = "") -> bool:
+    """Check if a tmux session exists.
+
+    ``prefix`` is a :func:`runuser_prefix` result so the check hits the
+    right tmux server when sessions are owned by a non-root user.
+    """
+    check = wrap_for_user(f"tmux has-session -t {tmux_name} 2>/dev/null", prefix)
     proc = await asyncio.create_subprocess_shell(
-        f"tmux has-session -t {tmux_name} 2>/dev/null",
+        check,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

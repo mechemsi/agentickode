@@ -18,8 +18,27 @@ from sqlalchemy import select
 
 from backend.database import async_session
 from backend.models import ProjectWorkspaceServer, TaskRun, WorkspaceServer
+from backend.services.workspace.runuser_prefix import runuser_prefix, wrap_for_user
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
+
+
+async def _platform_worker_user() -> str | None:
+    """Return the local platform server's ``worker_user`` if set.
+
+    Used by the WebSocket terminal-attach path so the tmux server it
+    talks to is the same one the REST endpoint created (a per-user
+    socket under ``/tmp/tmux-<UID>/``).
+    """
+    async with async_session() as db:
+        result = await db.execute(
+            select(WorkspaceServer.worker_user)
+            .where(WorkspaceServer.server_type == "local")
+            .limit(1)
+        )
+        user = result.scalar_one_or_none()
+        return user if (isinstance(user, str) and user.strip()) else None
+
 
 logger = logging.getLogger("agentickode.ws")
 router = APIRouter()
@@ -58,15 +77,37 @@ async def ws_global_events(websocket: WebSocket):
 
 
 async def _local_pty_terminal(websocket: WebSocket) -> None:
-    """Bridge a browser xterm.js to a local bash PTY (for the platform server)."""
+    """Bridge a browser xterm.js to a local bash PTY (for the platform server).
+
+    If the platform server has ``worker_user`` configured we ``execvp``
+    ``runuser -l <user>`` so the shell — and anything launched inside —
+    runs as that user instead of the backend's process user (typically
+    root in Docker). The user is provisioned lazily by
+    :func:`runuser_prefix` before fork().
+    """
     import fcntl
     import pty
     import struct
     import termios
 
+    worker_user = await _platform_worker_user()
+    # We don't need the runuser prefix string itself here (we exec the
+    # binary directly), but calling it ensures the user is created
+    # before fork() and that we get the same "should we wrap" decision
+    # as the other paths.
+    prefix = await runuser_prefix(worker_user)
+    drop_user = bool(prefix) and worker_user is not None
+
     pid, fd = pty.fork()
     if pid == 0:  # child
-        os.execvp("bash", ["bash"])
+        if drop_user:
+            # ``runuser -l USER bash`` starts a login bash as USER. The
+            # caller's env is wiped but bash's login startup files re-
+            # populate HOME / PATH / etc. for the target user.
+            assert worker_user is not None  # narrowed by ``drop_user``
+            os.execvp("runuser", ["runuser", "-l", worker_user, "-c", "bash --login"])
+        else:
+            os.execvp("bash", ["bash"])
         return
 
     # Set initial terminal size
@@ -533,15 +574,25 @@ async def _attach_to_tmux(
 
     await websocket.accept()
 
+    # Compute runuser prefix from the platform server config so the
+    # attached tmux, the shell inside, and the agent all run as the
+    # operator-configured worker_user instead of the backend's user.
+    worker_user = await _platform_worker_user()
+    prefix = await runuser_prefix(worker_user)
+
+    if worker_user and prefix:
+        agent_path = f"/home/{worker_user}/.local/bin:/home/{worker_user}/.local/share/claude/bin"
+    else:
+        agent_path = "/root/.local/bin:/root/.local/share/claude/bin"
     env = {
         **os.environ,
         "TERM": "xterm-256color",
-        "PATH": f"/root/.local/bin:/root/.local/share/claude/bin:{os.environ.get('PATH', '')}",
+        "PATH": f"{agent_path}:{os.environ.get('PATH', '')}",
     }
 
-    # Check if tmux session exists
+    # Check if tmux session exists (under the right user's socket)
     check = await asyncio.create_subprocess_shell(
-        f"tmux has-session -t {tmux_name} 2>/dev/null",
+        wrap_for_user(f"tmux has-session -t {tmux_name} 2>/dev/null", prefix),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -552,7 +603,7 @@ async def _attach_to_tmux(
         # Create tmux with shell, then launch agent inside
         agent_launch = "claude --permission-mode auto" if agent_name == "claude" else agent_name
         proc = await asyncio.create_subprocess_shell(
-            f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
+            wrap_for_user(f"tmux new-session -d -s {tmux_name} -x 120 -y 40", prefix),
             env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -567,7 +618,7 @@ async def _attach_to_tmux(
             return
         # Send the agent launch command into the shell
         await asyncio.create_subprocess_shell(
-            f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
+            wrap_for_user(f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter", prefix),
             env=env,
         )
     elif not tmux_exists:
@@ -577,11 +628,12 @@ async def _attach_to_tmux(
         await websocket.close()
         return
 
-    # Attach to tmux via a local PTY
+    # Attach to tmux via a local PTY (as the same user that owns the
+    # tmux server, otherwise we'd miss the socket).
     master_fd, slave_fd = pty.openpty()
 
     attach_proc = await asyncio.create_subprocess_shell(
-        f"tmux attach-session -t {tmux_name}",
+        wrap_for_user(f"tmux attach-session -t {tmux_name}", prefix),
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,
