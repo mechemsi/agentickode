@@ -100,11 +100,11 @@ shell-frontend:
 .PHONY: migrate migrate-new db-shell
 
 migrate:
-	$(DC) exec backend alembic upgrade head
+	$(DC) exec -e PYTHONPATH=/app backend alembic upgrade head
 
 migrate-new:
 	@test -n "$(MSG)" || (echo "Usage: make migrate-new MSG='add_users_table'" && exit 1)
-	$(DC) exec backend alembic revision --autogenerate -m "$(MSG)"
+	$(DC) exec -e PYTHONPATH=/app backend alembic revision --autogenerate -m "$(MSG)"
 
 db-shell:
 	$(DC) exec postgres psql -U agentickode -d agentickode
