@@ -42,6 +42,17 @@ def _parse_pr_url(url: str) -> tuple[str, int]:
     raise ValueError(f"Could not parse PR URL: {url}")
 
 
+def _parse_changed_files(diff: str) -> list[str]:
+    """Extract the changed-file paths from a unified ``git diff`` header block."""
+    files: list[str] = []
+    for line in diff.splitlines():
+        if line.startswith("diff --git ") and " b/" in line:
+            path = line.split(" b/", 1)[1].strip()
+            if path and path not in files:
+                files.append(path)
+    return files
+
+
 async def run(
     task_run: TaskRun,
     session: AsyncSession,
@@ -71,12 +82,17 @@ async def run(
 
     diff = await provider.get_pr_diff(repo_path, int(pr_number))
     comments = await provider.get_pr_comments(repo_path, int(pr_number))
+    files_changed = _parse_changed_files(diff)
 
     result = {
         "pr_diff": diff[:50000],  # Limit diff size
         "pr_comments": comments[:50],  # Limit comment count
         "pr_number": pr_number,
         "repo_path": repo_path,
+        "files_changed": files_changed,
+        # The reviewing phase derives its file inventory from
+        # coding_results["results"][*]["files_changed"], so expose it there too.
+        "results": [{"files_changed": files_changed}],
     }
 
     task_run.coding_results = {**(task_run.coding_results or {}), **result}

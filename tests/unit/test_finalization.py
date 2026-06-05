@@ -260,6 +260,110 @@ class TestFinalization:
             # Should NOT raise — finalization continues.
             await finalization.run(run, db_session, mock_services)
 
+    async def test_review_comment_mode_does_not_push_branch(
+        self, db_session, make_task_run, mock_services
+    ):
+        """A comment-mode PR review must post the review but never push to the PR branch."""
+        run = make_task_run(
+            pr_url=None,
+            task_source_meta={
+                "pr_head_branch": "feature/x",
+                "pr_number": 7,
+                "review_mode": "comment",
+            },
+            review_result={"approved": False, "issues": [{"severity": "major"}]},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.finalization._push_to_pr_branch",
+                new=AsyncMock(),
+            ) as mock_push,
+            patch(
+                "backend.worker.phases.finalization._post_review_comment",
+                new=AsyncMock(),
+            ) as mock_comment,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+            await finalization.run(run, db_session, mock_services)
+
+        mock_push.assert_not_called()
+        mock_comment.assert_awaited_once()
+        assert mock_comment.call_args.args[1] == 7
+
+    async def test_comment_mode_skips_workspace_cleanup(
+        self, db_session, make_task_run, mock_services
+    ):
+        """A comment-mode review creates no workspace, so finalization skips SSH cleanup."""
+        run = make_task_run(
+            pr_url=None,
+            task_source_meta={"pr_number": 9, "review_mode": "comment"},
+            review_result={"approved": True, "issues": []},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=AsyncMock()),
+            ) as mock_ssh,
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.finalization._post_review_comment",
+                new=AsyncMock(),
+            ) as mock_comment,
+        ):
+            await finalization.run(run, db_session, mock_services)
+
+        mock_comment.assert_awaited_once()
+        mock_sb_cls.assert_not_called()  # no sandbox stop
+        mock_ssh.assert_not_called()  # no SSH cleanup at all
+
+    async def test_fix_mode_pushes_to_pr_branch(self, db_session, make_task_run, mock_services):
+        """An explicit fix-mode run pushes fixes to the existing PR branch."""
+        run = make_task_run(
+            pr_url=None,
+            task_source_meta={"pr_head_branch": "feature/x", "review_mode": "fix"},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_ssh_for_run",
+                new=AsyncMock(return_value=AsyncMock()),
+            ),
+            patch("backend.worker.phases.finalization.RemoteSandbox") as mock_sb_cls,
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+            patch(
+                "backend.worker.phases.finalization._push_to_pr_branch",
+                new=AsyncMock(),
+            ) as mock_push,
+        ):
+            mock_sb_cls.return_value.stop_sandbox = AsyncMock()
+            await finalization.run(run, db_session, mock_services)
+
+        mock_push.assert_awaited_once()
+
     async def test_shared_workspace_not_deleted(self, db_session, make_task_run, mock_services):
         """Workspace paths that don't end with /{run.id} are not deleted."""
         run = make_task_run(pr_url="https://gitea.test/org/repo/pulls/4")

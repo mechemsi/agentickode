@@ -155,6 +155,29 @@ async def _resolve_workflow_phases(run: TaskRun, session: AsyncSession) -> list[
     4. Default template
     5. Hardcoded PHASE_NAMES fallback
     """
+    # 0. PR-review runs are bound to the pr-review template and must NEVER be
+    # diverted into a project's autonomous/coder pipeline — they have no checkout,
+    # so running a coder/agent_loop against them is wrong (and destructive). The
+    # explicit binding wins over execution_mode; if the template can't be resolved
+    # (binding lost or never seeded) we fail loudly rather than fall through.
+    meta = run.task_source_meta or {}
+    if meta.get("review_mode"):
+        repo = WorkflowTemplateRepository(session)
+        template = None
+        if run.workflow_template_id:
+            template = await repo.get_by_id(run.workflow_template_id)
+        if not template:
+            template = await repo.get_by_name("pr-review")
+        if not template or not template.phases:
+            raise RuntimeError(
+                f"PR-review run #{run.id} could not resolve a pr-review workflow template "
+                f"(workflow_template_id={run.workflow_template_id})"
+            )
+        if not run.workflow_template_id:
+            run.workflow_template_id = template.id
+        review_phases = cast(list[dict[str, Any]], template.phases)
+        return [p for p in review_phases if p.get("enabled", True)]
+
     # 1. Check execution mode — autonomous modes use fixed sequences
     execution_mode = await _get_project_execution_mode(run, session)
     if execution_mode in _AUTONOMOUS_PHASE_SEQUENCES:

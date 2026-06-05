@@ -48,9 +48,12 @@ async def run(
     meta = task_run.task_source_meta or {}
     pr_number = meta.get("pr_number")
     pr_branch = meta.get("pr_head_branch")
+    review_mode = meta.get("review_mode")
 
-    # fix-pr: push fixes to existing PR branch (no new PR)
-    if pr_branch and not task_run.pr_url:
+    # fix-pr: push fixes to existing PR branch (no new PR). Only for explicit
+    # fix-mode runs — a comment-only PR review must never push to the PR branch
+    # (it has no checkout/commits and pushing would fail or clobber the branch).
+    if pr_branch and not task_run.pr_url and review_mode == "fix":
         await _push_to_pr_branch(task_run, pr_branch, session)
 
     # Post review comment on source PR for pr-review / fix-pr workflows
@@ -68,6 +71,14 @@ async def run(
 
     # Close agent session (release locks so session_id can be reused if needed)
     await close_run_session(task_run, session)
+
+    # Comment-mode PR reviews never set up a per-task workspace/sandbox (the diff
+    # is fetched via API and reviewed in generate mode), so there is nothing to
+    # tear down — skip the SSH cleanup so a successful review can't be failed by
+    # a cleanup hiccup.
+    if review_mode == "comment":
+        await broadcaster.log(task_run.id, "Review complete", phase="finalization")
+        return
 
     # Cleanup workspace
     await broadcaster.log(task_run.id, "Stopping sandbox containers (if any)", phase="finalization")

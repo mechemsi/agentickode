@@ -22,10 +22,13 @@ class Settings(BaseSettings):
     # Gitea
     gitea_url: str = "https://gitea.yourdomain.com"
     gitea_token: str = ""
+    gitea_webhook_secret: str = ""  # optional HMAC secret for inbound PR webhooks
 
     # GitHub
     github_token: str = ""
     github_api_url: str = "https://api.github.com"
+    github_webhook_secret: str = ""  # optional HMAC secret for inbound PR webhooks
+    ci_trigger_secret: str = ""  # optional shared secret for POST /api/webhooks/pr-review
 
     # Bitbucket (workspace/repo access token from Bitbucket settings)
     bitbucket_access_token: str = ""
