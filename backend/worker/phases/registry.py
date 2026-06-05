@@ -35,7 +35,6 @@ class PhaseInfo:
     name: str
     module: ModuleType
     description: str = ""
-    default_role: str | None = None
     default_agent_mode: str | None = None
     # ADR-007: phases are either ``builtin`` (workspace_setup, init — the
     # immutable prelude) or ``legacy_phase`` (the old fixed-pipeline modules
@@ -80,7 +79,6 @@ def discover_phases() -> dict[str, PhaseInfo]:
             name=phase_name,
             module=mod,
             description=meta.get("description", ""),
-            default_role=meta.get("default_role"),
             default_agent_mode=meta.get("default_agent_mode"),
             kind=meta.get("kind", "legacy_phase"),
             deprecated_in=meta.get("deprecated_in"),

@@ -22,7 +22,7 @@ from backend.worker.phases._helpers import (
     ensure_agent_ready,
     get_agent_mode,
     get_agent_settings_kwargs,
-    get_phase_role,
+    get_phase_agent,
     get_ssh_for_run,
     get_workspace_server_id,
     phase_uses_agent,
@@ -36,7 +36,6 @@ PHASE_META = {
     "kind": "legacy_phase",
     "deprecated_in": "0.5.0",
     "description": "AI code review with auto-fix retry loop",
-    "default_role": "reviewer",
     "default_agent_mode": "generate",
 }
 
@@ -105,23 +104,16 @@ async def run(
     phase_exec_row = pe_result.scalar_one_or_none()
 
     ws_id = await get_workspace_server_id(task_run, session)
-    role = get_phase_role("reviewing", phase_config, phase_exec_row)
-    resolved = await services.role_resolver.resolve(role, session, ws_id, phase_name="reviewing")
-    if resolved.is_fallback and resolved.tried:
-        tried_msg = ", ".join(resolved.tried)
-        await broadcaster.log(
-            task_run.id,
-            f"⚠ Configured agents failed: {tried_msg} — fell back to Ollama",
-            level="warning",
-            phase="reviewing",
-        )
+    agent_name = get_phase_agent("reviewing", phase_config, phase_exec_row)
+    resolved = await services.agent_resolver.resolve_agent(
+        agent_name, session, ws_id, project_id=task_run.project_id
+    )
     reviewer = resolved.adapter
-    config = resolved.role_config
     settings_kwargs = get_agent_settings_kwargs(resolved.agent_settings, phase_config)
     apply_phase_command_overrides(reviewer, phase_config)
 
     system_prompt, user_template, extra_params, project_env_vars = await resolve_prompts(
-        config,
+        resolved.agent_settings,
         reviewer,
         session,
         FALLBACK_SYSTEM_PROMPT,
@@ -132,8 +124,8 @@ async def run(
     if project_env_vars:
         existing_env = settings_kwargs.get("environment_vars", {})
         settings_kwargs["environment_vars"] = {**existing_env, **project_env_vars}
-    temperature = config.default_temperature if config else 0.2
-    num_predict = config.default_num_predict if config else 2048
+    temperature = 0.2
+    num_predict = 2048
 
     # Read strictness from phase config (default: critical_only for backward compat)
     params = (phase_config or {}).get("params", {})

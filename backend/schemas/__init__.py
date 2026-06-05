@@ -13,11 +13,6 @@ from backend.schemas.agents import (
     AgentManagementStatus,
     AgentSettingsIn,
     AgentSettingsOut,
-    RoleConfigCreate,
-    RoleConfigOut,
-    RoleConfigUpdate,
-    RolePromptOverrideIn,
-    RolePromptOverrideOut,
     UserAgentStatus,
 )
 from backend.schemas.analytics import (
@@ -110,14 +105,6 @@ from backend.schemas.projects import (
     TestConnectionResponse,
 )
 from backend.schemas.readiness import CheckResultOut, WorkspaceReadinessOut
-from backend.schemas.roles import (
-    DEFAULT_VALID_ROLES,
-    VALID_AGENT_NAMES,
-    VALID_PROVIDER_TYPES,
-    VALID_ROLES,
-    RoleAssignmentCreate,
-    RoleAssignmentOut,
-)
 from backend.schemas.runs import (
     AdvancePhaseRequest,
     CreateRunRequest,
@@ -184,13 +171,9 @@ from backend.schemas.workflows import (
 )
 
 __all__ = [
-    "DEFAULT_VALID_ROLES",
-    "VALID_AGENT_NAMES",
     "VALID_CHANNEL_TYPES",
     "VALID_GIT_PROVIDERS",
     "VALID_NOTIFICATION_EVENTS",
-    "VALID_PROVIDER_TYPES",
-    "VALID_ROLES",
     "VALID_SCOPES",
     "AdvancePhaseRequest",
     "AgentCostStat",
@@ -277,13 +260,6 @@ __all__ = [
     "PruneResult",
     "RejectRequest",
     "RetrySetupRequest",
-    "RoleAssignmentCreate",
-    "RoleAssignmentOut",
-    "RoleConfigCreate",
-    "RoleConfigOut",
-    "RoleConfigUpdate",
-    "RolePromptOverrideIn",
-    "RolePromptOverrideOut",
     "RunningModel",
     "RunningModelsResponse",
     "SSHKeyCreate",

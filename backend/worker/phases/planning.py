@@ -25,7 +25,7 @@ from backend.worker.phases._helpers import (
     ensure_agent_ready,
     get_agent_mode,
     get_agent_settings_kwargs,
-    get_phase_role,
+    get_phase_agent,
     get_token_usage,
     get_workspace_server_id,
     phase_uses_agent,
@@ -38,7 +38,6 @@ PHASE_META = {
     "kind": "legacy_phase",
     "deprecated_in": "0.5.0",
     "description": "Decompose task into subtasks via AI agent",
-    "default_role": "planner",
     "default_agent_mode": "generate",
 }
 
@@ -112,18 +111,11 @@ async def run(
     phase_exec_row = pe_result.scalar_one_or_none()
 
     ws_id = await get_workspace_server_id(task_run, session)
-    role = get_phase_role("planning", phase_config, phase_exec_row)
-    resolved = await services.role_resolver.resolve(role, session, ws_id, phase_name="planning")
-    if resolved.is_fallback and resolved.tried:
-        tried_msg = ", ".join(resolved.tried)
-        await broadcaster.log(
-            task_run.id,
-            f"⚠ Configured agents failed: {tried_msg} — fell back to Ollama",
-            level="warning",
-            phase="planning",
-        )
+    agent_name = get_phase_agent("planning", phase_config, phase_exec_row)
+    resolved = await services.agent_resolver.resolve_agent(
+        agent_name, session, ws_id, project_id=task_run.project_id
+    )
     adapter = resolved.adapter
-    config = resolved.role_config
     settings_kwargs = get_agent_settings_kwargs(resolved.agent_settings, phase_config)
     apply_phase_command_overrides(adapter, phase_config)
 
@@ -134,7 +126,7 @@ async def run(
         session_id = str(uuid.uuid4())
 
     system_prompt, user_template, extra_params, project_env_vars = await resolve_prompts(
-        config,
+        resolved.agent_settings,
         adapter,
         session,
         FALLBACK_SYSTEM_PROMPT,
@@ -145,8 +137,8 @@ async def run(
     if project_env_vars:
         existing_env = settings_kwargs.get("environment_vars", {})
         settings_kwargs["environment_vars"] = {**existing_env, **project_env_vars}
-    temperature = config.default_temperature if config else 0.3
-    num_predict = config.default_num_predict if config else 2048
+    temperature = 0.3
+    num_predict = 2048
 
     user_prompt = user_template.format(
         title=task_run.title,

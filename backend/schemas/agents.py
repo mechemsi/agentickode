@@ -8,68 +8,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
-class RoleConfigCreate(BaseModel):
-    agent_name: str
-    display_name: str
-    description: str = ""
-    system_prompt: str = ""
-    user_prompt_template: str = ""
-    phase_binding: str | None = None
-    default_temperature: float = 0.3
-    default_num_predict: int = 2048
-    extra_params: dict[str, Any] = {}
-
-
-class RoleConfigUpdate(BaseModel):
-    display_name: str | None = None
-    description: str | None = None
-    system_prompt: str | None = None
-    user_prompt_template: str | None = None
-    phase_binding: str | None = None
-    default_temperature: float | None = None
-    default_num_predict: int | None = None
-    extra_params: dict[str, Any] | None = None
-
-
-class RoleConfigOut(BaseModel):
-    id: int
-    agent_name: str
-    display_name: str
-    description: str
-    system_prompt: str
-    user_prompt_template: str
-    phase_binding: str | None
-    is_system: bool
-    default_temperature: float
-    default_num_predict: int
-    extra_params: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class RolePromptOverrideIn(BaseModel):
-    system_prompt: str | None = None
-    user_prompt_template: str | None = None
-    minimal_mode: bool = False
-    extra_params: dict = {}
-
-
-class RolePromptOverrideOut(BaseModel):
-    id: int
-    role_config_id: int
-    cli_agent_name: str
-    system_prompt: str | None = None
-    user_prompt_template: str | None = None
-    minimal_mode: bool = False
-    extra_params: dict = {}
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class AgentSettingsIn(BaseModel):
     display_name: str | None = None
     description: str | None = None

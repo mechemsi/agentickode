@@ -2,7 +2,7 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Generic agent step runner — single-shot prompt → response via RoleResolver.
+"""Generic agent step runner — single-shot prompt → response via AgentResolver.
 
 Used by workflow templates whose ``phases[]`` entries have ``kind == "agent"``.
 Stays intentionally pure: no DB mutations, no PhaseExecution writes, no
@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import TaskRun
 from backend.services.adapters.cli_adapter import CLIAdapter
+from backend.services.agent_resolver import ResolvedAgent
 from backend.services.container import ServiceContainer
-from backend.services.role_resolver import ResolvedRole
 from backend.services.workspace.usernames import validate_username
 from backend.worker.phases._helpers import get_project_config
 from backend.worker.steps.templating import render
@@ -27,7 +27,6 @@ from backend.worker.steps.templating import render
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 1800
-DEFAULT_ROLE = "coder"
 DEFAULT_MODE = "generate"
 
 
@@ -62,20 +61,17 @@ async def run_agent_step(
     """
     params = phase_config.get("params") or {}
     raw_prompt: str = params["prompt"]
-    role: str = phase_config.get("role") or DEFAULT_ROLE
+    agent_name: str | None = phase_config.get("agent")  # None → project/global default
     mode: str = params.get("mode") or DEFAULT_MODE
-    phase_name = phase_config.get("phase_name")
 
     rendered_prompt = await render(raw_prompt, task_run, session)
     kwargs = _adapter_kwargs(phase_config)
-    if "agent_override" in phase_config:
-        kwargs["agent_override"] = phase_config["agent_override"]
 
-    resolved: ResolvedRole = await services.role_resolver.resolve(
-        role,
+    resolved: ResolvedAgent = await services.agent_resolver.resolve_agent(
+        agent_name,
         session,
         task_run.workspace_server_id,
-        phase_name=phase_name,
+        project_id=task_run.project_id,
     )
     adapter = resolved.adapter
 
@@ -99,7 +95,7 @@ async def run_agent_step(
 
     result: dict[str, Any] = {
         "provider": adapter.provider_name,
-        "role": role,
+        "agent": adapter.provider_name,
         "mode": mode,
         "prompt": rendered_prompt,
         "response": None,

@@ -24,7 +24,6 @@ from backend.api import (
     chat,
     git_connections,
     health,
-    llm_roles,
     local_terminals,
     logs,
     memory,
@@ -35,7 +34,6 @@ from backend.api import (
     project_instructions,
     project_issues,
     projects,
-    role_configs,
     runs,
     runs_actions,
     runs_phases,
@@ -125,26 +123,6 @@ async def _run_migrations() -> None:
             enabled BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-    """)
-    # Rename agent_configs → role_configs (existing installations)
-    await _run_migration_step("ALTER TABLE agent_configs RENAME TO role_configs")
-    await _run_migration_step("ALTER TABLE agent_prompt_overrides RENAME TO role_prompt_overrides")
-    await _run_migration_step(
-        "ALTER TABLE role_prompt_overrides RENAME COLUMN agent_config_id TO role_config_id"
-    )
-    await _run_migration_step("""
-        CREATE TABLE IF NOT EXISTS role_prompt_overrides (
-            id SERIAL PRIMARY KEY,
-            role_config_id INTEGER NOT NULL REFERENCES role_configs(id) ON DELETE CASCADE,
-            cli_agent_name TEXT NOT NULL,
-            system_prompt TEXT,
-            user_prompt_template TEXT,
-            minimal_mode BOOLEAN NOT NULL DEFAULT FALSE,
-            extra_params JSONB NOT NULL DEFAULT '{}',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            UNIQUE(role_config_id, cli_agent_name)
         )
     """)
     # Add user_context to discovered_agents (admin vs worker)
@@ -415,10 +393,8 @@ app.include_router(docker_management_router, prefix="/api")
 app.include_router(server_groups_router, prefix="/api")
 app.include_router(server_projects_router, prefix="/api")
 app.include_router(ollama_servers.router, prefix="/api")
-app.include_router(llm_roles.router, prefix="/api")
 app.include_router(ssh_keys_router, prefix="/api")
 app.include_router(notification_channels.router, prefix="/api")
-app.include_router(role_configs.router, prefix="/api")
 app.include_router(workflow_templates.router, prefix="/api")
 app.include_router(webhook_callbacks.router, prefix="/api")
 app.include_router(worker_user_router, prefix="/api")

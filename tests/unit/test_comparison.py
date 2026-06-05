@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.models import ProjectConfig
-from backend.services.role_resolver import ResolvedRole
+from backend.services.agent_resolver import ResolvedAgent
 from backend.worker.phases import coding
 
 
@@ -46,8 +46,8 @@ class TestComparisonDetection:
             await coding.run(run, db_session, mock_services, phase_config=phase_config)
 
         mock_comp.assert_called_once()
-        # role_resolver should NOT have been called (early return before normal flow)
-        mock_services.role_resolver.resolve.assert_not_called()
+        # agent_resolver should NOT have been called (early return before normal flow)
+        mock_services.agent_resolver.resolve_agent.assert_not_called()
 
     async def test_no_comparison_runs_normally(self, db_session, make_task_run, mock_services):
         """Without comparison config, coding runs the normal path."""
@@ -68,7 +68,9 @@ class TestComparisonDetection:
             "stderr": "",
             "command": "cd /ws && claude",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -92,7 +94,7 @@ class TestComparisonDetection:
             )
 
         # Normal flow was executed
-        mock_services.role_resolver.resolve.assert_called_once()
+        mock_services.agent_resolver.resolve_agent.assert_called_once()
 
 
 class TestComparisonResults:
@@ -127,7 +129,9 @@ class TestComparisonResults:
             "output": "done",
             "stderr": "",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         mock_git = MagicMock()
         mock_git.run_git = AsyncMock(return_value=MagicMock(stdout="abc123\n", stderr=""))

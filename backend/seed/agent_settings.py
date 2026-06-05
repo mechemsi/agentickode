@@ -162,6 +162,8 @@ DEFAULT_AGENT_SETTINGS: list[dict] = [
         "post_install_cmd": _CLAUDE_POST_INSTALL_CMD,
         "needs_non_root": True,
         "consolidated_default": True,
+        "is_default": True,  # global default agent when a step/project names none
+        "minimal_mode": True,  # claude supplies its own system prompt
     },
     {
         "agent_name": "codex",

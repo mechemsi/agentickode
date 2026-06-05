@@ -85,7 +85,10 @@ class PhaseConfig(BaseModel):
     phase_name: str
     kind: Literal["legacy_phase", "bash", "agent"] = "legacy_phase"
     enabled: bool = True
-    role: str | None = None
+    agent: str | None = (
+        None  # explicit agent (claude/codex/opencode); None → project/global default
+    )
+    role: str | None = None  # deprecated — ignored at runtime, kept for back-compat parsing
     uses_agent: bool | None = None
     agent_mode: str | None = None
     timeout_seconds: int | None = None

@@ -5,12 +5,12 @@
 """FastAPI dependency factories for service injection."""
 
 from backend.services.adapters.factory import AdapterFactory
+from backend.services.agent_resolver import AgentResolver
 from backend.services.chromadb_service import ChromaDBService
 from backend.services.container import ServiceContainer
 from backend.services.http_client import get_http_client
 from backend.services.ollama_service import OllamaService
 from backend.services.openhands_service import OpenHandsService
-from backend.services.role_resolver import RoleResolver
 from backend.services.task_source_updater import TaskSourceUpdater
 from backend.services.webhook_callback_service import WebhookCallbackService
 
@@ -31,12 +31,11 @@ def get_service_container() -> ServiceContainer:
     client = get_http_client()
     openhands = OpenHandsService(client)
     factory = AdapterFactory(http_client=client, openhands=openhands)
-    resolver = RoleResolver(factory=factory, http_client=client)
     return ServiceContainer(
         ollama=OllamaService(client),
         openhands=openhands,
         chromadb=ChromaDBService(client),
-        role_resolver=resolver,
+        agent_resolver=AgentResolver(factory=factory, http_client=client),
         task_source_updater=TaskSourceUpdater(client),
         webhook_callbacks=WebhookCallbackService(client),
     )

@@ -10,7 +10,7 @@ import pytest
 
 from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.adapters.cli_commands import AGENT_COMMANDS
-from backend.services.role_resolver import ResolvedRole
+from backend.services.agent_resolver import ResolvedAgent
 from backend.worker.phases import planning
 
 
@@ -433,7 +433,9 @@ class TestPlanningSessionContinuity:
         mock_adapter.generate.return_value = (
             '{"subtasks": [{"id": 1, "title": "Do X"}], "estimated_complexity": "simple"}'
         )
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -470,7 +472,9 @@ class TestPlanningSessionContinuity:
         mock_adapter.provider_name = "ollama/qwen2.5@gpu-01"
         mock_adapter.supports_session = False
         mock_adapter.generate.return_value = '{"subtasks": [], "estimated_complexity": "simple"}'
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(

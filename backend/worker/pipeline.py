@@ -261,12 +261,12 @@ async def _skip_phases_for_consolidated(
     # 3. Check agent's consolidated_default
     if consolidated is None:
         try:
-            from backend.worker.phases._helpers import get_phase_role, get_workspace_server_id
+            from backend.worker.phases._helpers import get_phase_agent, get_workspace_server_id
 
             ws_id = await get_workspace_server_id(run, session)
-            role = get_phase_role("coding", coding_pe.phase_config, coding_pe)
-            resolved = await services.role_resolver.resolve(
-                role, session, ws_id, phase_name="coding"
+            agent_name = get_phase_agent("coding", coding_pe.phase_config, coding_pe)
+            resolved = await services.agent_resolver.resolve_agent(
+                agent_name, session, ws_id, project_id=run.project_id
             )
             if resolved.agent_settings:
                 val = getattr(resolved.agent_settings, "consolidated_default", None)

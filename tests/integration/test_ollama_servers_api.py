@@ -206,32 +206,6 @@ class TestDeleteOllamaServer:
         get_resp = await client.get(f"/api/ollama-servers/{server_id}")
         assert get_resp.status_code == 404
 
-    async def test_delete_blocked_by_role_assignments(self, client: AsyncClient):
-        """Cannot delete a server that has active LLM role assignments."""
-        create_resp = await client.post(
-            "/api/ollama-servers",
-            json={"name": "role-srv", "url": "http://10.0.0.1:11434"},
-        )
-        server_id = create_resp.json()["id"]
-
-        # Create a role assignment
-        await client.put(
-            "/api/role-assignments",
-            json=[
-                {
-                    "role": "planner",
-                    "provider_type": "ollama",
-                    "ollama_server_id": server_id,
-                    "model_name": "qwen2.5-coder:32b",
-                },
-            ],
-        )
-
-        # Try to delete - should fail with 409
-        resp = await client.delete(f"/api/ollama-servers/{server_id}")
-        assert resp.status_code == 409
-        assert "role assignments" in resp.json()["detail"].lower()
-
 
 class TestRefreshModels:
     async def test_refresh(self, client: AsyncClient, mock_fetch_models):

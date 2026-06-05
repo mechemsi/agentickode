@@ -50,24 +50,20 @@ class TestDiscoverPhases:
 
         planning = phases["planning"]
         assert planning.description == "Decompose task into subtasks via AI agent"
-        assert planning.default_role == "planner"
         assert planning.default_agent_mode == "generate"
 
         coding = phases["coding"]
-        assert coding.default_role == "coder"
         assert coding.default_agent_mode == "task"
 
         reviewing = phases["reviewing"]
-        assert reviewing.default_role == "reviewer"
         assert reviewing.default_agent_mode == "generate"
 
     def test_missing_meta_defaults(self):
-        """Phases without default_role/default_agent_mode get None."""
+        """Phases without default_agent_mode get None."""
         phases = discover_phases()
 
         ws = phases["workspace_setup"]
         assert ws.description == "Set up workspace on remote server"
-        assert ws.default_role is None
         assert ws.default_agent_mode is None
 
     def test_all_phases_have_descriptions(self):

@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.services.agent_resolver import ResolvedAgent
 from backend.services.git.remote_ops import GitResult
-from backend.services.role_resolver import ResolvedRole
 from backend.worker.phases import coding
 
 
@@ -54,7 +54,9 @@ class TestCoding:
             "stderr": "",
             "command": "cd /ws && claude --print",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -96,11 +98,11 @@ class TestCoding:
             await coding.run(run, db_session, mock_services)
 
         assert run.coding_results == {"results": []}
-        # role_resolver should not be called when there are no subtasks and no title
-        mock_services.role_resolver.resolve.assert_not_called()
+        # agent_resolver should not be called when there are no subtasks and no title
+        mock_services.agent_resolver.resolve_agent.assert_not_called()
 
-    async def test_resolves_coder_role(self, db_session, make_task_run, mock_services):
-        """Verifies the coder role is resolved through role_resolver."""
+    async def test_resolves_agent(self, db_session, make_task_run, mock_services):
+        """Verifies the coding agent is resolved through agent_resolver."""
         run = make_task_run(
             planning_result={
                 "subtasks": [{"title": "T", "description": "D", "files_likely_affected": []}]
@@ -118,7 +120,9 @@ class TestCoding:
             "stderr": "",
             "command": "cd /ws && claude --print",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -141,8 +145,8 @@ class TestCoding:
                 phase_config={"params": {"consolidated": False}},
             )
 
-        mock_services.role_resolver.resolve.assert_called_once_with(
-            "coder", db_session, 5, phase_name="coding"
+        mock_services.agent_resolver.resolve_agent.assert_called_once_with(
+            None, db_session, 5, project_id=run.project_id
         )
 
     async def test_fails_when_all_subtasks_fail(self, db_session, make_task_run, mock_services):
@@ -165,7 +169,9 @@ class TestCoding:
             "stderr": "error",
             "command": "cd /ws && claude",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -209,7 +215,9 @@ class TestCoding:
             "stderr": "",
             "command": "cd /ws && claude",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -254,7 +262,9 @@ class TestCoding:
             "stderr": "",
             "command": "cd /ws && claude",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         mock_ssh = MagicMock()
         mock_remote_git = MagicMock()
@@ -326,7 +336,9 @@ class TestCoding:
             "stderr": "",
             "command": "cd /ws && claude",
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         mock_ssh = MagicMock()
         mock_remote_git = MagicMock()

@@ -12,7 +12,6 @@ from backend.models import (
     AppSetting,
     OllamaServer,
     ProjectConfig,
-    RoleConfig,
     WorkspaceServer,
 )
 from backend.services.backup.export_service import ExportService
@@ -47,12 +46,6 @@ async def _seed_source(session: AsyncSession) -> None:
     session.add(
         ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0)
     )
-    rc = RoleConfig(
-        agent_name="planner",
-        display_name="Planner",
-        system_prompt="You are a planner.",
-    )
-    session.add(rc)
     await session.commit()
 
 
@@ -118,7 +111,7 @@ async def test_roundtrip_encrypted(db_session: AsyncSession):
 
     # Delete existing data to simulate import into a clean DB
     await db_session.execute(select(ProjectConfig).where(True))  # force load
-    for model in [ProjectConfig, RoleConfig, AppSetting, OllamaServer, WorkspaceServer]:
+    for model in [ProjectConfig, AppSetting, OllamaServer, WorkspaceServer]:
         rows = (await db_session.execute(select(model))).scalars().all()
         for row in rows:
             await db_session.delete(row)

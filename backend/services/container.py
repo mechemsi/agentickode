@@ -6,10 +6,10 @@
 
 from dataclasses import dataclass, field
 
+from backend.services.agent_resolver import AgentResolver
 from backend.services.chromadb_service import ChromaDBService
 from backend.services.ollama_service import OllamaService
 from backend.services.openhands_service import OpenHandsService
-from backend.services.role_resolver import RoleResolver
 from backend.services.task_source_updater import TaskSourceUpdater
 from backend.services.webhook_callback_service import WebhookCallbackService
 
@@ -21,6 +21,6 @@ class ServiceContainer:
     ollama: OllamaService
     openhands: OpenHandsService
     chromadb: ChromaDBService
-    role_resolver: RoleResolver
+    agent_resolver: AgentResolver
     task_source_updater: TaskSourceUpdater | None = field(default=None)
     webhook_callbacks: WebhookCallbackService | None = field(default=None)

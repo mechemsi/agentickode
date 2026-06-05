@@ -244,7 +244,9 @@ async def run_review_loop(
             phase="reviewing",
         )
 
-        coder_resolved = await services.role_resolver.resolve("coder", session, ws_id)
+        coder_resolved = await services.agent_resolver.resolve_agent(
+            None, session, ws_id, project_id=task_run.project_id
+        )
         coder = coder_resolved.adapter
 
         async def _review_log(msg: str, level: str = "info") -> None:

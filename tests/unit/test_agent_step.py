@@ -14,14 +14,11 @@ from backend.services.workspace.usernames import UsernameError
 from backend.worker.steps.agent_step import run_agent_step
 
 
-def _make_resolved(adapter, role="coder"):
-    """Mimics the ResolvedRole shape returned by RoleResolver.resolve."""
+def _make_resolved(adapter):
+    """Mimics the ResolvedAgent shape returned by AgentResolver.resolve_agent."""
     resolved = MagicMock()
     resolved.adapter = adapter
-    resolved.role_config = None
     resolved.agent_settings = None
-    resolved.tried = []
-    resolved.is_fallback = False
     return resolved
 
 
@@ -38,7 +35,7 @@ class TestAgentStep:
         adapter = MagicMock()
         adapter.provider_name = "agent/claude"
         adapter.generate = AsyncMock(return_value="The answer is 42")
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "ask",
@@ -67,7 +64,7 @@ class TestAgentStep:
         adapter.run_task = AsyncMock(
             return_value={"exit_code": 0, "files_changed": ["a.py"], "session_id": "sess-1"}
         )
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "implement",
@@ -96,7 +93,7 @@ class TestAgentStep:
         adapter = MagicMock()
         adapter.provider_name = "agent/claude"
         adapter.generate = AsyncMock(return_value="ok")
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "ask",
@@ -130,7 +127,7 @@ class TestAgentStep:
         adapter = MagicMock()
         adapter.provider_name = "agent/claude"
         adapter.generate = AsyncMock(return_value="ok")
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "fix",
@@ -141,7 +138,7 @@ class TestAgentStep:
 
         assert adapter.generate.call_args[0][0] == "Fix 3 vulns"
 
-    async def test_custom_role_passed_to_resolver(self, db_session, mock_services, make_task_run):
+    async def test_custom_agent_passed_to_resolver(self, db_session, mock_services, make_task_run):
         project = ProjectConfig(
             project_id="proj-as5", project_slug="as5", repo_owner="o", repo_name="r"
         )
@@ -151,24 +148,23 @@ class TestAgentStep:
         await db_session.commit()
 
         adapter = MagicMock()
-        adapter.provider_name = "agent/claude"
+        adapter.provider_name = "agent/codex"
         adapter.generate = AsyncMock(return_value="reviewed")
-        mock_services.role_resolver.resolve = AsyncMock(
-            return_value=_make_resolved(adapter, role="reviewer")
-        )
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "review",
             "kind": "agent",
-            "role": "reviewer",
+            "agent": "codex",
             "params": {"prompt": "review"},
         }
         result = await run_agent_step(run, db_session, mock_services, phase_config)
 
-        # Verify resolve was called with role="reviewer"
-        call = mock_services.role_resolver.resolve.call_args
-        assert call[0][0] == "reviewer"  # first positional arg
-        assert result["role"] == "reviewer"
+        # Verify resolve_agent was called with agent_name="codex"
+        call = mock_services.agent_resolver.resolve_agent.call_args
+        assert call[0][0] == "codex"  # first positional arg (agent_name)
+        assert call.kwargs.get("project_id") == "proj-as5"
+        assert result["agent"] == "agent/codex"
 
     async def test_kwargs_passed_through(self, db_session, mock_services, make_task_run):
         project = ProjectConfig(
@@ -182,7 +178,7 @@ class TestAgentStep:
         adapter = MagicMock()
         adapter.provider_name = "agent/claude"
         adapter.generate = AsyncMock(return_value="ok")
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "x",
@@ -216,7 +212,7 @@ class TestAgentStep:
         adapter = MagicMock()
         adapter.provider_name = "agent/claude"
         adapter.run_task = AsyncMock(return_value={"exit_code": 0})
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "implement",
@@ -251,7 +247,7 @@ class TestAgentStep:
         ssh.username = "root"
         adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
         adapter.generate = fake_generate  # type: ignore[assignment]
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "ask",
@@ -281,7 +277,7 @@ class TestAgentStep:
         ssh.username = "root"
         adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
         adapter.generate = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[assignment]
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "ask",
@@ -319,7 +315,7 @@ class TestAgentStep:
         ssh.username = "root"
         adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
         adapter.generate = fake_generate  # type: ignore[assignment]
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {"phase_name": "ask", "kind": "agent", "params": {"prompt": "hi"}}
         await run_agent_step(run, db_session, mock_services, phase_config)
@@ -341,7 +337,7 @@ class TestAgentStep:
         ssh.username = "root"
         adapter = CLIAdapter(ssh_service=ssh, agent_name="claude", worker_user="coder")
         adapter.generate = AsyncMock(return_value="ok")  # type: ignore[assignment]
-        mock_services.role_resolver.resolve = AsyncMock(return_value=_make_resolved(adapter))
+        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
 
         phase_config = {
             "phase_name": "ask",

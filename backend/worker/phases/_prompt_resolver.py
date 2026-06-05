@@ -2,14 +2,13 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Prompt resolution helper: applies per-agent overrides to base RoleConfig prompts."""
+"""Prompt resolution: phase fallback prompts + per-agent minimal_mode + project instructions."""
 
 import logging
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import RoleConfig, RolePromptOverride
+from backend.models import AgentSettings
 
 logger = logging.getLogger("agentickode.prompt_resolver")
 
@@ -53,7 +52,7 @@ async def build_project_instructions_section(
 
 
 async def resolve_prompts(
-    config: RoleConfig | None,
+    agent_settings: AgentSettings | None,
     adapter: object,
     session: AsyncSession,
     fallback_system: str,
@@ -64,45 +63,17 @@ async def resolve_prompts(
     """Resolve system_prompt, user_template, extra_params, and project env vars.
 
     Resolution order:
-    1. Start with RoleConfig values (or fallbacks if config is None / fields empty).
-    2. If the adapter is a CLIAdapter (has agent_name), check for a RolePromptOverride.
-    3. If minimal_mode is set on the override: clear system_prompt entirely and use
-       the override's user_prompt_template (if set) or keep the current template.
-    4. Otherwise apply any non-None fields from the override.
-    5. Merge extra_params from config and override (override wins on key conflicts).
-    6. If project_id is set, prepend project instructions and collect env var secrets.
+    1. Start from the phase's fallback system/user prompts.
+    2. If the resolved agent has ``minimal_mode`` (e.g. claude, which supplies its own
+       system prompt), clear the system prompt.
+    3. If project_id is set, prepend project instructions and collect env var secrets.
     """
-    system_prompt: str = (
-        str(config.system_prompt) if config and config.system_prompt else fallback_system
-    )
-    user_template: str = (
-        str(config.user_prompt_template)
-        if config and config.user_prompt_template
-        else fallback_template
-    )
-    extra: dict[str, object] = {**config.extra_params} if config and config.extra_params else {}
+    system_prompt: str = fallback_system
+    user_template: str = fallback_template
+    extra: dict[str, object] = {}
 
-    cli_agent_name: str | None = getattr(adapter, "agent_name", None)
-    if cli_agent_name and config:
-        result = await session.execute(
-            select(RolePromptOverride).where(
-                RolePromptOverride.role_config_id == config.id,
-                RolePromptOverride.cli_agent_name == cli_agent_name,
-            )
-        )
-        override = result.scalar_one_or_none()
-        if override:
-            if override.extra_params:
-                extra = {**extra, **override.extra_params}
-            if override.minimal_mode:
-                system_prompt = ""
-                if override.user_prompt_template is not None:
-                    user_template = str(override.user_prompt_template)
-            else:
-                if override.system_prompt is not None:
-                    system_prompt = str(override.system_prompt)
-                if override.user_prompt_template is not None:
-                    user_template = str(override.user_prompt_template)
+    if agent_settings is not None and getattr(agent_settings, "minimal_mode", False):
+        system_prompt = ""
 
     project_env_vars: dict[str, str] = {}
     if project_id and phase_name:

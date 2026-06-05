@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from backend.models import PhaseExecution
-from backend.services.role_resolver import ResolvedRole
+from backend.services.agent_resolver import ResolvedAgent
 from backend.worker.phases import planning
 
 
@@ -43,7 +43,9 @@ class TestPlanning:
         mock_adapter.generate.return_value = (
             '{"subtasks": [{"id": 1, "title": "Do X"}], "estimated_complexity": "simple"}'
         )
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -57,8 +59,8 @@ class TestPlanning:
         ):
             await planning.run(run, db_session, mock_services)
 
-        mock_services.role_resolver.resolve.assert_called_once_with(
-            "planner", db_session, None, phase_name="planning"
+        mock_services.agent_resolver.resolve_agent.assert_awaited_once_with(
+            None, db_session, None, project_id=run.project_id
         )
         mock_adapter.generate.assert_called_once()
         assert run.planning_result["subtasks"][0]["title"] == "Do X"
@@ -72,7 +74,9 @@ class TestPlanning:
         mock_adapter = AsyncMock()
         mock_adapter.provider_name = "ollama/qwen2.5@gpu-01"
         mock_adapter.generate.return_value = '{"subtasks": [], "estimated_complexity": "simple"}'
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -96,7 +100,9 @@ class TestPlanning:
         mock_adapter = AsyncMock()
         mock_adapter.provider_name = "ollama/qwen2.5@gpu-01"
         mock_adapter.generate.return_value = "This is not JSON at all"
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -124,7 +130,9 @@ class TestPlanning:
         mock_adapter = AsyncMock()
         mock_adapter.provider_name = "agent/claude@ws-01"
         mock_adapter.generate.return_value = '{"subtasks": [], "estimated_complexity": "simple"}'
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(
@@ -138,8 +146,8 @@ class TestPlanning:
         ):
             await planning.run(run, db_session, mock_services)
 
-        mock_services.role_resolver.resolve.assert_called_once_with(
-            "planner", db_session, 42, phase_name="planning"
+        mock_services.agent_resolver.resolve_agent.assert_awaited_once_with(
+            None, db_session, 42, project_id=run.project_id
         )
 
     async def test_plan_review_enabled_sets_coding_trigger(
@@ -165,7 +173,9 @@ class TestPlanning:
         mock_adapter.generate.return_value = (
             '{"subtasks": [{"id": 1, "title": "Do X"}], "estimated_complexity": "simple"}'
         )
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         phase_config = {"params": {"enable_plan_review": True}}
         mock_broadcaster = MagicMock(log=AsyncMock(), event=AsyncMock())
@@ -207,7 +217,9 @@ class TestPlanning:
         mock_adapter.generate.return_value = (
             '{"subtasks": [{"id": 1, "title": "Do X"}], "estimated_complexity": "simple"}'
         )
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         with (
             patch(

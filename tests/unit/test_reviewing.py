@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.services.agent_resolver import ResolvedAgent
 from backend.services.git import GitResult
-from backend.services.role_resolver import ResolvedRole
 from backend.worker.phases import reviewing
 
 
@@ -67,7 +67,9 @@ class TestReviewing:
         reviewer_adapter.generate.return_value = (
             '{"approved": true, "issues": [], "suggestions": []}'
         )
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=reviewer_adapter
+        )
 
         p1, p2, p3, p4, p5 = _patch_reviewing()
         with p1, p2, p3, p4, p5 as mock_git_cls:
@@ -101,9 +103,9 @@ class TestReviewing:
         coder_adapter.run_task.return_value = {"files_changed": []}
 
         # First call returns reviewer, second returns coder (for fix)
-        mock_services.role_resolver.resolve.side_effect = [
-            ResolvedRole(adapter=reviewer_adapter),
-            ResolvedRole(adapter=coder_adapter),
+        mock_services.agent_resolver.resolve_agent.side_effect = [
+            ResolvedAgent(adapter=reviewer_adapter),
+            ResolvedAgent(adapter=coder_adapter),
         ]
 
         p1, p2, p3, p4, p5 = _patch_reviewing()
@@ -125,7 +127,9 @@ class TestReviewing:
         reviewer_adapter = AsyncMock()
         reviewer_adapter.provider_name = "ollama/qwen2.5@gpu-01"
         reviewer_adapter.generate.return_value = "garbage not json"
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=reviewer_adapter
+        )
 
         p1, p2, p3, p4, p5 = _patch_reviewing()
         with p1, p2, p3, p4, p5 as mock_git_cls:
@@ -148,7 +152,9 @@ class TestReviewing:
         reviewer_adapter = AsyncMock()
         reviewer_adapter.provider_name = "ollama/qwen2.5@gpu-01"
         reviewer_adapter.generate.return_value = '{"approved": true, "issues": [{"severity": "critical", "description": "security hole"}], "suggestions": []}'
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=reviewer_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=reviewer_adapter
+        )
 
         p1, p2, p3, p4, p5 = _patch_reviewing()
         with p1, p2, p3, p4, p5 as mock_git_cls:

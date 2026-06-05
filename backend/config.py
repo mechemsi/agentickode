@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     github_api_url: str = "https://api.github.com"
     github_webhook_secret: str = ""  # optional HMAC secret for inbound PR webhooks
     ci_trigger_secret: str = ""  # optional shared secret for POST /api/webhooks/pr-review
+    default_agent: str = "claude"  # global default agent when a step/project names none
 
     # Bitbucket (workspace/repo access token from Bitbucket settings)
     bitbucket_access_token: str = ""
