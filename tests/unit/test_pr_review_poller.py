@@ -123,7 +123,47 @@ class TestPrReviewPoller:
         assert len(first) == 1
         assert second == []  # same SHA already reviewed
 
+    async def test_no_auto_rereview_by_default(self, db_session, gitea_project, pr_template):
+        """Without the per-project opt-in, a reviewed PR is NOT re-reviewed on new commits."""
+        with (
+            patch(
+                "backend.services.task_source_polling.pr_review_poller.get_http_client",
+                new=MagicMock(),
+            ),
+            patch(
+                "backend.services.task_source_polling.pr_review_poller.get_git_provider",
+                new=MagicMock(return_value=_provider_returning([_pr(head_sha="sha1")])),
+            ),
+        ):
+            first = await poll_pr_reviews(gitea_project, db_session)
+            await db_session.commit()
+            run = await db_session.get(TaskRun, first[0])
+            run.status = "completed"
+            await db_session.commit()
+
+        # New commit + already-reviewed label, but project did NOT opt in → no re-review.
+        with (
+            patch(
+                "backend.services.task_source_polling.pr_review_poller.get_http_client",
+                new=MagicMock(),
+            ),
+            patch(
+                "backend.services.task_source_polling.pr_review_poller.get_git_provider",
+                new=MagicMock(
+                    return_value=_provider_returning(
+                        [_pr(labels=("ai-reviewed",), head_sha="sha2")]
+                    )
+                ),
+            ),
+        ):
+            second = await poll_pr_reviews(gitea_project, db_session)
+        assert len(first) == 1
+        assert second == []
+
     async def test_rereviews_on_new_head_sha(self, db_session, gitea_project, pr_template):
+        # Project opts in to automatic re-review on new commits.
+        gitea_project.integration_config = {"pr_review_rereview_on_push": True}
+        await db_session.commit()
         with (
             patch(
                 "backend.services.task_source_polling.pr_review_poller.get_http_client",

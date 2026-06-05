@@ -16,8 +16,15 @@ PRs that want an AI review — no inbound webhook needed (works against GitHub.c
 
 - Add the `ai-review` label to a PR. Within ~1 minute the poller launches a review run.
 - After the review, finalization flips the label to `ai-reviewed` (visible marker).
-- Push new commits → the head SHA changes → the PR is re-reviewed automatically.
+- By default a PR is reviewed **once**. To re-review after new commits, either re-add the
+  `ai-review` label, or opt the project in to automatic re-review-on-push (below).
 - Remove `ai-reviewed` to stop further reviews.
+
+### Automatic re-review on new commits (opt-in)
+
+Off by default. Set `integration_config.pr_review_rereview_on_push = true` on the project to
+have the poller automatically re-review a PR when its head commit SHA changes. Without the
+flag, a PR is reviewed once and not re-reviewed automatically.
 
 ## Key files
 
@@ -37,8 +44,11 @@ PRs that want an AI review — no inbound webhook needed (works against GitHub.c
 2. For each due project, `_poll_project` runs the normal issue poll **and** `poll_pr_reviews`.
 3. `poll_pr_reviews` lists open PRs via `provider.list_pull_requests`, keeps those labelled
    `ai-review` or `ai-reviewed`, and for each decides via `_already_handled`:
+   - **no prior review** for the PR → review (first review always proceeds);
    - a **pending/running** review for the PR → skip (never double-start);
    - a review already **attempted for this head SHA** (completed or failed) → skip (no retry storms);
+   - a prior review exists for a **different commit** (a re-review) → skip **unless** the project
+     set `integration_config.pr_review_rereview_on_push = true`;
    - otherwise → create a run bound to the `pr-review` template, `review_mode="comment"`,
      `max_retries=0`, with `pr_head_sha` stored in `task_source_meta`.
 4. The run flows through `pr_fetch → reviewing → finalization`; finalization posts the comment

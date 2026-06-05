@@ -6,8 +6,9 @@
 
 For a local server with no public webhook domain, poll git providers outbound for
 open PRs labelled ``ai-review`` (or already ``ai-reviewed``) and launch a review run.
-The PR's head commit SHA — stored on the review ``TaskRun`` — is the dedup key, so a PR
-is reviewed once per head SHA and re-reviewed when new commits are pushed.
+A PR is reviewed once; the PR head commit SHA stored on the review ``TaskRun`` is the
+dedup key. Automatic re-review on new commits is **opt-in per project** via
+``ProjectConfig.integration_config['pr_review_rereview_on_push']`` (default off).
 """
 
 import logging
@@ -33,21 +34,35 @@ _INFLIGHT_STATUSES = {"pending", "running"}
 
 
 async def _already_handled(
-    session: AsyncSession, project_id: str, task_id: str, head_sha: str
+    session: AsyncSession,
+    project_id: str,
+    task_id: str,
+    head_sha: str,
+    rereview_on_push: bool,
 ) -> bool:
-    """True if this PR has an in-flight review, or this head SHA was already attempted."""
+    """Decide whether to skip this PR.
+
+    Skip when a review is in-flight, when this exact head SHA was already attempted,
+    or — unless the project opted in via ``rereview_on_push`` — when the PR already has
+    *any* prior review (so a new commit does not trigger an automatic re-review).
+    """
     result = await session.execute(
         select(TaskRun).where(
             TaskRun.project_id == project_id,
             TaskRun.task_id == task_id,
         )
     )
-    for run in result.scalars().all():
+    runs = list(result.scalars().all())
+    if not runs:
+        return False  # never reviewed — first review always proceeds
+    for run in runs:
         if run.status in _INFLIGHT_STATUSES:
             return True  # a review is already pending/running — never double-start
         if (run.task_source_meta or {}).get("pr_head_sha") == head_sha:
             return True  # this exact commit was already reviewed (or failed) — don't redo
-    return False
+    # The PR has a prior review for a different commit → this would be a re-review.
+    # Only allow it when the project is explicitly marked for re-review-on-push.
+    return not rereview_on_push
 
 
 async def _resolve_token(project: ProjectConfig, session: AsyncSession) -> str | None:
@@ -96,6 +111,11 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
         logger.warning("PR poll failed for %s: %s", repo_path, exc)
         return []
 
+    # Per-project opt-in: re-review a PR automatically when new commits are pushed.
+    # Off by default — a PR is reviewed once (its first ``ai-review``); re-review only
+    # happens for projects explicitly marked for it.
+    rereview_on_push = bool((project.integration_config or {}).get("pr_review_rereview_on_push"))
+
     created: list[int] = []
     for pr in prs:
         labels = pr.get("labels") or []
@@ -105,7 +125,7 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
         number = pr["number"]
         head_sha = pr.get("head_sha", "")
         task_id = f"pr-{number}"
-        if await _already_handled(session, project.project_id, task_id, head_sha):
+        if await _already_handled(session, project.project_id, task_id, head_sha, rereview_on_push):
             continue
 
         run = build_pr_review_run(
