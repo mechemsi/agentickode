@@ -7,9 +7,13 @@
 Uses workspace/repository access tokens with Bearer authentication.
 """
 
+import logging
+
 import httpx
 
 from backend.config import settings
+
+logger = logging.getLogger("agentickode.git_provider")
 
 
 class BitbucketProvider:
@@ -115,6 +119,40 @@ class BitbucketProvider:
         if state == "OPEN":
             return "open"
         return "closed"
+
+    async def list_pull_requests(
+        self, repo_path: str, state: str = "open", limit: int = 50
+    ) -> list[dict]:
+        bb_state = "OPEN" if state == "open" else state.upper()
+        resp = await self._client.get(
+            f"{self._base_url}/repositories/{repo_path}/pullrequests",
+            headers=self._headers(),
+            params={"state": bb_state, "pagelen": limit},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return [
+            {
+                "number": item["id"],
+                "title": item.get("title", ""),
+                "body": item.get("description", "") or "",
+                "labels": [],  # Bitbucket Cloud PRs have no labels
+                "head_ref": item.get("source", {}).get("branch", {}).get("name", ""),
+                "head_sha": item.get("source", {}).get("commit", {}).get("hash", ""),
+                "html_url": item.get("links", {}).get("html", {}).get("href", ""),
+                "state": "open" if item.get("state") == "OPEN" else item.get("state", ""),
+            }
+            for item in resp.json().get("values", [])
+        ]
+
+    async def add_label(self, repo_path: str, number: int, label: str) -> None:
+        # Bitbucket Cloud has no PR label API — label-flip is a no-op there.
+        logger.warning(
+            "Bitbucket has no PR labels; cannot add %r to %s#%s", label, repo_path, number
+        )
+
+    async def remove_label(self, repo_path: str, number: int, label: str) -> None:
+        logger.debug("Bitbucket has no PR labels; remove %r is a no-op", label)
 
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         resp = await self._client.get(

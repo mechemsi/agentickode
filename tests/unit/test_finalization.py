@@ -335,6 +335,78 @@ class TestFinalization:
         mock_sb_cls.assert_not_called()  # no sandbox stop
         mock_ssh.assert_not_called()  # no SSH cleanup at all
 
+    async def test_comment_mode_flips_review_label(self, db_session, make_task_run, mock_services):
+        """After a comment-mode review, finalization flips ai-review → ai-reviewed."""
+        run = make_task_run(
+            pr_url=None,
+            repo_owner="org",
+            repo_name="repo",
+            task_source_meta={"pr_number": 9, "review_mode": "comment", "labels": ["ai-review"]},
+            review_result={"approved": True, "issues": []},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        provider = MagicMock()
+        provider.post_pr_comment = AsyncMock()
+        provider.remove_label = AsyncMock()
+        provider.add_label = AsyncMock()
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_git_provider",
+                new=MagicMock(return_value=provider),
+            ),
+            patch(
+                "backend.worker.phases.finalization.get_project_token",
+                new=AsyncMock(return_value="t"),
+            ),
+            patch("backend.worker.phases.finalization.get_http_client", new=MagicMock()),
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+        ):
+            await finalization.run(run, db_session, mock_services)
+
+        provider.remove_label.assert_awaited_once_with("org/repo", 9, "ai-review")
+        provider.add_label.assert_awaited_once_with("org/repo", 9, "ai-reviewed")
+
+    async def test_label_flip_failure_does_not_fail_run(
+        self, db_session, make_task_run, mock_services
+    ):
+        """A label-flip error must not fail an otherwise-successful review."""
+        run = make_task_run(
+            pr_url=None,
+            task_source_meta={"pr_number": 9, "review_mode": "comment"},
+            review_result={"approved": True, "issues": []},
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        provider = MagicMock()
+        provider.post_pr_comment = AsyncMock()
+        provider.remove_label = AsyncMock(side_effect=RuntimeError("403"))
+        provider.add_label = AsyncMock()
+
+        with (
+            patch(
+                "backend.worker.phases.finalization.get_git_provider",
+                new=MagicMock(return_value=provider),
+            ),
+            patch(
+                "backend.worker.phases.finalization.get_project_token",
+                new=AsyncMock(return_value="t"),
+            ),
+            patch("backend.worker.phases.finalization.get_http_client", new=MagicMock()),
+            patch(
+                "backend.worker.phases.finalization.broadcaster",
+                new=MagicMock(log=AsyncMock(), event=AsyncMock()),
+            ),
+        ):
+            # Must not raise.
+            await finalization.run(run, db_session, mock_services)
+
     async def test_fix_mode_pushes_to_pr_branch(self, db_session, make_task_run, mock_services):
         """An explicit fix-mode run pushes fixes to the existing PR branch."""
         run = make_task_run(

@@ -132,6 +132,48 @@ class GitHubProvider:
             return "merged"
         return "open" if data.get("state") == "open" else "closed"
 
+    async def list_pull_requests(
+        self, repo_path: str, state: str = "open", limit: int = 50
+    ) -> list[dict]:
+        resp = await self._client.get(
+            f"{self._base_url}/repos/{repo_path}/pulls",
+            headers=self._headers(),
+            params={"state": state, "per_page": limit},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return [
+            {
+                "number": item["number"],
+                "title": item.get("title", ""),
+                "body": item.get("body", "") or "",
+                "labels": [la.get("name", "") for la in item.get("labels", [])],
+                "head_ref": item.get("head", {}).get("ref", ""),
+                "head_sha": item.get("head", {}).get("sha", ""),
+                "html_url": item.get("html_url", ""),
+                "state": item.get("state", "open"),
+            }
+            for item in resp.json()
+        ]
+
+    async def add_label(self, repo_path: str, number: int, label: str) -> None:
+        resp = await self._client.post(
+            f"{self._base_url}/repos/{repo_path}/issues/{number}/labels",
+            headers=self._headers(),
+            json={"labels": [label]},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+
+    async def remove_label(self, repo_path: str, number: int, label: str) -> None:
+        resp = await self._client.delete(
+            f"{self._base_url}/repos/{repo_path}/issues/{number}/labels/{label}",
+            headers=self._headers(),
+            timeout=30.0,
+        )
+        if resp.status_code != 404:  # 404 = label already absent (idempotent)
+            resp.raise_for_status()
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         resp = await self._client.get(
             f"{self._base_url}/repos/{repo_path}/issues",

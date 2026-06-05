@@ -59,6 +59,10 @@ async def run(
     # Post review comment on source PR for pr-review / fix-pr workflows
     if task_run.review_result and pr_number:
         await _post_review_comment(task_run, pr_number, session)
+        # Flip the label to mark the PR as reviewed (visible marker; the DB head
+        # SHA remains the source of truth the poller dedupes on).
+        if review_mode == "comment":
+            await _flip_review_label(task_run, pr_number, session)
 
     if task_run.pr_url:
         await broadcaster.log(
@@ -197,6 +201,30 @@ async def _post_review_comment(task_run: TaskRun, pr_number: int, session: Async
         await broadcaster.log(
             task_run.id,
             f"Failed to post review comment: {exc}",
+            level="warning",
+            phase="finalization",
+        )
+
+
+async def _flip_review_label(task_run: TaskRun, pr_number: int, session: AsyncSession) -> None:
+    """Flip ``ai-review`` → ``ai-reviewed`` on the PR (best-effort visible marker)."""
+    repo_path = f"{task_run.repo_owner}/{task_run.repo_name}"
+    project_token = await get_project_token(task_run, session)
+    provider = get_git_provider(
+        task_run.git_provider, get_http_client(), access_token=project_token
+    )
+    try:
+        await provider.remove_label(repo_path, pr_number, "ai-review")
+        await provider.add_label(repo_path, pr_number, "ai-reviewed")
+        await broadcaster.log(
+            task_run.id,
+            f"Marked PR #{pr_number} as ai-reviewed",
+            phase="finalization",
+        )
+    except Exception as exc:
+        await broadcaster.log(
+            task_run.id,
+            f"Could not flip review label on PR #{pr_number}: {exc}",
             level="warning",
             phase="finalization",
         )

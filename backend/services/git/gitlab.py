@@ -141,6 +141,52 @@ class GitLabProvider:
             return "open"
         return "closed"
 
+    async def list_pull_requests(
+        self, repo_path: str, state: str = "open", limit: int = 50
+    ) -> list[dict]:
+        encoded = self._encode_path(repo_path)
+        gl_state = "opened" if state == "open" else state
+        resp = await self._client.get(
+            f"{self._base_url}/api/v4/projects/{encoded}/merge_requests",
+            headers=self._headers(),
+            params={"state": gl_state, "per_page": limit},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return [
+            {
+                "number": item["iid"],
+                "title": item.get("title", ""),
+                "body": item.get("description", "") or "",
+                "labels": item.get("labels", []),
+                "head_ref": item.get("source_branch", ""),
+                "head_sha": item.get("sha", ""),
+                "html_url": item.get("web_url", ""),
+                "state": "open" if item.get("state") == "opened" else item.get("state", ""),
+            }
+            for item in resp.json()
+        ]
+
+    async def add_label(self, repo_path: str, number: int, label: str) -> None:
+        encoded = self._encode_path(repo_path)
+        resp = await self._client.put(
+            f"{self._base_url}/api/v4/projects/{encoded}/merge_requests/{number}",
+            headers=self._headers(),
+            json={"add_labels": label},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+
+    async def remove_label(self, repo_path: str, number: int, label: str) -> None:
+        encoded = self._encode_path(repo_path)
+        resp = await self._client.put(
+            f"{self._base_url}/api/v4/projects/{encoded}/merge_requests/{number}",
+            headers=self._headers(),
+            json={"remove_labels": label},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         encoded = self._encode_path(repo_path)
         gl_state = "opened" if state == "open" else state

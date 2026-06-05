@@ -62,6 +62,7 @@ def build_pr_review_run(
     repo_full_name: str,
     labels: list[str],
     template_id: int,
+    pr_head_sha: str = "",
 ) -> TaskRun:
     """Create a single-pass, comment-mode PR-review run bound to a template."""
     run = create_task_run(
@@ -75,6 +76,7 @@ def build_pr_review_run(
             "pr_number": pr_number,
             "pr_title": pr_title,
             "pr_head_branch": pr_head_branch,
+            "pr_head_sha": pr_head_sha,
             "repo_full_name": repo_full_name,
             "labels": labels,
             "review_mode": "comment",

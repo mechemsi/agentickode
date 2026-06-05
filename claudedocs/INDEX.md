@@ -7,6 +7,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | Doc | Status | Date | Summary |
 |-----|--------|------|---------|
 | [PR-triggered AI code review](plans/2026-06-05-pr-review-trigger.md) | implemented | 2026-06-05 | `ai-review` label / CI endpoint launches a PR review run that comments on the PR |
+| [PR-review polling (webhook-less)](plans/2026-06-05-pr-review-poller.md) | implemented | 2026-06-05 | Outbound poller for `ai-review` PRs (no webhook domain); SHA-based re-review + label flip |
 | *Plans are in `docs/plans/` — migrate here as they are updated* | | | |
 
 ## Implementations
@@ -16,6 +17,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [Research: Autonomous Platform](../claudedocs/research_autonomous_platform_integrations_20260328.md) | 2026-03-28 | Research notes on autonomous agent scheduling and self-sustaining loops |
 | [Notion + issue polling](implementations/2026-05-02-notion-and-issue-polling.md) | 2026-05-02 | Notion task source (webhook + poller + bidirectional manager) and generic issue-polling fallback for all trackers |
 | [PR-triggered AI code review](implementations/2026-06-05-pr-review-trigger.md) | 2026-06-05 | Restored `pr-review` template; label-gated PR webhooks + CI endpoint + HMAC; comment-mode finalization guard |
+| [PR-review polling (webhook-less)](implementations/2026-06-05-pr-review-poller.md) | 2026-06-05 | Outbound poller + provider `list_pull_requests`/`add_label`/`remove_label`; SHA dedup; `ai-review→ai-reviewed` flip |
 
 ## Decisions
 
