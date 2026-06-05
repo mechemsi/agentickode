@@ -4,6 +4,28 @@ Persistent record of what was built, when, and by whom.
 
 ---
 
+## 2026-06-05 — PR-triggered AI code review (v0.5.2+)
+
+**Commit**: `5b0a1a2`
+**Tests**: 17 added, 1380 total passing
+**Files**: 17 changed (9 new)
+
+Reconnected the disconnected PR-review flow. A PR labelled `ai-review`
+(GitHub/Gitea `pull_request` events) or a CI call to `POST /api/webhooks/pr-review`
+now launches a single-pass review run (`pr_fetch → reviewing → finalization`) that
+fetches the PR diff and posts the AI review as a PR comment.
+
+- `backend/services/webhook_security.py` — `verify_hmac_sha256` + `verify_shared_secret` (constant-time)
+- `backend/api/_pr_webhook_helpers.py` — `read_verified_body` / `build_pr_review_run` / `handle_pr_event` (HMAC, label-gating via TriggerMatcher, in-flight dedupe, project_id fallback)
+- `backend/api/webhooks_pr.py` — `github-pr` / `gitea-pr` routes + CI `pr-review` route (optional `X-CI-Token`)
+- `backend/seed/workflow_templates.py` — restored `pr-review` template; un-deprecated; re-sync stale system rows
+- `backend/worker/pipeline.py` — PR-review runs use their template even on autonomous projects; fail loudly if unresolvable
+- `backend/worker/phases/finalization.py` — comment-mode posts review, skips push + workspace cleanup
+- `backend/worker/phases/pr_fetch.py` — parse changed-file list into the reviewer prompt
+- Config: `github_webhook_secret`, `gitea_webhook_secret`, `ci_trigger_secret`
+- Docs: `claudedocs/plans/` + `claudedocs/implementations/2026-06-05-pr-review-trigger.md`
+- Reviewed via adversarial multi-agent pass (14 findings confirmed/fixed, 3 dismissed)
+
 ## 2026-03-28 — Autonomous Platform Integrations (v0.3.0+)
 
 **Commit**: `8014f0f`
