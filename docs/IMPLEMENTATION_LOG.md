@@ -4,6 +4,29 @@ Persistent record of what was built, when, and by whom.
 
 ---
 
+## 2026-06-05 — Webhook-less PR-review polling + label flip (v0.5.2+)
+
+**Commit**: `1c35773`
+**Tests**: 15 added, 1397 total passing
+**Files**: 15 changed (5 new)
+
+Outbound polling so PR reviews work on a local server with no public webhook domain.
+The `IssuePollerScheduler` now also scans open PRs labelled `ai-review`/`ai-reviewed`
+and launches a review run; the PR head commit SHA on the run is the dedup key
+(review once per SHA, re-review on new commits), and finalization flips the label to
+`ai-reviewed` as a visible marker.
+
+- `backend/services/git/{protocol,github,gitea,gitlab,bitbucket}.py` — `list_pull_requests`,
+  `add_label`, `remove_label` (Gitea resolves label name→id with pagination; Bitbucket label no-op)
+- `backend/services/task_source_polling/pr_review_poller.py` — `poll_pr_reviews` (SHA dedup, in-flight guard, git_connections token resolution)
+- `backend/worker/issue_poller_scheduler.py` — `_poll_project` also runs the PR poll for git projects
+- `backend/worker/phases/finalization.py` — `_flip_review_label` (best-effort)
+- `backend/api/_pr_webhook_helpers.py` — `build_pr_review_run` stores `pr_head_sha`
+- Docs: `claudedocs/{plans,implementations}/2026-06-05-pr-review-poller.md`
+- Reviewed via adversarial multi-agent pass (2 fixed: token mismatch, Gitea pagination)
+
+---
+
 ## 2026-06-05 — PR-triggered AI code review (v0.5.2+)
 
 **Commit**: `5b0a1a2`
