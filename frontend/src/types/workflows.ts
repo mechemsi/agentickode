@@ -5,7 +5,6 @@
 export interface PhaseInfo {
   name: string;
   description: string;
-  default_role: string | null;
   default_agent_mode: "generate" | "task" | null;
 }
 
@@ -22,7 +21,7 @@ export interface PhaseConfig {
   phase_name: string;
   kind?: StepKind;
   enabled: boolean;
-  role: string | null;
+  agent?: string | null;
   uses_agent?: boolean | null;
   agent_mode?: "generate" | "task" | null;
   trigger_mode: string;

@@ -7,7 +7,6 @@ export * from "./projects";
 export * from "./servers";
 export * from "./agents";
 export * from "./ollama";
-export * from "./roles";
 export * from "./notifications";
 export * from "./workflows";
 export * from "./analytics";

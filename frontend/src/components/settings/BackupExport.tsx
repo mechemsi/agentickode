@@ -16,8 +16,6 @@ const ENTITY_TYPES = [
   { key: "notification_channels", label: "Notification Channels" },
   { key: "workflow_templates", label: "Workflow Templates" },
   { key: "project_configs", label: "Projects" },
-  { key: "role_configs", label: "Role Configs" },
-  { key: "role_assignments", label: "Role Assignments" },
 ];
 
 export default function BackupExport() {

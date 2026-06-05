@@ -273,6 +273,24 @@ async def _run_migrations() -> None:
             updated_at TIMESTAMPTZ
         )
     """)
+    # Direct-agent selection (replaces the roles abstraction).
+    await _run_migration_step(
+        "ALTER TABLE agent_settings ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _run_migration_step(
+        "ALTER TABLE agent_settings ADD COLUMN minimal_mode BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    await _run_migration_step("ALTER TABLE project_configs ADD COLUMN default_agent TEXT")
+    await _run_migration_step(
+        "UPDATE agent_settings SET is_default = TRUE WHERE agent_name = 'claude'"
+    )
+    await _run_migration_step(
+        "UPDATE agent_settings SET minimal_mode = TRUE WHERE agent_name = 'claude'"
+    )
+    # Drop the removed roles tables (FK order). Idempotent.
+    await _run_migration_step("DROP TABLE IF EXISTS role_prompt_overrides CASCADE")
+    await _run_migration_step("DROP TABLE IF EXISTS role_configs CASCADE")
+    await _run_migration_step("DROP TABLE IF EXISTS role_assignments CASCADE")
 
 
 async def _cleanup_orphaned_sessions() -> None:

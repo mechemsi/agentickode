@@ -11,7 +11,6 @@ const baseStep: PhaseConfig = {
   phase_name: "my-step",
   kind: "bash",
   enabled: true,
-  role: null,
   trigger_mode: "auto",
   notify_source: false,
   timeout_seconds: null,

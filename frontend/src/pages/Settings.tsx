@@ -130,9 +130,9 @@ export default function Settings() {
   };
 
   const handleDeleteServer = async (id: number) => {
-    const ok = await confirm({ title: "Delete Ollama Server", message: "Delete this Ollama server? Role assignments using it will need reconfiguring.", confirmLabel: "Delete", variant: "danger" });
+    const ok = await confirm({ title: "Delete Ollama Server", message: "Delete this Ollama server?", confirmLabel: "Delete", variant: "danger" });
     if (!ok) return;
-    try { await deleteOllamaServer(id); toast.success("Ollama server deleted"); loadOllamaServers(); } catch { toast.error("Cannot delete: server has active role assignments."); }
+    try { await deleteOllamaServer(id); toast.success("Ollama server deleted"); loadOllamaServers(); } catch { toast.error("Cannot delete this Ollama server."); }
   };
 
   const handleRefreshServer = async (id: number) => { await refreshOllamaModels(id); loadOllamaServers(); };

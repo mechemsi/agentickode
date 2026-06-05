@@ -3,13 +3,12 @@
 // Commercial licensing: info@mechemsi.com
 
 import type { PhaseConfig } from '../../types';
+import { VISIBLE_AGENTS } from '../../types';
 
-// Roles are deprecated and slated for removal; see
-// https://github.com/mechemsi/agentickode/issues/19. We keep the
-// ``step.role`` field on the data model so existing templates and the
-// runtime resolver still work — we just don't surface a picker in the
-// step editor anymore. New agent steps default to ``role: "coder"`` via
-// the step factory.
+// Agents shown in the per-step picker. Sourced from the shared visible-agent
+// allowlist (claude/codex/opencode) so it stays in sync with the rest of the
+// UI. An empty value means "use the project/global default agent".
+const AGENT_OPTIONS = Array.from(VISIBLE_AGENTS);
 
 function getParamString(step: PhaseConfig, key: string): string {
   const v = step.params?.[key];
@@ -151,16 +150,35 @@ export function AgentBody({ step, onParam, onChange }: BodyProps) {
   const mode = getParamString(step, 'mode') || 'generate';
   return (
     <>
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">Mode</label>
-        <select
-          value={mode}
-          onChange={(e) => onParam('mode', e.target.value)}
-          className="w-full sm:w-1/2 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-        >
-          <option value="generate">Generate</option>
-          <option value="task">Task</option>
-        </select>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Mode</label>
+          <select
+            value={mode}
+            onChange={(e) => onParam('mode', e.target.value)}
+            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+          >
+            <option value="generate">Generate</option>
+            <option value="task">Task</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Agent</label>
+          <select
+            value={step.agent ?? ''}
+            onChange={(e) =>
+              onChange({ ...step, agent: e.target.value || null })
+            }
+            className="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+          >
+            <option value="">Default (project/global)</option>
+            {AGENT_OPTIONS.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div>
         <label className="block text-xs text-gray-400 mb-1">Prompt</label>
