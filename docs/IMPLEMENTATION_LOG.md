@@ -4,6 +4,25 @@ Persistent record of what was built, when, and by whom.
 
 ---
 
+## 2026-06-05 — Remove the roles abstraction (v0.5.2+)
+
+**Commits**: `323480a` (backend), `c9d108a` (frontend + drop migration)
+**Tests**: 1325 backend passing; 282 frontend passing
+**Files**: ~80 changed (~3200 lines net removed)
+
+Replaced the role → RoleAssignment → agent indirection with direct agent selection. A
+workflow step names an `agent`; otherwise the per-project default (`ProjectConfig.default_agent`)
+or global default (`AgentSettings.is_default`, seeded claude) runs.
+
+- `backend/services/agent_resolver.py` — new `AgentResolver.resolve_agent` (builds adapter from AgentSettings)
+- All worker phases/steps migrated off `role_resolver`; `get_phase_role`→`get_phase_agent`;
+  `phase_uses_agent` keys off `default_agent_mode`; prompts from fallbacks + `AgentSettings.minimal_mode`
+- Deleted RoleResolver, RoleAssignment/RoleConfig/RolePromptOverride models, role APIs/repos/schemas/seed,
+  frontend Roles page + role API clients; added a per-step Agent picker
+- Migrations 039 (add `is_default`/`minimal_mode`/`default_agent`, seed claude) + 040 (drop role tables, irreversible)
+- ADR: `claudedocs/decisions/008-direct-agent-selection.md`
+- Executed in 5 verified phases; mapping + deletions run via multi-agent fan-out with the suites as the gate
+
 ## 2026-06-05 — Webhook-less PR-review polling + label flip (v0.5.2+)
 
 **Commit**: `1c35773`

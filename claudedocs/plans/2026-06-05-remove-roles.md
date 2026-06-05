@@ -1,6 +1,6 @@
 ---
 title: Remove the roles abstraction — workflow step names the agent
-status: in-progress
+status: implemented
 date: 2026-06-05
 related:
   - claudedocs/decisions/007-composable-step-workflows.md
@@ -55,8 +55,14 @@ or the **global default** (`AgentSettings.is_default`, seeded `claude`) runs.
 
 ## Success criteria
 
-- [ ] A workflow step with `agent: "codex"` runs codex; without it, project/global default (`claude`).
-- [ ] Per-project `default_agent` overrides the global default.
-- [ ] claude `minimal_mode` preserved; phases still run planning/coding/reviewing + comparison + consolidated.
-- [ ] No runtime reference to roles; role tables dropped; fresh + existing DB migrate cleanly.
-- [ ] ruff + pyright clean; full backend + frontend suites green.
+- [x] A workflow step with `agent: "codex"` runs codex; without it, project/global default (`claude`).
+- [x] Per-project `default_agent` overrides the global default.
+- [x] claude `minimal_mode` preserved; phases still run planning/coding/reviewing + comparison + consolidated.
+- [x] No runtime reference to roles; role tables dropped; existing dev DB migrated cleanly (verified live).
+- [x] ruff + pyright clean; backend + frontend suites green.
+
+## Execution notes
+
+Done in 5 verified phases across 3 commits (`323480a` backend; `c9d108a` frontend + drop migration).
+Mapped via a 6-way parallel fan-out + synthesis; the 8 phase-test migrations, the backend deletion,
+and the frontend deletion were each run by focused agents with the test suites as the gate.
