@@ -17,8 +17,6 @@ a role → RoleAssignment cascade:
 All nullable / defaulted — existing rows keep working.
 """
 
-import sqlalchemy as sa
-
 from alembic import op
 
 revision = "039"
@@ -28,18 +26,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "agent_settings",
-        sa.Column("is_default", sa.Boolean(), nullable=False, server_default="false"),
+    # Idempotent ADDs: the runtime auto-migrate (main.py ``_run_migrations``) may have
+    # already added these columns without advancing ``alembic_version``, so a plain
+    # ``op.add_column`` would raise DuplicateColumnError on ``alembic upgrade head``.
+    op.execute(
+        "ALTER TABLE agent_settings "
+        "ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false"
     )
-    op.add_column(
-        "agent_settings",
-        sa.Column("minimal_mode", sa.Boolean(), nullable=False, server_default="false"),
+    op.execute(
+        "ALTER TABLE agent_settings "
+        "ADD COLUMN IF NOT EXISTS minimal_mode BOOLEAN NOT NULL DEFAULT false"
     )
-    op.add_column(
-        "project_configs",
-        sa.Column("default_agent", sa.Text(), nullable=True),
-    )
+    op.execute("ALTER TABLE project_configs ADD COLUMN IF NOT EXISTS default_agent TEXT")
     # Seed the global default agent.
     op.execute("UPDATE agent_settings SET is_default = true WHERE agent_name = 'claude'")
     op.execute("UPDATE agent_settings SET minimal_mode = true WHERE agent_name = 'claude'")
