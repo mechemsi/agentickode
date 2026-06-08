@@ -26,6 +26,23 @@ from backend.services.workspace.ssh_service import SSHService
 router = APIRouter(tags=["workspace-servers"])
 
 
+def _all_roots(server) -> list[str]:
+    """Primary ``workspace_root`` plus any extra ``workspace_folders``, de-duplicated."""
+    roots = [server.workspace_root]
+    for folder in server.workspace_folders or []:
+        if folder and folder not in roots:
+            roots.append(folder)
+    return roots
+
+
+async def _scan_all_roots(proj_discovery, server):
+    """Scan every configured root and return the accumulated discovered projects."""
+    discovered = []
+    for root in _all_roots(server):
+        discovered.extend(await proj_discovery.scan_workspace(root))
+    return discovered
+
+
 @router.post("/workspace-servers/{server_id}/deploy-key", response_model=SSHTestResult)
 async def deploy_key_to_server(
     server_id: int,
@@ -87,7 +104,7 @@ async def deploy_key_to_server(
         await repo.replace_agents_for_context(server.id, "worker", worker_agents)
 
         proj_discovery = ProjectDiscoveryService(ssh)
-        discovered = await proj_discovery.scan_workspace(server.workspace_root)
+        discovered = await _scan_all_roots(proj_discovery, server)
         for dp in discovered:
             existing = await project_repo.find_by_repo(dp.owner, dp.name)
             if existing is None:
@@ -175,7 +192,7 @@ async def scan_workspace_server(
     # Discover projects
     try:
         proj_discovery = ProjectDiscoveryService(ssh)
-        discovered = await proj_discovery.scan_workspace(server.workspace_root)
+        discovered = await _scan_all_roots(proj_discovery, server)
     except Exception as exc:
         await repo.update(server, {"status": "error", "error_message": str(exc)})
         raise HTTPException(502, f"Project discovery failed: {exc}") from exc

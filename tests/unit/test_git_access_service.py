@@ -120,3 +120,57 @@ class TestCheckAll:
         assert len(providers) == 3  # default providers
         assert all(not p.connected for p in providers)
         assert all(p.error == "No SSH key found" for p in providers)
+
+
+class TestCheckGhCli:
+    async def test_not_installed(self):
+        ssh = AsyncMock()
+        ssh.run_command = AsyncMock(return_value=("", "", 1))  # command -v gh fails
+        svc = GitAccessService(ssh)
+        result = await svc.check_gh_cli()
+        assert result.installed is False
+        assert result.auth_ok is False
+        assert result.error == "gh CLI not installed"
+
+    async def test_installed_and_authenticated(self):
+        ssh = AsyncMock()
+        ssh.run_command = AsyncMock(
+            side_effect=[
+                ("/usr/bin/gh", "", 0),  # command -v gh
+                ("mechemsi", "", 0),  # gh api user --jq .login
+            ]
+        )
+        svc = GitAccessService(ssh)
+        result = await svc.check_gh_cli()
+        assert result.installed is True
+        assert result.auth_ok is True
+        assert result.auth_user == "mechemsi"
+
+    async def test_installed_but_not_authenticated(self):
+        ssh = AsyncMock()
+        ssh.run_command = AsyncMock(
+            side_effect=[
+                ("/usr/bin/gh", "", 0),
+                ("", "gh: To authenticate, run: gh auth login", 1),
+            ]
+        )
+        svc = GitAccessService(ssh)
+        result = await svc.check_gh_cli()
+        assert result.installed is True
+        assert result.auth_ok is False
+        assert "authenticate" in (result.error or "")
+
+    async def test_runs_as_worker_user(self):
+        ssh = AsyncMock()
+        ssh.run_command_as = AsyncMock(
+            side_effect=[
+                ("/usr/bin/gh", "", 0),
+                ("octocat", "", 0),
+            ]
+        )
+        svc = GitAccessService(ssh)
+        result = await svc.check_gh_cli(as_user="worker")
+        assert result.auth_ok is True
+        assert result.auth_user == "octocat"
+        # Both probes went through run_command_as with the worker user
+        assert ssh.run_command_as.await_args_list[0].args[0] == "worker"

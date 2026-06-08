@@ -36,6 +36,14 @@ class KeyInfo:
     key_type: str | None = None
 
 
+@dataclass
+class GhCliStatus:
+    installed: bool
+    auth_ok: bool
+    auth_user: str | None = None
+    error: str | None = None
+
+
 class GitAccessService:
     """Check git provider SSH access from a workspace server."""
 
@@ -147,6 +155,26 @@ class GitAccessService:
             status = await self.test_provider(host, name, as_user)
             statuses.append(status)
         return key_info, statuses
+
+    async def check_gh_cli(self, as_user: str | None = None) -> GhCliStatus:
+        """Check whether the ``gh`` CLI is installed and authenticated for GitHub.
+
+        Uses ``gh api user --jq .login`` (stable JSON output) rather than parsing
+        the human-readable ``gh auth status``. Auth relies on the ambient
+        ``GITHUB_TOKEN`` (present in the backend container and in worker users'
+        login env), so no token is passed on the command line.
+        """
+        _, _, rc = await self._run("command -v gh", as_user, timeout=10)
+        if rc != 0:
+            return GhCliStatus(installed=False, auth_ok=False, error="gh CLI not installed")
+
+        stdout, stderr, rc = await self._run("gh api user --jq .login", as_user, timeout=15)
+        login = stdout.strip()
+        if rc == 0 and login and " " not in login and "\n" not in login:
+            return GhCliStatus(installed=True, auth_ok=True, auth_user=login)
+
+        err = (stderr.strip() or stdout.strip() or "gh not authenticated")[:200]
+        return GhCliStatus(installed=True, auth_ok=False, error=err)
 
 
 def _parse_ssh_output(host: str, name: str, output: str) -> ProviderStatus:

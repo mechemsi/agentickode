@@ -3,9 +3,14 @@
 // Commercial licensing: info@mechemsi.com
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Key, Link, Loader2, RefreshCw, Users, X } from "lucide-react";
-import { checkGitAccess, generateGitKey, syncGitKeys } from "../../api";
-import type { GitAccessStatus, GitProviderStatus, UserGitAccessStatus } from "../../types";
+import { Check, Copy, Key, Link, Loader2, RefreshCw, Terminal, Users, X } from "lucide-react";
+import { checkGhCli, checkGitAccess, generateGitKey, syncGitKeys } from "../../api";
+import type {
+  GhCliCheckResult,
+  GitAccessStatus,
+  GitProviderStatus,
+  UserGitAccessStatus,
+} from "../../types";
 
 function ProviderBadge({ provider }: { provider: GitProviderStatus }) {
   return (
@@ -163,6 +168,8 @@ export default function GitAccessPanel({ serverId }: { serverId: number }) {
   const [generating, setGenerating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [gh, setGh] = useState<GhCliCheckResult | null>(null);
+  const [ghLoading, setGhLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -216,6 +223,17 @@ export default function GitAccessPanel({ serverId }: { serverId: number }) {
   const handleCopyMain = async () => {
     if (status?.public_key) {
       await handleCopy(status.public_key);
+    }
+  };
+
+  const handleCheckGh = async () => {
+    setGhLoading(true);
+    try {
+      setGh(await checkGhCli(serverId));
+    } catch {
+      setGh({ installed: false, auth_ok: false, auth_user: null, error: "check failed" });
+    } finally {
+      setGhLoading(false);
     }
   };
 
@@ -343,6 +361,50 @@ export default function GitAccessPanel({ serverId }: { serverId: number }) {
           )}
         </>
       )}
+
+      {/* GitHub CLI (gh) status */}
+      <div className="pt-3 mt-1 border-t border-gray-700/40">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-medium text-gray-300 inline-flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-gray-400" />
+            GitHub CLI (gh)
+          </span>
+          <button
+            onClick={handleCheckGh}
+            disabled={ghLoading}
+            className="text-xs text-gray-500 hover:text-gray-300 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-700/50 transition-colors"
+          >
+            <RefreshCw className={`w-3 h-3 ${ghLoading ? "animate-spin" : ""}`} />
+            Check gh
+          </button>
+        </div>
+        {gh && (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border ${
+              gh.installed && gh.auth_ok
+                ? "bg-green-500/5 border-green-800/40 text-green-400"
+                : "bg-red-500/5 border-red-800/40 text-red-400"
+            }`}
+            title={
+              gh.installed && gh.auth_ok
+                ? `gh authenticated as ${gh.auth_user}`
+                : gh.error || (gh.installed ? "not authenticated" : "gh not installed")
+            }
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                gh.installed && gh.auth_ok ? "bg-green-400" : "bg-red-400"
+              }`}
+            />
+            {!gh.installed
+              ? "not installed"
+              : gh.auth_ok
+                ? `authenticated${gh.auth_user ? ` · ${gh.auth_user}` : ""}`
+                : "not authenticated"}
+            {(!gh.installed || !gh.auth_ok) && <X className="w-3 h-3 text-red-400/60" />}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

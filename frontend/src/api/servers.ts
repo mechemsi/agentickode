@@ -10,6 +10,7 @@ import type {
   DockerNetwork,
   DockerOverview,
   DockerVolume,
+  GhCliCheckResult,
   GitAccessStatus,
   ProjectConfig,
   PruneResult,
@@ -81,6 +82,9 @@ export const generateGitKey = (id: number, force?: boolean) =>
 
 export const syncGitKeys = (id: number) =>
   post<GitAccessStatus>(`/workspace-servers/${id}/git-access/sync-keys`, {});
+
+export const checkGhCli = (id: number) =>
+  post<GhCliCheckResult>(`/workspace-servers/${id}/git-access/check-gh`, {});
 
 // --- Server Groups ---
 

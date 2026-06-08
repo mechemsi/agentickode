@@ -30,6 +30,8 @@ class WorkspaceServer(Base):
     username = Column(Text, nullable=False, default="root")
     ssh_key_path = Column(Text, nullable=True)
     workspace_root = Column(Text, nullable=False, default="/workspaces")
+    # Extra scan roots beyond workspace_root (list[str]); null = none.
+    workspace_folders = Column(JSONB, nullable=True)
     status = Column(Text, nullable=False, default="unknown")
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)

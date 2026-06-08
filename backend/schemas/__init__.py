@@ -48,6 +48,7 @@ from backend.schemas.docker import (
     PruneResult,
 )
 from backend.schemas.git import (
+    GhCliCheckResult,
     GitAccessCheckRequest,
     GitAccessGenerateKeyRequest,
     GitAccessStatus,
@@ -206,6 +207,7 @@ __all__ = [
     "DockerOverview",
     "DockerVolume",
     "ExportRequest",
+    "GhCliCheckResult",
     "GitAccessCheckRequest",
     "GitAccessGenerateKeyRequest",
     "GitAccessStatus",

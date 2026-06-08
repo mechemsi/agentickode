@@ -1,6 +1,6 @@
 ---
 title: Multiple Workspace Folders + Single Projects on Platform Server
-status: planned
+status: implemented
 date: 2026-06-08
 related:
   - decisions/003-workspace-types.md

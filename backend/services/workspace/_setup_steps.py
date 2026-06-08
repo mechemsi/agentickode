@@ -190,7 +190,12 @@ async def _step_discover(
 
     proj_discovery = ProjectDiscoveryService(ssh)
     workspace_root = server.workspace_root or f"/home/{username}/workspaces"
-    await proj_discovery.scan_workspace(workspace_root)
+    roots = [workspace_root]
+    for folder in server.workspace_folders or []:
+        if folder and folder not in roots:
+            roots.append(folder)
+    for root in roots:
+        await proj_discovery.scan_workspace(root)
 
 
 async def _step_mark_online(
