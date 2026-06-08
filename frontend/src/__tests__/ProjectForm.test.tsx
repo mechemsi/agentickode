@@ -106,16 +106,39 @@ describe("ProjectForm", () => {
     expect(screen.getByDisplayValue("org")).toBeInTheDocument();
   });
 
-  it("shows workspace server checkboxes in create mode", () => {
-    render(<ProjectForm onSubmit={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByText("Workspace Servers (used to verify repo access)")).toBeInTheDocument();
+  it("create mode is minimal: advanced fields hidden until toggled", () => {
+    render(<ProjectForm onSubmit={vi.fn()} onCancel={vi.fn()} servers={mockServers} />);
+    // Minimal view: URL + project name + advanced toggle + Save
+    expect(screen.getByPlaceholderText("https://github.com/owner/repo")).toBeInTheDocument();
+    expect(screen.getByText("Project name / slug")).toBeInTheDocument();
+    expect(screen.getByText("Advanced options")).toBeInTheDocument();
+    // Advanced fields are NOT rendered yet
+    expect(
+      screen.queryByText("Workspace Servers (used to verify repo access)"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("coding-01")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("local-path-input")).not.toBeInTheDocument();
   });
 
-  it("shows server checkboxes when servers prop provided", () => {
+  it("expanding Advanced reveals workspace servers + repo fields in create mode", () => {
     render(<ProjectForm onSubmit={vi.fn()} onCancel={vi.fn()} servers={mockServers} />);
+    fireEvent.click(screen.getByTestId("toggle-advanced"));
+    expect(
+      screen.getByText("Workspace Servers (used to verify repo access)"),
+    ).toBeInTheDocument();
     expect(screen.getByText("coding-01")).toBeInTheDocument();
     expect(screen.getByText("coding-02")).toBeInTheDocument();
-    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId("local-path-input")).toBeInTheDocument();
+  });
+
+  it("edit mode shows advanced fields without toggling", () => {
+    render(
+      <ProjectForm initial={editInitial} onSubmit={vi.fn()} onCancel={vi.fn()} servers={mockServers} />,
+    );
+    expect(
+      screen.getByText("Workspace Servers (used to verify repo access)"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("local-path-input")).toBeInTheDocument();
   });
 
   it("includes workspace_server_ids in onSubmit data when server checked (edit mode)", () => {
