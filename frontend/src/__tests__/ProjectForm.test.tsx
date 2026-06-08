@@ -240,4 +240,30 @@ describe("ProjectForm", () => {
       }),
     );
   });
+
+  it("surfaces the error when onSubmit rejects (no longer a silent fail)", async () => {
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValue(
+        new Error("POST /projects: SSH repo verification failed: Permission denied (publickey)"),
+      );
+    render(<ProjectForm initial={editInitial} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByText("Save"));
+    expect(
+      await screen.findByText(/SSH repo verification failed: Permission denied/),
+    ).toBeInTheDocument();
+  });
+
+  it("disables Save while the submission is in flight", async () => {
+    let resolve: () => void = () => {};
+    const onSubmit = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    );
+    render(<ProjectForm initial={editInitial} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByText("Save"));
+    expect(await screen.findByText("Saving…")).toBeInTheDocument();
+    resolve();
+  });
 });
