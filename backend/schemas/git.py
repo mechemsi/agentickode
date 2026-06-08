@@ -50,3 +50,10 @@ class GitAccessCheckRequest(BaseModel):
 class GitAccessGenerateKeyRequest(BaseModel):
     key_type: str = "ed25519"
     force: bool = False
+
+
+class GhCliCheckResult(BaseModel):
+    installed: bool
+    auth_ok: bool
+    auth_user: str | None = None
+    error: str | None = None

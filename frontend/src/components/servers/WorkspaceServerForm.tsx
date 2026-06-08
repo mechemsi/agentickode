@@ -13,6 +13,7 @@ interface FormData {
   ssh_key_path: string;
   worker_user: string;
   workspace_root: string;
+  workspace_folders: string[];
   setup_password: string;
   [key: string]: unknown;
 }
@@ -25,6 +26,7 @@ const defaults: FormData = {
   ssh_key_path: "",
   worker_user: "coder",
   workspace_root: "",
+  workspace_folders: [],
   setup_password: "",
 };
 
@@ -137,6 +139,52 @@ export default function WorkspaceServerForm({
           placeholder="/home/coder/workspaces (auto-created if empty)"
         />
       </label>
+      <div className="flex flex-col gap-1 sm:col-span-2">
+        <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+          <FolderOpen className="w-3 h-3" />
+          extra workspace folders (additional scan roots)
+        </span>
+        {(form.workspace_folders || []).map((folder, i) => (
+          <div key={i} className="flex gap-2">
+            <input
+              className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={folder}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  workspace_folders: (p.workspace_folders || []).map((f, j) =>
+                    j === i ? e.target.value : f,
+                  ),
+                }))
+              }
+              placeholder="/home/you/other-projects"
+              data-testid="workspace-folder-input"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setForm((p) => ({
+                  ...p,
+                  workspace_folders: (p.workspace_folders || []).filter((_, j) => j !== i),
+                }))
+              }
+              className="px-2 py-1.5 text-xs text-red-400 hover:text-red-300 rounded-lg hover:bg-red-900/20 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setForm((p) => ({ ...p, workspace_folders: [...(p.workspace_folders || []), ""] }))
+          }
+          className="self-start text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-900/20 transition-colors"
+          data-testid="add-workspace-folder"
+        >
+          + Add folder
+        </button>
+      </div>
       {!isEdit && !isLocal && (
         <label className="flex flex-col gap-1 sm:col-span-2">
           <span className="text-xs text-gray-400 inline-flex items-center gap-1">
@@ -159,9 +207,11 @@ export default function WorkspaceServerForm({
       <div className="col-span-1 sm:col-span-2 flex gap-2 mt-2">
         <button
           onClick={() => {
-            const { setup_password, workspace_root, ...rest } = form;
+            const { setup_password, workspace_root, workspace_folders, ...rest } = form;
             const data: Record<string, unknown> = { ...rest };
             if (workspace_root) data.workspace_root = workspace_root;
+            const folders = (workspace_folders || []).map((f) => f.trim()).filter(Boolean);
+            data.workspace_folders = folders.length ? folders : null;
             if (setup_password) data.setup_password = setup_password;
             onSubmit(data);
           }}

@@ -1,6 +1,6 @@
 ---
 title: "Host Machine as Default Platform Workspace (run-as user + gh check)"
-status: planned
+status: partial
 date: 2026-06-08
 related:
   - plans/2026-05-24-workspace-config.md
@@ -8,6 +8,14 @@ related:
 ---
 
 # Host Machine as Default Platform Workspace
+
+> **STATUS (2026-06-08): partial.** The **`gh` CLI check** (section 3) is implemented —
+> `GitAccessService.check_gh_cli`, `POST /workspace-servers/{id}/git-access/check-gh`, and a
+> badge in `GitAccessPanel`. The **host-execution switch** (section 1, Option A: SSH to
+> `host-gateway`) and the **platform run-as-user seeding** (sections 2/4) are **deferred** —
+> they carry high environment risk on WSL2/Docker Desktop (host `sshd`, key ceremony,
+> `runuser` needs root) and flipping the working in-container platform server could break it.
+> These need an explicit environment decision before implementation (see Risks 1–5).
 
 ## Goal
 

@@ -364,6 +364,7 @@ export default function WorkspaceServers() {
             ssh_key_path: s.ssh_key_path || "",
             worker_user: s.worker_user || "coder",
             workspace_root: s.workspace_root || "",
+            workspace_folders: s.workspace_folders ?? [],
           }}
           onSubmit={(data) => handleUpdate(s.id, data)}
           onCancel={() => setEditing(null)}

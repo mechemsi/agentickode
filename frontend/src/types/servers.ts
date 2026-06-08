@@ -17,6 +17,7 @@ export interface WorkspaceServer {
   username: string;
   ssh_key_path: string | null;
   workspace_root: string;
+  workspace_folders?: string[] | null;
   status: string;
   last_seen_at: string | null;
   error_message: string | null;
@@ -54,7 +55,15 @@ export interface WorkspaceServerCreate {
   ssh_key_path?: string;
   worker_user?: string;
   workspace_root?: string;
+  workspace_folders?: string[] | null;
   setup_password?: string;
+}
+
+export interface GhCliCheckResult {
+  installed: boolean;
+  auth_ok: boolean;
+  auth_user: string | null;
+  error: string | null;
 }
 
 export interface SSHTestResult {

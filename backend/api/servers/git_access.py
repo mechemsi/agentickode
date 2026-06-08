@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.repositories.workspace_server_repo import WorkspaceServerRepository
 from backend.schemas import (
+    GhCliCheckResult,
     GitAccessCheckRequest,
     GitAccessGenerateKeyRequest,
     GitAccessStatus,
@@ -132,6 +133,34 @@ async def sync_git_keys(
 
     # Return full status including worker user
     return await check_git_access(server_id, repo=repo)
+
+
+@router.post(
+    "/workspace-servers/{server_id}/git-access/check-gh",
+    response_model=GhCliCheckResult,
+)
+async def check_gh_cli(
+    server_id: int,
+    repo: WorkspaceServerRepository = Depends(_get_repo),
+):
+    """Check whether the ``gh`` CLI is installed and authenticated on a server.
+
+    Runs as the server's ``worker_user`` when configured (matching how runs
+    execute), else as the connection user.
+    """
+    server = await repo.get_by_id(server_id)
+    if not server:
+        raise HTTPException(404, "Workspace server not found")
+
+    ssh = executor_for_server(server)
+    svc = GitAccessService(ssh)
+    status = await svc.check_gh_cli(as_user=server.worker_user or None)
+    return GhCliCheckResult(
+        installed=status.installed,
+        auth_ok=status.auth_ok,
+        auth_user=status.auth_user,
+        error=status.error,
+    )
 
 
 @router.post(

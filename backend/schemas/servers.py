@@ -16,6 +16,7 @@ class WorkspaceServerCreate(BaseModel):
     ssh_key_path: str | None = None
     worker_user: str | None = "coder"
     workspace_root: str | None = None  # if set, use this instead of auto-creating
+    workspace_folders: list[str] | None = None  # extra scan roots beyond workspace_root
     setup_password: str | None = None  # transient — used to deploy SSH key, never stored
     max_concurrent_tasks: int = 1
     server_group_id: int | None = None
@@ -30,6 +31,7 @@ class WorkspaceServerUpdate(BaseModel):
     ssh_key_path: str | None = None
     worker_user: str | None = None
     workspace_root: str | None = None
+    workspace_folders: list[str] | None = None
     max_concurrent_tasks: int | None = None
     server_group_id: int | None = None
     server_type: str | None = None
@@ -105,6 +107,7 @@ class WorkspaceServerOut(BaseModel):
     username: str
     ssh_key_path: str | None
     workspace_root: str
+    workspace_folders: list[str] | None = None
     status: str
     last_seen_at: datetime | None
     error_message: str | None
