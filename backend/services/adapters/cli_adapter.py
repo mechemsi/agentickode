@@ -61,7 +61,7 @@ class CLIAdapter:
         if command_templates:
             self._commands.update(command_templates)
 
-        # Determine if agent needs non-root execution (from DB via RoleResolver).
+        # Determine if agent needs non-root execution (from AgentSettings).
         self._needs_non_root = bool(needs_non_root)
 
         # Token usage from last CLI invocation (parsed from JSON output)

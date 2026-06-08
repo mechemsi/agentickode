@@ -155,6 +155,29 @@ async def _resolve_workflow_phases(run: TaskRun, session: AsyncSession) -> list[
     4. Default template
     5. Hardcoded PHASE_NAMES fallback
     """
+    # 0. PR-review runs are bound to the pr-review template and must NEVER be
+    # diverted into a project's autonomous/coder pipeline — they have no checkout,
+    # so running a coder/agent_loop against them is wrong (and destructive). The
+    # explicit binding wins over execution_mode; if the template can't be resolved
+    # (binding lost or never seeded) we fail loudly rather than fall through.
+    meta = run.task_source_meta or {}
+    if meta.get("review_mode"):
+        repo = WorkflowTemplateRepository(session)
+        template = None
+        if run.workflow_template_id:
+            template = await repo.get_by_id(run.workflow_template_id)
+        if not template:
+            template = await repo.get_by_name("pr-review")
+        if not template or not template.phases:
+            raise RuntimeError(
+                f"PR-review run #{run.id} could not resolve a pr-review workflow template "
+                f"(workflow_template_id={run.workflow_template_id})"
+            )
+        if not run.workflow_template_id:
+            run.workflow_template_id = template.id
+        review_phases = cast(list[dict[str, Any]], template.phases)
+        return [p for p in review_phases if p.get("enabled", True)]
+
     # 1. Check execution mode — autonomous modes use fixed sequences
     execution_mode = await _get_project_execution_mode(run, session)
     if execution_mode in _AUTONOMOUS_PHASE_SEQUENCES:
@@ -238,12 +261,12 @@ async def _skip_phases_for_consolidated(
     # 3. Check agent's consolidated_default
     if consolidated is None:
         try:
-            from backend.worker.phases._helpers import get_phase_role, get_workspace_server_id
+            from backend.worker.phases._helpers import get_phase_agent, get_workspace_server_id
 
             ws_id = await get_workspace_server_id(run, session)
-            role = get_phase_role("coding", coding_pe.phase_config, coding_pe)
-            resolved = await services.role_resolver.resolve(
-                role, session, ws_id, phase_name="coding"
+            agent_name = get_phase_agent("coding", coding_pe.phase_config, coding_pe)
+            resolved = await services.agent_resolver.resolve_agent(
+                agent_name, session, ws_id, project_id=run.project_id
             )
             if resolved.agent_settings:
                 val = getattr(resolved.agent_settings, "consolidated_default", None)

@@ -9,11 +9,10 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import OllamaServer, RoleAssignment
+from backend.models import OllamaServer
 from backend.repositories.ollama_server_repo import OllamaServerRepository
 from backend.schemas import (
     GpuStatusResponse,
@@ -135,19 +134,6 @@ async def delete_ollama_server(
     server = await repo.get_by_id(server_id)
     if not server:
         raise HTTPException(404, "Ollama server not found")
-    # Check if any role assignments reference this server (avoid lazy load)
-    role_count = (
-        await db.execute(
-            select(func.count(RoleAssignment.id)).where(
-                RoleAssignment.ollama_server_id == server_id
-            )
-        )
-    ).scalar_one()
-    if role_count > 0:
-        raise HTTPException(
-            409,
-            "Cannot delete server with active role assignments. Remove role assignments first.",
-        )
     await repo.delete(server)
 
 

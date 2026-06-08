@@ -353,41 +353,6 @@ class TestDeleteWorkspaceServer:
         resp = await client.delete("/api/workspace-servers/999")
         assert resp.status_code == 404
 
-    async def test_delete_cascades_role_assignments(self, client: AsyncClient):
-        """Regression: deleting a server with a scoped role_assignment must succeed.
-
-        Before the fix, the FK on role_assignments.workspace_server_id had no
-        ondelete clause, so Postgres rejected the delete with
-        ForeignKeyViolationError. This test fails without the migration.
-        """
-        create_resp = await client.post(
-            "/api/workspace-servers",
-            json={"name": "fk-cascade-srv", "hostname": "10.0.0.9"},
-        )
-        server_id = create_resp.json()["id"]
-
-        assign_resp = await client.put(
-            "/api/role-assignments",
-            json=[
-                {
-                    "role": "coder",
-                    "provider_type": "agent",
-                    "agent_name": "claude",
-                    "workspace_server_id": server_id,
-                }
-            ],
-        )
-        assert assign_resp.status_code in (200, 201, 204)
-
-        resp = await client.delete(f"/api/workspace-servers/{server_id}")
-        assert resp.status_code == 204
-
-        # Role assignment for that server should be gone too
-        list_resp = await client.get("/api/role-assignments")
-        assert list_resp.status_code == 200
-        leftover = [r for r in list_resp.json() if r.get("workspace_server_id") == server_id]
-        assert leftover == []
-
     async def test_delete_removes_project_server_links(
         self, client: AsyncClient, mock_ssh_with_discovery
     ):

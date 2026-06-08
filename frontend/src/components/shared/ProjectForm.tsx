@@ -100,13 +100,14 @@ function UrlSection({ gitUrl, setGitUrl, onParsed, workspaceServerId }: { gitUrl
   );
 }
 
-export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] }: { initial?: Initial; onSubmit: (d: Record<string, unknown>) => void; onCancel: () => void; servers?: WorkspaceServer[] }) {
+export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] }: { initial?: Initial; onSubmit: (d: Record<string, unknown>) => void | Promise<void>; onCancel: () => void; servers?: WorkspaceServer[] }) {
   const isEdit = !!initial;
   const [gitUrl, setGitUrl] = useState("");
   const [parsed, setParsed] = useState(false);
   const [providerHost, setProviderHost] = useState("");
   const [connStatus, setConnStatus] = useState<Status | null>(null);
   const [saveErr, setSaveErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const integrationCfg = (initial?.integration_config ?? {}) as Record<string, unknown>;
   const [form, setForm] = useState<FD>({
     project_id: initial?.project_id ?? "",
@@ -153,7 +154,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     } catch (e) { setConnStatus({ ok: false, msg: e instanceof Error ? e.message : "Connection failed" }); }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isEdit && !parsed && form.task_source !== "notion") {
       setSaveErr("Parse git URL first");
       return;
@@ -178,7 +179,14 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       if (notion.notion_title_property) cfg.notion_title_property = notion.notion_title_property;
       if (Object.keys(cfg).length > 0) data.integration_config = cfg;
     }
-    onSubmit(data);
+    setSaving(true);
+    try {
+      await onSubmit(data);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Failed to save project");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -389,7 +397,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       <div className="col-span-1 sm:col-span-2 flex flex-col gap-2 mt-2">
         {saveErr && <StatusLine s={{ ok: false, msg: saveErr }} />}
         <div className="flex gap-2">
-          <button onClick={handleSave} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40">Save</button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40">{saving ? "Saving…" : "Save"}</button>
           <button onClick={onCancel} className="px-4 py-1.5 text-gray-400 hover:text-white text-sm rounded-lg hover:bg-gray-700/50 transition-colors">Cancel</button>
         </div>
       </div>

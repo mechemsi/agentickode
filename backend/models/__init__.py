@@ -7,8 +7,6 @@ from backend.models.agents import (
     AgentSettings,
     MonitoringRule,
     NotificationSource,
-    RoleConfig,
-    RolePromptOverride,
     ScheduledTask,
 )
 from backend.models.base import Base
@@ -21,7 +19,6 @@ from backend.models.ollama import OllamaServer
 from backend.models.policies import AgentPolicy
 from backend.models.projects import ProjectConfig, ProjectWorkspaceServer
 from backend.models.readiness import WorkspaceReadiness
-from backend.models.roles import RoleAssignment
 from backend.models.runs import AgentInvocation, PhaseExecution, TaskLog, TaskRun
 from backend.models.server_groups import ServerGroup
 from backend.models.servers import DiscoveredAgent, WorkspaceServer
@@ -51,9 +48,6 @@ __all__ = [
     "ProjectInstructionVersion",
     "ProjectSecret",
     "ProjectWorkspaceServer",
-    "RoleAssignment",
-    "RoleConfig",
-    "RolePromptOverride",
     "ScheduledTask",
     "ServerGroup",
     "TaskLog",

@@ -80,11 +80,10 @@ async def run_comparison(
         await git.run_git(["checkout", "-B", branch, base_commit], cwd=workspace)
 
         # Resolve this specific agent
-        resolved = await services.role_resolver.resolve(
-            agent_name, session, ws_id, phase_name="coding"
+        resolved = await services.agent_resolver.resolve_agent(
+            agent_name, session, ws_id, project_id=task_run.project_id
         )
         adapter = resolved.adapter
-        config = resolved.role_config
 
         async def _log(msg: str, level: str = "info") -> None:
             await broadcaster.log(run_id, msg, level=level, phase="coding")
@@ -92,7 +91,11 @@ async def run_comparison(
         await ensure_agent_ready(adapter, log_fn=_log, agent_settings=resolved.agent_settings)
 
         system_prompt, user_template, extra_params, _project_env = await resolve_prompts(
-            config, adapter, session, FALLBACK_SYSTEM_PROMPT, FALLBACK_USER_TEMPLATE
+            resolved.agent_settings,
+            adapter,
+            session,
+            FALLBACK_SYSTEM_PROMPT,
+            FALLBACK_USER_TEMPLATE,
         )
 
         agent_results: list[dict] = []

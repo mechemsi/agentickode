@@ -32,7 +32,7 @@ from backend.worker.phases._helpers import (
     ensure_agent_ready,
     get_agent_mode,
     get_agent_settings_kwargs,
-    get_phase_role,
+    get_phase_agent,
     get_workspace_server_id,
     phase_uses_agent,
 )
@@ -44,7 +44,6 @@ PHASE_META = {
     "kind": "legacy_phase",
     "deprecated_in": "0.5.0",
     "description": "Execute subtasks via AI coding agent",
-    "default_role": "coder",
     "default_agent_mode": "task",
 }
 
@@ -136,18 +135,11 @@ async def run(
         )
         return
 
-    role = get_phase_role("coding", phase_config, phase_exec_row)
-    resolved = await services.role_resolver.resolve(role, session, ws_id, phase_name="coding")
-    if resolved.is_fallback and resolved.tried:
-        tried_msg = ", ".join(resolved.tried)
-        await broadcaster.log(
-            task_run.id,
-            f"⚠ Configured agents failed: {tried_msg} — fell back to Ollama",
-            level="warning",
-            phase="coding",
-        )
+    agent_name = get_phase_agent("coding", phase_config, phase_exec_row)
+    resolved = await services.agent_resolver.resolve_agent(
+        agent_name, session, ws_id, project_id=task_run.project_id
+    )
     adapter = resolved.adapter
-    config = resolved.role_config
     settings_kwargs = get_agent_settings_kwargs(resolved.agent_settings, phase_config)
     apply_phase_command_overrides(adapter, phase_config)
 
@@ -161,7 +153,7 @@ async def run(
         await ensure_agent_ready(adapter, log_fn=_phase_log, agent_settings=resolved.agent_settings)
 
     system_prompt, user_template, extra_params, project_env_vars = await resolve_prompts(
-        config,
+        resolved.agent_settings,
         adapter,
         session,
         FALLBACK_SYSTEM_PROMPT,

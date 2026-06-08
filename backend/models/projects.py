@@ -25,6 +25,9 @@ class ProjectConfig(Base):
     local_path = Column(Text, nullable=True)
     worker_user_override = Column(Text, nullable=True)
     git_provider_token_enc = Column(Text, nullable=True)
+    default_agent = Column(
+        Text, nullable=True
+    )  # per-project default agent; overrides global is_default
     autonomy_config = Column(JSONB, nullable=True, default=dict)
     integration_config = Column(JSONB, nullable=False, default=dict, server_default="{}")
     poll_enabled = Column(Boolean, nullable=False, default=False, server_default="false")

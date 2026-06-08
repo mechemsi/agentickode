@@ -18,7 +18,6 @@ function makeDefaultStep(): PhaseConfig {
     phase_name: '',
     kind: 'bash',
     enabled: true,
-    role: null,
     trigger_mode: 'auto',
     notify_source: false,
     timeout_seconds: null,

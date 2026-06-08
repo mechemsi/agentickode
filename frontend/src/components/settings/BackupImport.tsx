@@ -21,8 +21,6 @@ const ENTITY_LABELS: Record<string, string> = {
   notification_channels: "Notification Channels",
   workflow_templates: "Workflow Templates",
   project_configs: "Projects",
-  role_configs: "Role Configs",
-  role_assignments: "Role Assignments",
 };
 
 export default function BackupImport() {

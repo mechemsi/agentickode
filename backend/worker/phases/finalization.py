@@ -48,14 +48,21 @@ async def run(
     meta = task_run.task_source_meta or {}
     pr_number = meta.get("pr_number")
     pr_branch = meta.get("pr_head_branch")
+    review_mode = meta.get("review_mode")
 
-    # fix-pr: push fixes to existing PR branch (no new PR)
-    if pr_branch and not task_run.pr_url:
+    # fix-pr: push fixes to existing PR branch (no new PR). Only for explicit
+    # fix-mode runs — a comment-only PR review must never push to the PR branch
+    # (it has no checkout/commits and pushing would fail or clobber the branch).
+    if pr_branch and not task_run.pr_url and review_mode == "fix":
         await _push_to_pr_branch(task_run, pr_branch, session)
 
     # Post review comment on source PR for pr-review / fix-pr workflows
     if task_run.review_result and pr_number:
         await _post_review_comment(task_run, pr_number, session)
+        # Flip the label to mark the PR as reviewed (visible marker; the DB head
+        # SHA remains the source of truth the poller dedupes on).
+        if review_mode == "comment":
+            await _flip_review_label(task_run, pr_number, session)
 
     if task_run.pr_url:
         await broadcaster.log(
@@ -68,6 +75,14 @@ async def run(
 
     # Close agent session (release locks so session_id can be reused if needed)
     await close_run_session(task_run, session)
+
+    # Comment-mode PR reviews never set up a per-task workspace/sandbox (the diff
+    # is fetched via API and reviewed in generate mode), so there is nothing to
+    # tear down — skip the SSH cleanup so a successful review can't be failed by
+    # a cleanup hiccup.
+    if review_mode == "comment":
+        await broadcaster.log(task_run.id, "Review complete", phase="finalization")
+        return
 
     # Cleanup workspace
     await broadcaster.log(task_run.id, "Stopping sandbox containers (if any)", phase="finalization")
@@ -186,6 +201,30 @@ async def _post_review_comment(task_run: TaskRun, pr_number: int, session: Async
         await broadcaster.log(
             task_run.id,
             f"Failed to post review comment: {exc}",
+            level="warning",
+            phase="finalization",
+        )
+
+
+async def _flip_review_label(task_run: TaskRun, pr_number: int, session: AsyncSession) -> None:
+    """Flip ``ai-review`` → ``ai-reviewed`` on the PR (best-effort visible marker)."""
+    repo_path = f"{task_run.repo_owner}/{task_run.repo_name}"
+    project_token = await get_project_token(task_run, session)
+    provider = get_git_provider(
+        task_run.git_provider, get_http_client(), access_token=project_token
+    )
+    try:
+        await provider.remove_label(repo_path, pr_number, "ai-review")
+        await provider.add_label(repo_path, pr_number, "ai-reviewed")
+        await broadcaster.log(
+            task_run.id,
+            f"Marked PR #{pr_number} as ai-reviewed",
+            phase="finalization",
+        )
+    except Exception as exc:
+        await broadcaster.log(
+            task_run.id,
+            f"Could not flip review label on PR #{pr_number}: {exc}",
             level="warning",
             phase="finalization",
         )

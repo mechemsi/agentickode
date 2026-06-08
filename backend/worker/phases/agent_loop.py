@@ -44,7 +44,6 @@ PHASE_META = {
     "kind": "legacy_phase",
     "deprecated_in": "0.5.0",
     "description": "Autonomous agent loop — Claude Code drives exploration, planning, and execution",
-    "default_role": None,
     "default_agent_mode": "task",
 }
 

@@ -5,7 +5,7 @@
 """End-to-end integration test for the composable step workflow model.
 
 Drives the pipeline directly with a workflow template that mixes ``bash`` and
-``agent`` step kinds. External surfaces (SSH executor for bash, RoleResolver +
+``agent`` step kinds. External surfaces (SSH executor for bash, AgentResolver +
 adapter for agent) are mocked; the step runners themselves and the pipeline
 dispatcher are exercised for real so we prove the whole composition stack
 works together.
@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import select
 
 from backend.models import PhaseExecution, TaskRun
+from backend.services.agent_resolver import ResolvedAgent
 from backend.services.container import ServiceContainer
 from backend.worker.pipeline import execute_pipeline
 
@@ -27,17 +28,12 @@ def _mock_broadcaster() -> MagicMock:
 
 
 def _build_services_with_adapter(adapter: MagicMock) -> ServiceContainer:
-    """Build a ServiceContainer whose role_resolver returns the given adapter."""
-    resolved = MagicMock()
-    resolved.adapter = adapter
-    resolved.role_config = None
-    resolved.agent_settings = None
-    resolved.tried = []
-    resolved.is_fallback = False
+    """Build a ServiceContainer whose agent_resolver returns the given adapter."""
+    resolved = ResolvedAgent(adapter=adapter, agent_settings=None)
 
     services = MagicMock(spec=ServiceContainer)
-    services.role_resolver = MagicMock()
-    services.role_resolver.resolve = AsyncMock(return_value=resolved)
+    services.agent_resolver = MagicMock()
+    services.agent_resolver.resolve_agent = AsyncMock(return_value=resolved)
     services.task_source_updater = None
     services.webhook_callbacks = None
     return services

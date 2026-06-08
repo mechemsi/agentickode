@@ -2,30 +2,37 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Webhook endpoints for pull-request events.
+"""Webhook + CI endpoints that launch AI code-review runs for pull requests.
 
-Parses GitHub and Gitea pull_request webhooks, looks up project config,
-and creates a pr-review task_run row for the worker to pick up.
+A PR review is gated by the ``ai-review`` label (GitHub / Gitea ``pull_request``
+events) and routed through the ``pr-review`` workflow template via
+``TriggerMatcher`` — the same label-driven routing the issue webhooks use. CI
+systems can trigger a review directly with ``POST /api/webhooks/pr-review``
+(repo + pr_number). Review runs are single-pass (``max_retries=0``) and carry
+``review_mode="comment"`` so finalization posts the review instead of pushing.
 """
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.webhooks import _create_task_run, _get_repo
+from backend.api._pr_webhook_helpers import (
+    GITEA_PR_ACTIONS,
+    GITHUB_PR_ACTIONS,
+    build_pr_review_run,
+    handle_pr_event,
+)
+from backend.api.webhooks import _get_repo
+from backend.config import settings
 from backend.database import get_db
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
+from backend.services.webhook_security import verify_shared_secret
 
 logger = logging.getLogger("agentickode.webhooks")
 router = APIRouter(tags=["webhooks"])
-
-
-async def _get_pr_review_template_id(db: AsyncSession) -> int | None:
-    wf_repo = WorkflowTemplateRepository(db)
-    template = await wf_repo.get_by_name("pr-review")
-    return int(template.id) if template else None
 
 
 @router.post("/webhooks/github-pr")
@@ -34,51 +41,16 @@ async def github_pr_webhook(
     db: AsyncSession = Depends(get_db),
     repo: ProjectConfigRepository = Depends(_get_repo),
 ):
-    """Receive GitHub pull_request events and create pr-review task runs."""
-    body = await request.json()
-    action = body.get("action", "")
-
-    if action not in ("opened", "synchronize"):
-        return {"status": "ignored", "reason": f"action_{action}"}
-
-    pr = body.get("pull_request", {})
-    repo_data = body.get("repository", {})
-    repo_full_name = repo_data.get("full_name", "")
-    owner, name = repo_full_name.split("/", 1) if "/" in repo_full_name else ("", repo_full_name)
-
-    project = await repo.get_by_git_repo("github", owner, name)
-    if not project:
-        logger.warning(f"No project config for {repo_full_name}")
-        return {"status": "ignored", "reason": "unknown_project"}
-
-    pr_number = pr.get("number", 0)
-    pr_title = pr.get("title", "")
-    pr_url = pr.get("html_url", "")
-    template_id = await _get_pr_review_template_id(db)
-
-    run = _create_task_run(
-        task_id=f"pr-{pr_number}",
-        project=project,
-        title=f"Review PR #{pr_number}: {pr_title}",
-        description=pr.get("body", "") or "",
-        task_source="github",
-        task_source_meta={
-            "pr_url": pr_url,
-            "pr_number": pr_number,
-            "pr_title": pr_title,
-            "pr_head_branch": pr.get("head", {}).get("ref", ""),
-            "repo_full_name": repo_full_name,
-            "labels": [lbl.get("name", "") for lbl in pr.get("labels", [])],
-        },
-        use_claude=False,
+    """Receive GitHub pull_request events; review when labelled ``ai-review``."""
+    return await handle_pr_event(
+        request,
+        db,
+        repo,
+        source="github",
+        allowed_actions=GITHUB_PR_ACTIONS,
+        secret=settings.github_webhook_secret,
+        signature_header="X-Hub-Signature-256",
     )
-    run.workflow_template_id = template_id
-    db.add(run)
-    await db.commit()
-    await db.refresh(run)
-
-    logger.info(f"Created run #{run.id} from GitHub PR webhook: {run.title}")
-    return {"status": "accepted", "run_id": run.id}
 
 
 @router.post("/webhooks/gitea-pr")
@@ -87,48 +59,74 @@ async def gitea_pr_webhook(
     db: AsyncSession = Depends(get_db),
     repo: ProjectConfigRepository = Depends(_get_repo),
 ):
-    """Receive Gitea pull_request events and create pr-review task runs."""
-    body = await request.json()
-    action = body.get("action", "")
-
-    if action not in ("opened", "synchronized"):
-        return {"status": "ignored", "reason": f"action_{action}"}
-
-    pr = body.get("pull_request", {})
-    repo_data = body.get("repository", {})
-    repo_full_name = repo_data.get("full_name", "")
-    owner, name = repo_full_name.split("/", 1) if "/" in repo_full_name else ("", repo_full_name)
-
-    project = await repo.get_by_git_repo("gitea", owner, name)
-    if not project:
-        logger.warning(f"No project config for {repo_full_name}")
-        return {"status": "ignored", "reason": "unknown_project"}
-
-    pr_number = pr.get("number", 0)
-    pr_title = pr.get("title", "")
-    pr_url = pr.get("html_url", "")
-    template_id = await _get_pr_review_template_id(db)
-
-    run = _create_task_run(
-        task_id=f"pr-{pr_number}",
-        project=project,
-        title=f"Review PR #{pr_number}: {pr_title}",
-        description=pr.get("body", "") or "",
-        task_source="gitea",
-        task_source_meta={
-            "pr_url": pr_url,
-            "pr_number": pr_number,
-            "pr_title": pr_title,
-            "pr_head_branch": pr.get("head", {}).get("ref", ""),
-            "repo_full_name": repo_full_name,
-            "labels": [lbl.get("name", "") for lbl in pr.get("labels", [])],
-        },
-        use_claude=False,
+    """Receive Gitea pull_request events; review when labelled ``ai-review``."""
+    return await handle_pr_event(
+        request,
+        db,
+        repo,
+        source="gitea",
+        allowed_actions=GITEA_PR_ACTIONS,
+        secret=settings.gitea_webhook_secret,
+        signature_header="X-Gitea-Signature",
     )
-    run.workflow_template_id = template_id
+
+
+class PrReviewTriggerRequest(BaseModel):
+    """CI-facing payload to launch a review for an existing PR."""
+
+    repo: str  # "owner/name"
+    pr_number: int = Field(gt=0)
+    provider: str = "github"
+    pr_head_branch: str = ""
+    pr_title: str = ""
+    pr_body: str = ""
+    labels: list[str] = []
+
+
+@router.post("/webhooks/pr-review")
+async def trigger_pr_review(
+    payload: PrReviewTriggerRequest,
+    db: AsyncSession = Depends(get_db),
+    repo: ProjectConfigRepository = Depends(_get_repo),
+    x_ci_token: str | None = Header(default=None),
+):
+    """Launch a PR-review run for ``repo``#``pr_number`` (CI/manual trigger).
+
+    Unlike the webhook, this is an explicit request — it forces the ``pr-review``
+    template by name and does not require the ``ai-review`` label. When
+    ``CI_TRIGGER_SECRET`` is configured, callers must present a matching
+    ``X-CI-Token`` header (constant-time compared); when it is unset the endpoint
+    is open (protect it at the network layer).
+    """
+    if settings.ci_trigger_secret and not verify_shared_secret(
+        settings.ci_trigger_secret, x_ci_token
+    ):
+        raise HTTPException(status_code=401, detail="invalid or missing X-CI-Token")
+
+    owner, _, name = payload.repo.partition("/")
+    project = await repo.get_by_git_repo(payload.provider, owner, name)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"No project for {payload.repo}")
+
+    template = await WorkflowTemplateRepository(db).get_by_name("pr-review")
+    if not template:
+        raise HTTPException(status_code=503, detail="pr-review template not seeded")
+
+    run = build_pr_review_run(
+        project,
+        task_source=payload.provider,
+        pr_number=payload.pr_number,
+        pr_title=payload.pr_title or f"PR #{payload.pr_number}",
+        pr_body=payload.pr_body,
+        pr_head_branch=payload.pr_head_branch,
+        pr_url="",
+        repo_full_name=payload.repo,
+        labels=payload.labels,
+        template_id=template.id,
+    )
     db.add(run)
     await db.commit()
     await db.refresh(run)
 
-    logger.info(f"Created run #{run.id} from Gitea PR webhook: {run.title}")
+    logger.info("Created run #%d from CI pr-review trigger: %s", run.id, run.title)
     return {"status": "accepted", "run_id": run.id}

@@ -103,17 +103,17 @@ async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture()
 def mock_services() -> ServiceContainer:
     """ServiceContainer with all services mocked."""
-    from backend.services.role_resolver import RoleResolver
+    from backend.services.agent_resolver import AgentResolver
 
     ollama = AsyncMock(spec=OllamaService)
     openhands = AsyncMock(spec=OpenHandsService)
     chromadb = AsyncMock(spec=ChromaDBService)
-    role_resolver = AsyncMock(spec=RoleResolver)
+    agent_resolver = AsyncMock(spec=AgentResolver)
     return ServiceContainer(
         ollama=ollama,
         openhands=openhands,
         chromadb=chromadb,
-        role_resolver=role_resolver,
+        agent_resolver=agent_resolver,
     )
 
 

@@ -7,12 +7,9 @@
 import pytest
 from sqlalchemy import select
 
-from backend.models import AgentSettings, RoleConfig, WorkflowTemplate
-from backend.models.agents import RolePromptOverride
+from backend.models import AgentSettings, WorkflowTemplate
 from backend.seed import (
-    AGENT_PROMPT_OVERRIDES,
     DEFAULT_AGENT_SETTINGS,
-    DEFAULT_ROLE_CONFIGS,
     DEFAULT_WORKFLOW_TEMPLATES,
     seed_all,
 )
@@ -126,35 +123,6 @@ class TestSeedAll:
         assert "{{run.title}}" in implement["params"]["prompt"]
         assert implement["params"]["mode"] == "task"
 
-    async def test_seeds_role_configs(self, seeded_db):
-        result = await seeded_db.execute(select(RoleConfig).where(RoleConfig.is_system.is_(True)))
-        configs = result.scalars().all()
-        names = {c.agent_name for c in configs}
-        expected = {d["agent_name"] for d in DEFAULT_ROLE_CONFIGS}
-        assert names == expected
-
-    async def test_role_configs_have_prompts(self, seeded_db):
-        result = await seeded_db.execute(select(RoleConfig).where(RoleConfig.is_system.is_(True)))
-        for c in result.scalars().all():
-            assert c.system_prompt, f"{c.agent_name} missing system_prompt"
-            assert c.user_prompt_template, f"{c.agent_name} missing user_prompt_template"
-
-    async def test_seeds_prompt_overrides(self, seeded_db):
-        result = await seeded_db.execute(select(RolePromptOverride))
-        overrides = result.scalars().all()
-        # 3 system configs x N CLI agents
-        expected_count = len(DEFAULT_ROLE_CONFIGS) * len(AGENT_PROMPT_OVERRIDES)
-        assert len(overrides) == expected_count
-
-    async def test_claude_override_is_minimal(self, seeded_db):
-        result = await seeded_db.execute(
-            select(RolePromptOverride).where(RolePromptOverride.cli_agent_name == "claude")
-        )
-        overrides = result.scalars().all()
-        assert len(overrides) == len(DEFAULT_ROLE_CONFIGS)
-        for o in overrides:
-            assert o.minimal_mode is True
-
 
 class TestSeedIdempotent:
     """Verify seed_all is safe to call multiple times."""
@@ -168,13 +136,6 @@ class TestSeedIdempotent:
 
         templates = (await db_session.execute(select(WorkflowTemplate))).scalars().all()
         assert len(templates) == len(DEFAULT_WORKFLOW_TEMPLATES)
-
-        configs = (
-            (await db_session.execute(select(RoleConfig).where(RoleConfig.is_system.is_(True))))
-            .scalars()
-            .all()
-        )
-        assert len(configs) == len(DEFAULT_ROLE_CONFIGS)
 
     async def test_backfills_command_templates(self, db_session):
         """Existing agent settings with empty templates get backfilled."""

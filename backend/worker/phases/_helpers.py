@@ -33,19 +33,17 @@ from backend.services.workspace.worker_user_service import WorkerUserService
 
 logger = logging.getLogger("agentickode.phases.helpers")
 
-_default_roles: dict[str, str] | None = None
 _default_modes: dict[str, str] | None = None
 
 
 def _load_defaults() -> None:
-    """Populate default role/mode dicts from the phase registry (lazy)."""
-    global _default_roles, _default_modes
-    if _default_roles is not None:
+    """Populate the default agent-mode dict from the phase registry (lazy)."""
+    global _default_modes
+    if _default_modes is not None:
         return
     from backend.worker.phases.registry import discover_phases
 
     phases = discover_phases()
-    _default_roles = {n: i.default_role for n, i in phases.items() if i.default_role}
     _default_modes = {n: i.default_agent_mode for n, i in phases.items() if i.default_agent_mode}
 
 
@@ -68,34 +66,33 @@ def phase_uses_agent(phase_name: str, phase_config: dict | None) -> bool:
     """Decide whether a phase should invoke an AI agent.
 
     If *phase_config* contains an explicit ``uses_agent`` value, that wins.
-    Otherwise fall back to the registry default: only phases with a
-    ``default_role`` in their PHASE_META use an agent.
+    Otherwise fall back to the registry default: only phases that declare a
+    ``default_agent_mode`` in their PHASE_META use an agent.
     """
     if phase_config is not None:
         flag = phase_config.get("uses_agent")
         if flag is not None:
             return bool(flag)
     _load_defaults()
-    assert _default_roles is not None
-    return phase_name in _default_roles
+    assert _default_modes is not None
+    return phase_name in _default_modes
 
 
-def get_phase_role(
+def get_phase_agent(
     phase_name: str,
     phase_config: dict | None,
     phase_execution: PhaseExecution | None = None,
-) -> str:
-    """Return the role to use for a phase.
+) -> str | None:
+    """Return the explicit agent name for a phase, or None to use the default.
 
-    Priority: PhaseExecution.agent_override (DB column) > phase_config["role"] > default mapping.
+    Priority: ``PhaseExecution.agent_override`` (now an agent name) > ``phase_config['agent']``.
+    ``None`` means the AgentResolver picks the per-project / global default.
     """
     if phase_execution and phase_execution.agent_override:
         return str(phase_execution.agent_override)
-    if phase_config and phase_config.get("role"):
-        return str(phase_config["role"])
-    _load_defaults()
-    assert _default_roles is not None
-    return _default_roles.get(phase_name, phase_name)
+    if phase_config and phase_config.get("agent"):
+        return str(phase_config["agent"])
+    return None
 
 
 async def get_project_config(task_run: TaskRun, session: AsyncSession) -> ProjectConfig | None:

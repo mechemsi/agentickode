@@ -119,6 +119,78 @@ class GiteaProvider:
             return "merged"
         return "open" if data.get("state") == "open" else "closed"
 
+    async def list_pull_requests(
+        self, repo_path: str, state: str = "open", limit: int = 50
+    ) -> list[dict]:
+        resp = await self._client.get(
+            f"{self._base_url}/api/v1/repos/{repo_path}/pulls",
+            headers=self._headers(),
+            params={"state": state, "limit": limit},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return [
+            {
+                "number": item["number"],
+                "title": item.get("title", ""),
+                "body": item.get("body", "") or "",
+                "labels": [la.get("name", "") for la in item.get("labels", [])],
+                "head_ref": item.get("head", {}).get("ref", ""),
+                "head_sha": item.get("head", {}).get("sha", ""),
+                "html_url": item.get("html_url", ""),
+                "state": item.get("state", "open"),
+            }
+            for item in resp.json()
+        ]
+
+    async def _label_id(self, repo_path: str, label: str) -> int | None:
+        """Resolve a Gitea label name to its numeric id (the labels API needs ids).
+
+        Pages through the labels list so a repo with >100 labels still resolves.
+        """
+        page = 1
+        while page <= 50:  # safety bound (5000 labels)
+            resp = await self._client.get(
+                f"{self._base_url}/api/v1/repos/{repo_path}/labels",
+                headers=self._headers(),
+                params={"limit": 100, "page": page},
+                timeout=30.0,
+            )
+            resp.raise_for_status()
+            items = resp.json()
+            for la in items:
+                if la.get("name") == label:
+                    return la.get("id")
+            if len(items) < 100:
+                return None
+            page += 1
+        return None
+
+    async def add_label(self, repo_path: str, number: int, label: str) -> None:
+        label_id = await self._label_id(repo_path, label)
+        if label_id is None:
+            logger.warning("Gitea label %r not found in %s — cannot add", label, repo_path)
+            return
+        resp = await self._client.post(
+            f"{self._base_url}/api/v1/repos/{repo_path}/issues/{number}/labels",
+            headers=self._headers(),
+            json={"labels": [label_id]},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+
+    async def remove_label(self, repo_path: str, number: int, label: str) -> None:
+        label_id = await self._label_id(repo_path, label)
+        if label_id is None:
+            return  # not present / unknown — nothing to remove
+        resp = await self._client.delete(
+            f"{self._base_url}/api/v1/repos/{repo_path}/issues/{number}/labels/{label_id}",
+            headers=self._headers(),
+            timeout=30.0,
+        )
+        if resp.status_code != 404:
+            resp.raise_for_status()
+
     async def list_issues(self, repo_path: str, state: str = "open", limit: int = 30) -> list[dict]:
         resp = await self._client.get(
             f"{self._base_url}/api/v1/repos/{repo_path}/issues",

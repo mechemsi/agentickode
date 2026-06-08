@@ -11,7 +11,6 @@ import { ToastProvider } from "./components/shared/Toast";
 import AgentSettingsPage from "./pages/AgentSettings";
 import Dashboard from "./pages/Dashboard";
 import GpuDashboard from "./pages/GpuDashboard";
-import RoleConfigs from "./pages/RoleConfigs";
 import NewRun from "./pages/NewRun";
 import Projects from "./pages/Projects";
 import RunDetail from "./pages/RunDetail";
@@ -37,7 +36,6 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/runs/:id" element={<RunDetail />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/workspace-servers" element={<WorkspaceServers />} />
-                <Route path="/roles" element={<RoleConfigs />} />
                 <Route path="/gpu-dashboard" element={<GpuDashboard />} />
                 <Route path="/agents" element={<AgentSettingsPage />} />
                 <Route path="/workflows" element={<WorkflowTemplates />} />

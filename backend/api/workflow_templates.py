@@ -59,7 +59,6 @@ async def list_phases():
         {
             "name": info.name,
             "description": info.description,
-            "default_role": info.default_role,
             "default_agent_mode": info.default_agent_mode,
             "kind": info.kind,
             "deprecated_in": info.deprecated_in,
@@ -93,7 +92,7 @@ async def list_step_kinds():
         },
         {
             "kind": "agent",
-            "description": "Invoke a configured agent (via RoleResolver).",
+            "description": "Invoke a named agent directly (claude/codex/opencode).",
             "params_schema": {
                 "prompt": {
                     "type": "string",

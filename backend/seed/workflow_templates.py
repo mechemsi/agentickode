@@ -120,6 +120,38 @@ DEFAULT_WORKFLOW_TEMPLATES: list[dict] = [
             ),
         ],
     },
+    {
+        "name": "pr-review",
+        "description": (
+            "AI code review for pull requests. Fetches the PR diff via the git "
+            "provider API, runs a single-pass AI review, and posts the result as a "
+            "comment on the PR. Triggered by the 'ai-review' label on a PR (GitHub / "
+            "Gitea) or the POST /api/webhooks/pr-review endpoint (CI)."
+        ),
+        "is_default": False,
+        "is_system": True,
+        "label_rules": [],
+        "triggers": [
+            {
+                "type": "pr_event",
+                "source": "github",
+                "action": "any",
+                "label_filter": ["ai-review"],
+            },
+            {"type": "pr_event", "source": "gitea", "action": "any", "label_filter": ["ai-review"]},
+        ],
+        "phases": [
+            _phase("pr_fetch", kind="legacy_phase"),
+            _phase(
+                "reviewing",
+                kind="legacy_phase",
+                uses_agent=True,
+                agent_mode="generate",
+                params={"review_strictness": "critical_only"},
+            ),
+            _phase("finalization", kind="legacy_phase"),
+        ],
+    },
 ]
 
 
@@ -134,7 +166,6 @@ _DEPRECATED_SYSTEM_TEMPLATES = (
     "planner",
     "hotfix",
     "small-task",
-    "pr-review",
     "fix-pr",
 )
 
@@ -210,6 +241,7 @@ async def seed_workflow_templates(db: AsyncSession) -> None:
 
     created = 0
     backfilled = 0
+    reconciled = 0
     upgraded_default = False
     for defaults in DEFAULT_WORKFLOW_TEMPLATES:
         result = await db.execute(
@@ -233,6 +265,21 @@ async def seed_workflow_templates(db: AsyncSession) -> None:
             upgraded_default = True
             continue
 
+        # Reconcile routing-critical fields for system templates that declare
+        # triggers (currently pr-review). Existing-DB rows that predate this
+        # release can carry stale triggers (e.g. label-type entries backfilled
+        # from old label_rules) that ``TriggerMatcher`` will never match for a
+        # pr_event — silently killing the feature. System rows are seed-managed,
+        # so re-sync them from the seed definition. Operator-owned (is_system=
+        # False) rows are already skipped above and never touched.
+        declared_triggers = defaults.get("triggers")
+        if declared_triggers is not None and existing.triggers != declared_triggers:
+            existing.triggers = declared_triggers
+            existing.phases = defaults["phases"]
+            existing.description = defaults["description"]
+            reconciled += 1
+            continue
+
         # Backfill missing keys into existing system templates
         phases: list[dict] = existing.phases or []  # type: ignore[assignment]
         changed = False
@@ -250,5 +297,7 @@ async def seed_workflow_templates(db: AsyncSession) -> None:
         logger.info("Seeded %d workflow templates", created)
     if backfilled:
         logger.info("Backfilled phase_config fields for %d workflow templates", backfilled)
+    if reconciled:
+        logger.info("Reconciled triggers/phases for %d system workflow templates", reconciled)
     if upgraded_default:
         logger.info("Upgraded the system 'default' template to the new 5-step shape")

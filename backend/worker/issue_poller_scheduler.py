@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 
 from backend.models import ProjectConfig
 from backend.services.task_source_polling.factory import get_poller
+from backend.services.task_source_polling.pr_review_poller import poll_pr_reviews
 
 logger = logging.getLogger("agentickode.issue_poller_scheduler")
 
@@ -84,32 +85,39 @@ class IssuePollerScheduler:
     async def _poll_project(
         self, session: AsyncSession, project: ProjectConfig, now: datetime
     ) -> None:
+        # Issue polling — source-specific (github/gitea/plane/notion/…).
         poller = get_poller(project.task_source)
-        if poller is None:
-            logger.debug(
-                "No poller for task_source=%s on project %s",
-                project.task_source,
-                project.project_id,
-            )
-            # Still advance next_poll_at so we don't spin on unsupported sources.
-            self._advance(project, now)
-            return
-
-        try:
-            created = await poller.poll(project, session)
-            if created:
-                logger.info(
-                    "Polled %s: %d new run(s) for project %s",
+        if poller is not None:
+            try:
+                created = await poller.poll(project, session)
+                if created:
+                    logger.info(
+                        "Polled %s: %d new run(s) for project %s",
+                        project.task_source,
+                        len(created),
+                        project.project_id,
+                    )
+            except Exception:
+                logger.exception(
+                    "Poller for %s failed on project %s",
                     project.task_source,
-                    len(created),
+                    project.project_id,
+                )
+
+        # PR-review polling — provider-based, orthogonal to task_source. Runs for any
+        # git project (poll_pr_reviews gates on the provider), so a project whose
+        # task_source has no issue poller still gets its PRs reviewed.
+        try:
+            pr_created = await poll_pr_reviews(project, session)
+            if pr_created:
+                logger.info(
+                    "PR poll: %d review run(s) for project %s",
+                    len(pr_created),
                     project.project_id,
                 )
         except Exception:
-            logger.exception(
-                "Poller for %s failed on project %s",
-                project.task_source,
-                project.project_id,
-            )
+            logger.exception("PR review poll failed on project %s", project.project_id)
+
         self._advance(project, now)
 
     def _advance(self, project: ProjectConfig, now: datetime) -> None:

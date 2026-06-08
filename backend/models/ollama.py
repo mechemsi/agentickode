@@ -4,7 +4,6 @@
 
 from sqlalchemy import Column, DateTime, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
 
 from backend.models.base import Base
 
@@ -22,10 +21,4 @@ class OllamaServer(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-
-    role_assignments = relationship(
-        "RoleAssignment",
-        back_populates="ollama_server",
-        foreign_keys="RoleAssignment.ollama_server_id",
     )

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.services.role_resolver import ResolvedRole
+from backend.services.agent_resolver import ResolvedAgent
 from backend.worker.phases import coding
 from backend.worker.phases._coding_utils import (
     FALLBACK_USER_TEMPLATE,
@@ -123,7 +123,9 @@ class TestCodingSessionGeneration:
             "command": "claude ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
@@ -163,7 +165,9 @@ class TestCodingSessionGeneration:
             "command": "aider ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
@@ -206,7 +210,9 @@ class TestCodingSessionGeneration:
             "command": "claude ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
@@ -248,7 +254,9 @@ class TestCodingSessionGeneration:
             "command": "codex ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
@@ -291,7 +299,9 @@ class TestCodingSessionGeneration:
             "command": "claude ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (
@@ -352,7 +362,9 @@ class TestCodingSessionGeneration:
             "command": "claude ...",
             "session_id": None,
         }
-        mock_services.role_resolver.resolve.return_value = ResolvedRole(adapter=mock_adapter)
+        mock_services.agent_resolver.resolve_agent.return_value = ResolvedAgent(
+            adapter=mock_adapter
+        )
 
         bp1, bp2, bp3, bp4 = _broadcaster_patches()
         with (

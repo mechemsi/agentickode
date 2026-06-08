@@ -4,6 +4,70 @@ Persistent record of what was built, when, and by whom.
 
 ---
 
+## 2026-06-05 — Remove the roles abstraction (v0.5.2+)
+
+**Commits**: `323480a` (backend), `c9d108a` (frontend + drop migration)
+**Tests**: 1325 backend passing; 282 frontend passing
+**Files**: ~80 changed (~3200 lines net removed)
+
+Replaced the role → RoleAssignment → agent indirection with direct agent selection. A
+workflow step names an `agent`; otherwise the per-project default (`ProjectConfig.default_agent`)
+or global default (`AgentSettings.is_default`, seeded claude) runs.
+
+- `backend/services/agent_resolver.py` — new `AgentResolver.resolve_agent` (builds adapter from AgentSettings)
+- All worker phases/steps migrated off `role_resolver`; `get_phase_role`→`get_phase_agent`;
+  `phase_uses_agent` keys off `default_agent_mode`; prompts from fallbacks + `AgentSettings.minimal_mode`
+- Deleted RoleResolver, RoleAssignment/RoleConfig/RolePromptOverride models, role APIs/repos/schemas/seed,
+  frontend Roles page + role API clients; added a per-step Agent picker
+- Migrations 039 (add `is_default`/`minimal_mode`/`default_agent`, seed claude) + 040 (drop role tables, irreversible)
+- ADR: `claudedocs/decisions/008-direct-agent-selection.md`
+- Executed in 5 verified phases; mapping + deletions run via multi-agent fan-out with the suites as the gate
+
+## 2026-06-05 — Webhook-less PR-review polling + label flip (v0.5.2+)
+
+**Commit**: `1c35773`
+**Tests**: 15 added, 1397 total passing
+**Files**: 15 changed (5 new)
+
+Outbound polling so PR reviews work on a local server with no public webhook domain.
+The `IssuePollerScheduler` now also scans open PRs labelled `ai-review`/`ai-reviewed`
+and launches a review run; the PR head commit SHA on the run is the dedup key
+(review once per SHA, re-review on new commits), and finalization flips the label to
+`ai-reviewed` as a visible marker.
+
+- `backend/services/git/{protocol,github,gitea,gitlab,bitbucket}.py` — `list_pull_requests`,
+  `add_label`, `remove_label` (Gitea resolves label name→id with pagination; Bitbucket label no-op)
+- `backend/services/task_source_polling/pr_review_poller.py` — `poll_pr_reviews` (SHA dedup, in-flight guard, git_connections token resolution)
+- `backend/worker/issue_poller_scheduler.py` — `_poll_project` also runs the PR poll for git projects
+- `backend/worker/phases/finalization.py` — `_flip_review_label` (best-effort)
+- `backend/api/_pr_webhook_helpers.py` — `build_pr_review_run` stores `pr_head_sha`
+- Docs: `claudedocs/{plans,implementations}/2026-06-05-pr-review-poller.md`
+- Reviewed via adversarial multi-agent pass (2 fixed: token mismatch, Gitea pagination)
+
+---
+
+## 2026-06-05 — PR-triggered AI code review (v0.5.2+)
+
+**Commit**: `5b0a1a2`
+**Tests**: 17 added, 1380 total passing
+**Files**: 17 changed (9 new)
+
+Reconnected the disconnected PR-review flow. A PR labelled `ai-review`
+(GitHub/Gitea `pull_request` events) or a CI call to `POST /api/webhooks/pr-review`
+now launches a single-pass review run (`pr_fetch → reviewing → finalization`) that
+fetches the PR diff and posts the AI review as a PR comment.
+
+- `backend/services/webhook_security.py` — `verify_hmac_sha256` + `verify_shared_secret` (constant-time)
+- `backend/api/_pr_webhook_helpers.py` — `read_verified_body` / `build_pr_review_run` / `handle_pr_event` (HMAC, label-gating via TriggerMatcher, in-flight dedupe, project_id fallback)
+- `backend/api/webhooks_pr.py` — `github-pr` / `gitea-pr` routes + CI `pr-review` route (optional `X-CI-Token`)
+- `backend/seed/workflow_templates.py` — restored `pr-review` template; un-deprecated; re-sync stale system rows
+- `backend/worker/pipeline.py` — PR-review runs use their template even on autonomous projects; fail loudly if unresolvable
+- `backend/worker/phases/finalization.py` — comment-mode posts review, skips push + workspace cleanup
+- `backend/worker/phases/pr_fetch.py` — parse changed-file list into the reviewer prompt
+- Config: `github_webhook_secret`, `gitea_webhook_secret`, `ci_trigger_secret`
+- Docs: `claudedocs/plans/` + `claudedocs/implementations/2026-06-05-pr-review-trigger.md`
+- Reviewed via adversarial multi-agent pass (14 findings confirmed/fixed, 3 dismissed)
+
 ## 2026-03-28 — Autonomous Platform Integrations (v0.3.0+)
 
 **Commit**: `8014f0f`

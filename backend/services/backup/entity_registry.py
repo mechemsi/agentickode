@@ -14,9 +14,6 @@ from backend.models import (
     NotificationChannel,
     OllamaServer,
     ProjectConfig,
-    RoleAssignment,
-    RoleConfig,
-    RolePromptOverride,
     WorkflowTemplate,
     WorkspaceServer,
 )
@@ -126,51 +123,6 @@ ENTITY_CONFIGS: dict[str, EntityConfig] = {
         excluded_fields=_COMMON_EXCLUDED,
         # TODO(Task4): add workspace_servers export via project_workspace_servers join table
     ),
-    "role_configs": EntityConfig(
-        model=RoleConfig,
-        export_key="role_configs",
-        match_fields=("agent_name",),
-        excluded_fields=_COMMON_EXCLUDED | {"id"},
-        children=(
-            ChildConfig(
-                relationship_attr="prompt_overrides",
-                model=RolePromptOverride,
-                excluded_fields=frozenset(
-                    {
-                        "id",
-                        "role_config_id",
-                        "created_at",
-                        "updated_at",
-                    }
-                ),
-            ),
-        ),
-    ),
-    "role_assignments": EntityConfig(
-        model=RoleAssignment,
-        export_key="role_assignments",
-        match_fields=("role", "workspace_server_name", "priority"),
-        excluded_fields=_COMMON_EXCLUDED
-        | {
-            "id",
-            "workspace_server_id",
-            "ollama_server_id",
-        },
-        fk_mappings=(
-            FKMapping(
-                column="workspace_server_id",
-                target_model=WorkspaceServer,
-                target_name_col="name",
-                export_field="workspace_server_name",
-            ),
-            FKMapping(
-                column="ollama_server_id",
-                target_model=OllamaServer,
-                target_name_col="name",
-                export_field="ollama_server_name",
-            ),
-        ),
-    ),
 }
 
 # Import must follow this order to satisfy FK constraints.
@@ -184,7 +136,4 @@ DEPENDENCY_ORDER: list[str] = [
     "workflow_templates",
     # Tier 2 — depends on T1
     "project_configs",
-    "role_configs",
-    # Tier 3 — depends on T1+T2
-    "role_assignments",
 ]

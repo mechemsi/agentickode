@@ -13,9 +13,6 @@ from backend.models import (
     NotificationChannel,
     OllamaServer,
     ProjectConfig,
-    RoleAssignment,
-    RoleConfig,
-    RolePromptOverride,
     WorkflowTemplate,
     WorkspaceServer,
 )
@@ -70,30 +67,6 @@ async def _seed(session: AsyncSession) -> None:
     session.add(
         ProjectWorkspaceServer(project_id=proj.project_id, workspace_server_id=ws.id, priority=0)
     )
-    rc = RoleConfig(
-        agent_name="planner",
-        display_name="Planner",
-        system_prompt="You are a planner.",
-    )
-    session.add(rc)
-    await session.flush()
-    session.add(
-        RolePromptOverride(
-            role_config_id=rc.id,
-            cli_agent_name="claude",
-            system_prompt="Plan with Claude",
-        )
-    )
-    session.add(
-        RoleAssignment(
-            role="coder",
-            provider_type="agent",
-            agent_name="claude",
-            workspace_server_id=ws.id,
-            ollama_server_id=ollama.id,
-            priority=0,
-        )
-    )
     await session.commit()
 
 
@@ -128,15 +101,6 @@ async def test_export_full_redacted(db_session: AsyncSession):
     assert len(entities["notification_channels"]) == 1
     nc = entities["notification_channels"][0]
     assert nc["config"]["bot_token"] == REDACTED
-
-    assert len(entities["role_configs"]) == 1
-    rc = entities["role_configs"][0]
-    assert len(rc["prompt_overrides"]) == 1
-
-    assert len(entities["role_assignments"]) == 1
-    ra = entities["role_assignments"][0]
-    assert ra["workspace_server_name"] == "ws-01"
-    assert ra["ollama_server_name"] == "ollama-01"
 
 
 @pytest.mark.asyncio
