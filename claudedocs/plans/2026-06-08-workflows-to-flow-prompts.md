@@ -11,6 +11,19 @@ related:
 
 # Replace Workflow Templates with Flow Prompts
 
+> **DECISIONS (2026-06-08, Dominykas)** — direction locked, implementation still paused:
+> - **Option B (full simplification): a flow prompt = a single agent call.** The agent's
+>   return becomes the run status; AgenticKode auto-assembles surrounding data, the user
+>   only defines the prompt. (Resolves OQ-9.)
+> - **Supersede ADR-007** — multi-step bash+agent composition is removed. (Resolves OQ-4.)
+> - **Break custom multi-step templates** — no migration path. (Resolves OQ-3.)
+> - **PR-review is also a flow prompt** — same single-call mechanism, different prompt. (Resolves OQ-6.)
+>
+> **Still blocking (posted to the Notion task as a discussion):** OQ-1 (audit/`phase_executions`
+> + cost FK fate), OQ-2 (which data AgenticKode auto-fetches & how declared), OQ-5 (comparison
+> mode), OQ-7 (irreversible migration of `task_runs.workflow_template_id` / run history).
+> ADR-009 to be written once these four are answered.
+
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
 > explicit product decisions before any code is written. An ADR (009) must be
