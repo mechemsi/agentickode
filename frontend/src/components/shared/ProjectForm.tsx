@@ -3,7 +3,7 @@
 // Commercial licensing: info@mechemsi.com
 
 import { useState } from "react";
-import { CheckCircle, GitBranch, Globe, Key, Link, Server, Tag, XCircle, Zap } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronRight, GitBranch, Globe, Key, Link, Server, Tag, XCircle, Zap } from "lucide-react";
 import { parseGitUrl, testConnection } from "../../api";
 import type { GitUrlParseResponse, ProjectConfig, WorkspaceServer } from "../../types";
 
@@ -108,6 +108,8 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
   const [connStatus, setConnStatus] = useState<Status | null>(null);
   const [saveErr, setSaveErr] = useState("");
   const [saving, setSaving] = useState(false);
+  // Create mode opens minimal (URL + name); editing shows everything up front.
+  const [showAdvanced, setShowAdvanced] = useState(isEdit);
   const integrationCfg = (initial?.integration_config ?? {}) as Record<string, unknown>;
   const [form, setForm] = useState<FD>({
     project_id: initial?.project_id ?? "",
@@ -189,52 +191,46 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
     }
   };
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {!isEdit && (
-        <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
-          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />Workspace Servers (used to verify repo access)</span>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto">
-            {servers.map((s) => (
-              <label key={s.id} className="flex items-center gap-2 cursor-pointer py-1">
-                <input
-                  type="checkbox"
-                  checked={(form.workspace_server_ids ?? []).includes(s.id)}
-                  onChange={(e) => {
-                    const ids = form.workspace_server_ids ?? [];
-                    setForm((p) => ({
-                      ...p,
-                      workspace_server_ids: e.target.checked
-                        ? [...ids, s.id]
-                        : ids.filter((id) => id !== s.id),
-                    }));
-                  }}
-                  className="accent-blue-500 w-3.5 h-3.5"
-                />
-                <span className="text-sm text-gray-300">{s.name}</span>
-                <span className="text-xs text-gray-600">{s.hostname}</span>
-              </label>
-            ))}
-          </div>
-          {servers.length === 0 && (
-            <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
-          )}
-          <div className="flex gap-2 mt-1">
-            <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
-              <Zap className="w-4 h-4" />Test Connection
-            </button>
-          </div>
-          {connStatus && <StatusLine s={connStatus} />}
+  const advancedFields = (
+    <>
+      {/* Workspace servers + test connection */}
+      <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
+        <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />Workspace Servers (used to verify repo access)</span>
+        <div className="space-y-1.5 max-h-40 overflow-y-auto">
+          {servers.map((s) => (
+            <label key={s.id} className="flex items-center gap-2 cursor-pointer py-1">
+              <input
+                type="checkbox"
+                checked={(form.workspace_server_ids ?? []).includes(s.id)}
+                onChange={(e) => {
+                  const ids = form.workspace_server_ids ?? [];
+                  setForm((p) => ({
+                    ...p,
+                    workspace_server_ids: e.target.checked
+                      ? [...ids, s.id]
+                      : ids.filter((id) => id !== s.id),
+                  }));
+                }}
+                className="accent-blue-500 w-3.5 h-3.5"
+              />
+              <span className="text-sm text-gray-300">{s.name}</span>
+              <span className="text-xs text-gray-600">{s.hostname}</span>
+            </label>
+          ))}
         </div>
-      )}
-
-      {!isEdit && <UrlSection gitUrl={gitUrl} setGitUrl={setGitUrl} onParsed={handleParsed} workspaceServerId={form.workspace_server_ids[0] ?? null} />}
+        {servers.length === 0 && (
+          <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
+        )}
+        <div className="flex gap-2 mt-1">
+          <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
+            <Zap className="w-4 h-4" />Test Connection
+          </button>
+        </div>
+        {connStatus && <StatusLine s={connStatus} />}
+      </div>
 
       <Field label="project_id" icon={Tag}>
         <input className={CLS} value={form.project_id} onChange={(e) => set("project_id", e.target.value)} disabled={isEdit} />
-      </Field>
-      <Field label="project_slug" icon={Tag}>
-        <input className={CLS} value={form.project_slug} onChange={(e) => set("project_slug", e.target.value)} />
       </Field>
       <Field label="repo_owner" icon={Globe}>
         <input className={CLS} value={form.repo_owner} onChange={(e) => set("repo_owner", e.target.value)} />
@@ -325,7 +321,21 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
           </Field>
         </div>
       )}
+    </>
+  );
 
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Minimal create: paste git URL + name. Edit shows everything. */}
+      {!isEdit && <UrlSection gitUrl={gitUrl} setGitUrl={setGitUrl} onParsed={handleParsed} workspaceServerId={form.workspace_server_ids[0] ?? null} />}
+
+      <div className="col-span-1 sm:col-span-2">
+        <Field label="Project name / slug" icon={Tag}>
+          <input className={CLS} value={form.project_slug} onChange={(e) => set("project_slug", e.target.value)} />
+        </Field>
+      </div>
+
+      {/* Issue polling stays visible (not hidden behind Advanced) when the source supports it */}
       {POLL_CAPABLE_SOURCES.has(form.task_source) && (
         <div
           className="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border border-gray-700/60 bg-gray-900/40"
@@ -357,42 +367,20 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
         </div>
       )}
 
-      {isEdit && (
-        <div className="col-span-1 sm:col-span-2 flex flex-col gap-1">
-          <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Server className="w-3 h-3" />workspace_servers</span>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto">
-            {servers.map((s) => (
-              <label key={s.id} className="flex items-center gap-2 cursor-pointer py-1">
-                <input
-                  type="checkbox"
-                  checked={(form.workspace_server_ids ?? []).includes(s.id)}
-                  onChange={(e) => {
-                    const ids = form.workspace_server_ids ?? [];
-                    setForm((p) => ({
-                      ...p,
-                      workspace_server_ids: e.target.checked
-                        ? [...ids, s.id]
-                        : ids.filter((id) => id !== s.id),
-                    }));
-                  }}
-                  className="accent-blue-500 w-3.5 h-3.5"
-                />
-                <span className="text-sm text-gray-300">{s.name}</span>
-                <span className="text-xs text-gray-600">{s.hostname}</span>
-              </label>
-            ))}
-          </div>
-          {servers.length === 0 && (
-            <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
-          )}
-          <div className="flex gap-2 mt-1">
-            <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
-              <Zap className="w-4 h-4" />Test Connection
-            </button>
-          </div>
-          {connStatus && <StatusLine s={connStatus} />}
-        </div>
-      )}
+      {/* Everything below is autopopulated/optional — hidden by default on create */}
+      <div className="col-span-1 sm:col-span-2">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+          data-testid="toggle-advanced"
+        >
+          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {showAdvanced ? "Hide advanced options" : "Advanced options"}
+        </button>
+      </div>
+
+      {showAdvanced && advancedFields}
 
       <div className="col-span-1 sm:col-span-2 flex flex-col gap-2 mt-2">
         {saveErr && <StatusLine s={{ ok: false, msg: saveErr }} />}

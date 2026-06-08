@@ -1,6 +1,6 @@
 ---
 title: Simplify project creation — paste git URL + name, hide the rest
-status: planned
+status: implemented
 date: 2026-06-08
 related:
   - frontend/src/components/shared/ProjectForm.tsx
@@ -92,17 +92,17 @@ No other files need to change.
 
 ### Save validation change (lines 158–160)
 
-Current guard:
-```ts
-if (!isEdit && !parsed && form.task_source !== "notion") {
-  setSaveErr("Parse git URL first");
-  return;
-}
-```
+**DEVIATION (implemented):** the proposed relaxation below was NOT applied. Allowing
+save without Parse would submit empty `repo_owner`/`repo_name` — the backend
+`create_project` reads those fields directly (it does not parse the URL server-side),
+so it would create broken projects or 422. The existing "Parse git URL first" guard
+was kept unchanged: Parse remains the autopopulation mechanism in create mode. If a
+URL-only create flow is desired, it needs a backend change (parse the URL in
+`create_project`) — out of scope here.
 
-Proposed change:
-- If `form.workspace_server_ids.length > 0`: keep the existing guard (branch resolution requires Parse).
-- If no workspace server is selected: allow save without Parse, validating only that `gitUrl` is non-empty. This covers the common case where no workspace server is configured yet.
+Original proposal (not implemented):
+- If `form.workspace_server_ids.length > 0`: keep the existing guard.
+- If no workspace server is selected: allow save without Parse (gitUrl non-empty).
 
 ### Autopopulation flow — unchanged
 
