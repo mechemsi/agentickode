@@ -290,6 +290,17 @@ async def _skip_phases_for_consolidated(
     await session.commit()
 
 
+def _defaults_to_implement_flow(run: TaskRun) -> bool:
+    """Whether a run with no explicit flow prompt should default to the implement flow.
+
+    PR-review runs (``review_mode`` set in ``task_source_meta``) must NOT be defaulted
+    to implement — if their ``pr_review`` flow prompt is absent/disabled they fall
+    through to the template path instead of running an implement (code-writing) job
+    against a PR. (Edge case surfaced by an AI review of PR #31.)
+    """
+    return not bool((run.task_source_meta or {}).get("review_mode"))
+
+
 async def execute_pipeline(run: TaskRun, session: AsyncSession, services: ServiceContainer) -> None:
     """Execute the pipeline phase-by-phase using PhaseExecution rows.
 
@@ -302,7 +313,7 @@ async def execute_pipeline(run: TaskRun, session: AsyncSession, services: Servic
     from backend.config import settings
 
     if settings.flow_prompts_enabled:
-        if not run.flow_prompt_id:
+        if not run.flow_prompt_id and _defaults_to_implement_flow(run):
             # Phase 3: default new runs to the implement flow prompt.
             from backend.repositories.flow_prompt_repo import FlowPromptRepository
 

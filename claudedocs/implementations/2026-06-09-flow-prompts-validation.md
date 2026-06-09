@@ -33,12 +33,20 @@ fork → executor → server resolved (platform id 6) → `pr_fetch` fetched the
 single `generate` agent call → finalization **posted the PR comment + flipped the label** →
 `completed`. Full parity with the template path.
 
-## Known local-environment caveat (NOT a flow-prompt defect)
-The posted review body was empty because claude (`needs_non_root=True`) is run by the adapter as
-a non-root `coder` user that **isn't provisioned in the local backend container** (claude's creds
-live in `/root/.claude`). A direct `claude -p` **as root** returns output fine. This blocks the
-template path identically — it's an agent-user provisioning gap, not a flow issue. On a properly
-provisioned workspace server (worker user created + agent creds copied) it works.
+## Local agent execution — fixed
+First pass: the posted review body was empty because claude (`needs_non_root=True`) was run by
+the adapter as a non-root `coder` user that isn't provisioned in the local container (creds live
+in `/root/.claude`). **Fix** (`backend/services/adapters/factory.py`): for a **local**
+(in-container) server, run the agent as the container user (root) — or an explicitly-configured
+non-root `worker_user` if set — never the remote `coder` default. After this, run **#48 produced
+a real 3498-char review** and posted it to PR #31. Full end-to-end success with actual agent output.
+
+## Bonus: the AI review caught a real bug (now fixed)
+Claude's review of PR #31 flagged that Phase 3's default routed **any** `flow_prompt_id`-less run
+to the implement flow — so a PR-review run whose `pr_review` prompt was absent/disabled would
+wrongly run an implement (code-writing) job against a PR. **Fix** (`backend/worker/pipeline.py`):
+`_defaults_to_implement_flow(run)` excludes `review_mode` runs from the implement default; they
+fall through to the template path. Regression test added.
 
 ## Follow-up noted
 - The flow executor uses the pure `run_agent_step`, which does **not** record an
