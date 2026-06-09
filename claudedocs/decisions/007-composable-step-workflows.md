@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-05-23)
+Superseded by [ADR-009](009-flow-prompts.md) (2026-06-09) — flow prompts replace composable
+multi-step workflows with a single agent call. Accepted (2026-05-23).
 
 ## Context
 
