@@ -47,6 +47,23 @@ class AdapterFactory:
             raise ValueError(f"CLI agent '{agent_name}' requires a workspace server for SSH access")
 
         ssh = executor_for_server(workspace_server)
+
+        # Local (in-container) platform server: there is no SSH/user isolation and
+        # the agent's credentials belong to the container user (root). Run as that
+        # user — or an explicitly-configured non-root worker_user if one is set —
+        # never the remote "coder" non-root default (which isn't provisioned here).
+        if getattr(workspace_server, "server_type", "remote") == "local":
+            wu = workspace_server.worker_user
+            local_worker = wu if (wu and wu != "root") else None
+            return CLIAdapter(
+                ssh,
+                agent_name,
+                server_name=workspace_server.name,
+                worker_user=local_worker,
+                command_templates=command_templates,
+                needs_non_root=False,
+            )
+
         worker_user = (
             workspace_server.worker_user
             if getattr(workspace_server, "worker_user_status", None) == "ready"
