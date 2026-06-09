@@ -142,6 +142,7 @@ class WorkspaceReadinessItem(BaseModel):
     status: str  # "ready", "not_cloned", "error", "unreachable"
     path: str | None = None
     error: str | None = None
+    worker_user: str | None = None  # OS user launches run as on this server
 
 
 class WorkspaceReadinessResponse(BaseModel):

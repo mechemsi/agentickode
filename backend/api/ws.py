@@ -18,8 +18,18 @@ from sqlalchemy import select
 
 from backend.database import async_session
 from backend.models import ProjectWorkspaceServer, TaskRun, WorkspaceServer
+from backend.models.local_sessions import LocalTerminalSession
+from backend.services.workspace.platform_user import get_platform_run_as_user
 from backend.services.workspace.ssh_service import SSHService
 from backend.worker.broadcaster import broadcaster
+
+
+def _runuser(cmd: str, run_as_user: str | None) -> str:
+    """Wrap a shell command to run as ``run_as_user`` via ``runuser`` (no-op when unset)."""
+    if not run_as_user:
+        return cmd
+    return f"runuser -l {shlex.quote(run_as_user)} -c {shlex.quote(cmd)}"
+
 
 logger = logging.getLogger("agentickode.ws")
 router = APIRouter()
@@ -513,15 +523,30 @@ async def ws_session_terminal(websocket: WebSocket, session_id: str):
 @router.websocket("/ws/local-terminal/{agent_name}")
 async def ws_local_terminal(websocket: WebSocket, agent_name: str):
     """Legacy endpoint — creates a new ephemeral terminal. Use /ws/local-terminal-attach instead."""
+    async with async_session() as db:
+        run_as_user = await get_platform_run_as_user(db)
     await _attach_to_tmux(
-        websocket, f"chat-{agent_name}-ephemeral", agent_name, cleanup_on_close=True
+        websocket,
+        f"chat-{agent_name}-ephemeral",
+        agent_name,
+        cleanup_on_close=True,
+        run_as_user=run_as_user,
     )
 
 
 @router.websocket("/ws/local-terminal-attach/{tmux_name}")
 async def ws_local_terminal_attach(websocket: WebSocket, tmux_name: str):
     """Attach to an existing local terminal tmux session. Session persists after disconnect."""
-    await _attach_to_tmux(websocket, tmux_name, agent_name=None, cleanup_on_close=False)
+    # The session was created under a specific user; attach as that same user.
+    async with async_session() as db:
+        result = await db.execute(
+            select(LocalTerminalSession).where(LocalTerminalSession.tmux_name == tmux_name)
+        )
+        sess = result.scalar_one_or_none()
+    run_as_user = sess.run_as_user if sess else None
+    await _attach_to_tmux(
+        websocket, tmux_name, agent_name=None, cleanup_on_close=False, run_as_user=run_as_user
+    )
 
 
 async def _attach_to_tmux(
@@ -529,11 +554,14 @@ async def _attach_to_tmux(
     tmux_name: str,
     agent_name: str | None,
     cleanup_on_close: bool,
+    run_as_user: str | None = None,
 ) -> None:
     """Bridge a WebSocket to a tmux session via PTY.
 
     If tmux_name doesn't exist and agent_name is provided, creates it.
     If cleanup_on_close is False, tmux survives browser disconnect.
+    When ``run_as_user`` is set, all tmux commands run as that user via
+    ``runuser`` (the tmux server is per-user). No-op when unset.
     """
     import fcntl
     import pty
@@ -550,7 +578,7 @@ async def _attach_to_tmux(
 
     # Check if tmux session exists
     check = await asyncio.create_subprocess_shell(
-        f"tmux has-session -t {tmux_name} 2>/dev/null",
+        _runuser(f"tmux has-session -t {tmux_name} 2>/dev/null", run_as_user),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -561,7 +589,7 @@ async def _attach_to_tmux(
         # Create tmux with shell, then launch agent inside
         agent_launch = "claude --permission-mode auto" if agent_name == "claude" else agent_name
         proc = await asyncio.create_subprocess_shell(
-            f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
+            _runuser(f"tmux new-session -d -s {tmux_name} -x 120 -y 40", run_as_user),
             env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -576,7 +604,7 @@ async def _attach_to_tmux(
             return
         # Send the agent launch command into the shell
         await asyncio.create_subprocess_shell(
-            f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
+            _runuser(f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter", run_as_user),
             env=env,
         )
     elif not tmux_exists:
@@ -590,7 +618,7 @@ async def _attach_to_tmux(
     master_fd, slave_fd = pty.openpty()
 
     attach_proc = await asyncio.create_subprocess_shell(
-        f"tmux attach-session -t {tmux_name}",
+        _runuser(f"tmux attach-session -t {tmux_name}", run_as_user),
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,

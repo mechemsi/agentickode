@@ -109,6 +109,7 @@ async def _run_migrations() -> None:
     """)
     await _run_migration_step("ALTER TABLE workspace_servers ADD COLUMN setup_log JSONB")
     await _run_migration_step("ALTER TABLE workspace_servers ADD COLUMN workspace_folders JSONB")
+    await _run_migration_step("ALTER TABLE local_terminal_sessions ADD COLUMN run_as_user TEXT")
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS agent_settings (
             id SERIAL PRIMARY KEY,

@@ -45,7 +45,7 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
         agent_name: "claude",
         project_id: project.project_id,
         workspace_path: ws.path,
-        user_context: "root",
+        user_context: ws.worker_user || "root",
         display_name: `claude @ ${project.project_slug}`,
       });
       setSessionId(session.session_id);

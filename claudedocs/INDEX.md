@@ -13,7 +13,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [Docs & site agentic update](plans/2026-06-08-docs-agentic-update.md) | planned | 2026-06-08 | Update README, CLAUDE.md, skills, and agentickodeweb site to reflect agentic model; remove stale roles/8-phase framing |
 | [Replace workflow templates with flow prompts](plans/2026-06-08-workflows-to-flow-prompts.md) | planned | 2026-06-08 | Drop `WorkflowTemplate` + phase-step dispatch; replace with single flow-prompt + agent. Pre-design doc; ADR-009 required before implementation. |
 | [Multiple workspace folders on platform server](plans/2026-06-08-multi-workspace-folders.md) | implemented | 2026-06-08 | Add `workspace_folders` JSONB to WorkspaceServer; multi-root scan/discovery; platform server UI |
-| [Terminal + Chat Agent Launch as Selected User](plans/2026-06-08-launch-as-user.md) | partial | 2026-06-08 | Terminal PTY + chat agent run as `worker_user` via `runuser` (no-op when unset); tmux sessions + LaunchAgentModal deferred |
+| [Terminal + Chat Agent Launch as Selected User](plans/2026-06-08-launch-as-user.md) | implemented | 2026-06-08 | Terminal PTY + chat agent + tmux sessions + LaunchAgentModal all run as `worker_user` via `runuser` (no-op when unset); migration 042 |
 | [Host machine as default platform workspace](plans/2026-06-08-host-default-workspace.md) | partial | 2026-06-08 | `gh` check + run-as-user seeding + SSH-to-host switch (all OFF by default via `PLATFORM_*`); host-side sshd setup is operator's step |
 | *Plans are in `docs/plans/` — migrate here as they are updated* | | | |
 

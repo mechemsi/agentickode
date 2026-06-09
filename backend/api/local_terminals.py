@@ -7,6 +7,7 @@
 import asyncio
 import logging
 import os
+import shlex
 import uuid
 from datetime import UTC, datetime
 
@@ -17,10 +18,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models.local_sessions import LocalTerminalSession
+from backend.services.workspace.platform_user import get_platform_run_as_user
 from backend.worker.broadcaster import broadcaster
 
 logger = logging.getLogger("agentickode.api.local_terminals")
 router = APIRouter(tags=["local-terminals"])
+
+
+def _tmux(cmd: str, run_as_user: str | None) -> str:
+    """Wrap a tmux shell command to run as ``run_as_user`` via ``runuser``.
+
+    The tmux server is per-user, so create/send/attach/kill/has-session for a
+    given session must all run as the same user. No-op when ``run_as_user`` is
+    falsy (runs as the backend process user — pre-existing behaviour).
+    """
+    if not run_as_user:
+        return cmd
+    return f"runuser -l {shlex.quote(run_as_user)} -c {shlex.quote(cmd)}"
 
 
 class CreateSessionRequest(BaseModel):
@@ -61,7 +75,7 @@ async def list_local_sessions(db: AsyncSession = Depends(get_db)):
     # Verify active sessions still have tmux running
     verified = []
     for s in sessions:
-        if s.status == "active" and not await _tmux_exists(s.tmux_name):
+        if s.status == "active" and not await _tmux_exists(s.tmux_name, s.run_as_user):
             s.status = "closed"
         verified.append(s)
     await db.commit()
@@ -78,6 +92,8 @@ async def create_local_session(
     tmux_name = f"lt-{body.agent_name}-{session_id}"
     display_name = body.display_name or f"{body.agent_name} session"
 
+    # Run the tmux session as the platform server's worker user when configured.
+    run_as_user = await get_platform_run_as_user(db)
     env = {
         **os.environ,
         "TERM": "xterm-256color",
@@ -93,7 +109,7 @@ async def create_local_session(
         agent_launch = body.agent_name
 
     proc = await asyncio.create_subprocess_shell(
-        f"tmux new-session -d -s {tmux_name} -x 120 -y 40",
+        _tmux(f"tmux new-session -d -s {tmux_name} -x 120 -y 40", run_as_user),
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -105,14 +121,17 @@ async def create_local_session(
 
     # Enable mouse scrolling and increase scrollback
     await asyncio.create_subprocess_shell(
-        f"tmux set-option -t {tmux_name} mouse on && "
-        f"tmux set-option -t {tmux_name} history-limit 10000",
+        _tmux(
+            f"tmux set-option -t {tmux_name} mouse on && "
+            f"tmux set-option -t {tmux_name} history-limit 10000",
+            run_as_user,
+        ),
         env=env,
     )
 
     # Send the agent launch command into the shell
     await asyncio.create_subprocess_shell(
-        f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter",
+        _tmux(f"tmux send-keys -t {tmux_name} '{agent_launch}' Enter", run_as_user),
         env=env,
     )
 
@@ -123,6 +142,7 @@ async def create_local_session(
         display_name=display_name,
         last_command=agent_launch,
         agent_session_id=claude_session_id if body.agent_name == "claude" else None,
+        run_as_user=run_as_user,
         status="active",
     )
     db.add(session)
@@ -185,8 +205,10 @@ async def resume_local_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
+    run_as_user = session.run_as_user
+
     # If tmux is already running, just mark active
-    if await _tmux_exists(session.tmux_name):
+    if await _tmux_exists(session.tmux_name, run_as_user):
         session.status = "active"
         session.last_activity_at = datetime.now(UTC)
         await db.commit()
@@ -201,7 +223,7 @@ async def resume_local_session(
 
     # Re-create tmux session with the same name
     proc = await asyncio.create_subprocess_shell(
-        f"tmux new-session -d -s {session.tmux_name} -x 120 -y 40",
+        _tmux(f"tmux new-session -d -s {session.tmux_name} -x 120 -y 40", run_as_user),
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -213,8 +235,11 @@ async def resume_local_session(
 
     # Enable mouse scrolling and increase scrollback
     await asyncio.create_subprocess_shell(
-        f"tmux set-option -t {session.tmux_name} mouse on && "
-        f"tmux set-option -t {session.tmux_name} history-limit 10000",
+        _tmux(
+            f"tmux set-option -t {session.tmux_name} mouse on && "
+            f"tmux set-option -t {session.tmux_name} history-limit 10000",
+            run_as_user,
+        ),
         env=env,
     )
 
@@ -224,7 +249,7 @@ async def resume_local_session(
     else:
         agent_cmd = session.last_command or session.agent_name
     await asyncio.create_subprocess_shell(
-        f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter",
+        _tmux(f"tmux send-keys -t {session.tmux_name} '{agent_cmd}' Enter", run_as_user),
         env=env,
     )
 
@@ -251,9 +276,9 @@ async def close_local_session(
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # Kill tmux
+    # Kill tmux (as the user that owns the session's tmux server)
     await asyncio.create_subprocess_shell(
-        f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true"
+        _tmux(f"tmux kill-session -t {session.tmux_name} 2>/dev/null || true", session.run_as_user)
     )
 
     await db.delete(session)
@@ -272,10 +297,10 @@ async def close_local_session(
     return {"status": "deleted"}
 
 
-async def _tmux_exists(tmux_name: str) -> bool:
-    """Check if a tmux session exists."""
+async def _tmux_exists(tmux_name: str, run_as_user: str | None = None) -> bool:
+    """Check if a tmux session exists (on the owning user's tmux server)."""
     proc = await asyncio.create_subprocess_shell(
-        f"tmux has-session -t {tmux_name} 2>/dev/null",
+        _tmux(f"tmux has-session -t {tmux_name} 2>/dev/null", run_as_user),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
