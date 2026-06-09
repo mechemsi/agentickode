@@ -29,6 +29,10 @@ services:
       dockerfile: Dockerfile.backend.dev
     ports:
       - "8222:8000"
+    # Resolve "host-gateway" to the Docker host so the platform server can
+    # optionally SSH to the host (opt-in via PLATFORM_SSH_HOST). Harmless otherwise.
+    extra_hosts:
+      - "host-gateway:host-gateway"
     env_file:
       - path: .env
         required: false

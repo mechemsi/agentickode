@@ -9,13 +9,19 @@ related:
 
 # Host Machine as Default Platform Workspace
 
-> **STATUS (2026-06-08): partial.** The **`gh` CLI check** (section 3) is implemented —
-> `GitAccessService.check_gh_cli`, `POST /workspace-servers/{id}/git-access/check-gh`, and a
-> badge in `GitAccessPanel`. The **host-execution switch** (section 1, Option A: SSH to
-> `host-gateway`) and the **platform run-as-user seeding** (sections 2/4) are **deferred** —
-> they carry high environment risk on WSL2/Docker Desktop (host `sshd`, key ceremony,
-> `runuser` needs root) and flipping the working in-container platform server could break it.
-> These need an explicit environment decision before implementation (see Risks 1–5).
+> **STATUS (2026-06-09): partial — scaffolding landed, OFF by default.**
+> - **`gh` CLI check** (section 3): implemented (`GitAccessService.check_gh_cli`, endpoint, panel badge).
+> - **Run-as-user seeding** (sections 2/4): `seed_platform_server` sets the platform server's
+>   `worker_user` from `PLATFORM_USER` (empty = root, current behaviour).
+> - **SSH-to-host switch** (section 1, Option A): implemented behind `PLATFORM_SSH_HOST` —
+>   when set, the seed switches the platform server to `server_type=remote`/`host-gateway`;
+>   `extra_hosts: host-gateway` added to both compose files; agent discovery uses
+>   `executor_for_server`. **OFF by default** so the working in-container server is unchanged.
+> - **Runbook**: `claudedocs/runbooks/platform-host-execution.md` covers the one-time host
+>   setup (host `sshd`, authorized_keys, root SSH for `runuser`).
+>
+> Remaining: the host-side setup itself is the operator's step (WSL2 `sshd` etc.); until
+> `PLATFORM_SSH_HOST`/`PLATFORM_USER` are set, nothing changes.
 
 ## Goal
 

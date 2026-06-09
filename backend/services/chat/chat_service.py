@@ -29,6 +29,7 @@ from backend.services.chat.agent_process import (
     invoke_agent_streaming,
     is_agent_available,
 )
+from backend.services.workspace.platform_user import get_platform_run_as_user
 
 logger = logging.getLogger("agentickode.chat.service")
 
@@ -94,12 +95,14 @@ class ChatService:
         # Invoke agent (one-shot with session resume)
         agent_session_id = chat.agent_session_id or chat.session_id
 
+        run_as_user = await get_platform_run_as_user(db)
         result = await invoke_agent(
             agent_name=chat.agent_name,
             message=message,
             session_id=agent_session_id,
             is_new_session=is_first,
             platform_url=platform_url,
+            run_as_user=run_as_user,
         )
 
         # Append assistant response
@@ -141,12 +144,14 @@ class ChatService:
         agent_session_id = chat.agent_session_id or chat.session_id
         response_parts: list[str] = []
 
+        run_as_user = await get_platform_run_as_user(db)
         async for chunk in invoke_agent_streaming(
             agent_name=chat.agent_name,
             message=message,
             session_id=agent_session_id,
             is_new_session=is_first,
             platform_url=platform_url,
+            run_as_user=run_as_user,
         ):
             response_parts.append(chunk)
             yield chunk
