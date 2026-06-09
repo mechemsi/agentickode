@@ -39,6 +39,29 @@ class TestFlowPromptRepo:
         assert await repo.get_by_flow_type("nope") is None
 
 
+class TestSeed:
+    async def test_seed_creates_implement_and_pr_review(self, db_session):
+        from backend.seed.flow_prompts import seed_flow_prompts
+
+        await seed_flow_prompts(db_session)
+        repo = FlowPromptRepository(db_session)
+        # Phase 3 default resolves the implement flow prompt by type:
+        impl = await repo.get_by_flow_type("implement")
+        assert impl is not None and impl.agent_mode == "task"
+        pr = await repo.get_by_flow_type("pr_review")
+        assert pr is not None and pr.agent_mode == "generate"
+
+    async def test_seed_is_idempotent(self, db_session):
+        from backend.seed.flow_prompts import seed_flow_prompts
+
+        await seed_flow_prompts(db_session)
+        await seed_flow_prompts(db_session)
+        rows = await FlowPromptRepository(db_session).list_all()
+        names = [r.name for r in rows]
+        assert names.count("implement") == 1
+        assert names.count("pr-review") == 1
+
+
 class TestSourcesFor:
     def test_fixed_sources_per_type(self):
         flow = SimpleNamespace(flow_type="implement", extra_data_sources=None)

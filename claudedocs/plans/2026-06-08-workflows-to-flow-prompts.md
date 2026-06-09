@@ -34,7 +34,11 @@ related:
 > **Phase 2 (PR-review on a flow prompt) — DONE 2026-06-09** (poller + webhook bind PR-review runs
 > to the `pr-review` flow prompt when the flag is on; executor sets `review_result` so finalization
 > posts the comment + flips the label — parity with the template path).
-> See [implementation](../implementations/2026-06-09-flow-prompts-phase2-pr-review.md). Phases 3–5 pending.
+> See [implementation](../implementations/2026-06-09-flow-prompts-phase2-pr-review.md).
+>
+> **Phase 3 (default + deprecate templates) — DONE 2026-06-09** (flag on → runs with no explicit
+> flow prompt default to the `implement` flow prompt; template creation logs a deprecation warning).
+> See [implementation](../implementations/2026-06-09-flow-prompts-phase3-default.md). Phases 4–5 pending.
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
