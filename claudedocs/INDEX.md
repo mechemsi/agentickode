@@ -32,6 +32,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [Flow prompts — Phase 1](implementations/2026-06-09-flow-prompts-phase1.md) | 2026-06-09 | ADR-009 Phase 1 (additive, flag-gated): `flow_prompts` table + `flow_prompt_id` + data-source registry + single-agent-call executor; off by default (migration 043) |
 | [Flow prompts — Phase 2 (PR-review)](implementations/2026-06-09-flow-prompts-phase2-pr-review.md) | 2026-06-09 | ADR-009 Phase 2: poller/webhook bind PR-review to the `pr-review` flow prompt (flag-gated); executor sets `review_result` → finalization posts comment + flips label (parity) |
 | [Flow prompts — Phase 3 (default)](implementations/2026-06-09-flow-prompts-phase3-default.md) | 2026-06-09 | ADR-009 Phase 3: flag on → runs default to the `implement` flow prompt; template creation deprecated (warning) |
+| [Flow prompts — live validation + fixes](implementations/2026-06-09-flow-prompts-validation.md) | 2026-06-09 | Live PR-review run validated the flow engine; fixed CI-endpoint flow binding + executor server resolution; local non-root agent-user caveat |
 
 ## Decisions
 

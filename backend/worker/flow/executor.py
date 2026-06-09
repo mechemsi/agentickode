@@ -28,7 +28,7 @@ from backend.repositories.flow_prompt_repo import FlowPromptRepository
 from backend.services.container import ServiceContainer
 from backend.worker.broadcaster import broadcaster
 from backend.worker.flow.data_sources import fetch_flow_data
-from backend.worker.phases._helpers import close_run_session
+from backend.worker.phases._helpers import close_run_session, get_workspace_server_id
 from backend.worker.steps.agent_step import run_agent_step
 
 logger = logging.getLogger("agentickode.flow.executor")
@@ -72,6 +72,11 @@ async def execute_flow_prompt(
 
     run.status = "running"
     run.started_at = run.started_at or datetime.now(UTC)
+    # Resolve a workspace server (the agent CLI needs one to run on) — mirrors the
+    # legacy phases, which use get_workspace_server_id rather than the raw column.
+    # Falls back to the project's assigned server (e.g. the local platform server).
+    if not run.workspace_server_id:
+        run.workspace_server_id = await get_workspace_server_id(run, session)
     await session.commit()
     await broadcaster.event(
         run.id,
