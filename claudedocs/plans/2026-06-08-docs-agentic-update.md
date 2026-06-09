@@ -1,13 +1,18 @@
 ---
 title: Bring public docs and skills in line with the agentic model
-status: planned
+status: in-progress
 date: 2026-06-08
 related:
   - claudedocs/plans/2026-06-05-remove-roles.md
   - claudedocs/decisions/008-direct-agent-selection.md
   - claudedocs/decisions/007-composable-step-workflows.md
+  - claudedocs/decisions/009-flow-prompts.md
   - docs/plans/2026-03-22-website-readme-update-design.md
 ---
+
+> **Status (2026-06-09): Part A (this repo) is complete; Part B (agentickodeweb site) is pending — that repo is not checked out here.**
+>
+> **Ground-truth correction:** the plan assumed `RoleAdapter` was renamed to `AgentAdapter` (ADR-008). Verified against `backend/services/adapters/protocol.py` — that did **not** happen: `RoleAdapter` is still the live adapter protocol name. Only the resolver was renamed (`RoleResolver` → `AgentResolver`). All edits keep `RoleAdapter` as-is and only fix `RoleResolver`, the "8-phase pipeline as the primary model" framing, and add ADR-009 (flow prompts) as the current model. README/CLAUDE.md/skills/legacy docs reframed accordingly.
 
 # Docs & Site Agentic Update
 

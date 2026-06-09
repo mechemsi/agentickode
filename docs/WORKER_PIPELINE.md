@@ -1,6 +1,6 @@
 # Worker Pipeline (Legacy Reference)
 
-> **This document is deprecated.** See [workflows.md](workflows.md) for the current composable-workflow model. Kept for reference; the architecture documented here (fixed 8-phase pipeline) is preserved as the `default` workflow template for back-compat.
+> **This document is deprecated.** The current execution model is flow prompts — a single agent call per run ([ADR-009 — Flow Prompts](../claudedocs/decisions/009-flow-prompts.md)). The composable step model ([workflows.md](workflows.md)) and the fixed 8-phase pipeline documented here are both kept for back-compat; the 8-phase shape is preserved as the `default` workflow template.
 
 The 8-phase pipeline (`workspace_setup → init → planning → coding → testing → reviewing → approval → finalization`) used to be the only execution model. It is now one of several workflow templates — the `default` seeded template composes every step with `kind: legacy_phase`, and the underlying phase modules in `backend/worker/phases/` are unchanged.
 

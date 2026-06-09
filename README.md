@@ -2,9 +2,9 @@
 
 # AgenticKode
 
-### Composable AI workflows triggered by your tools
+### Agentic AI coding triggered by your tools — issues in, pull requests out
 
-**Compose `bash` and `agent` steps into workflows that run when an issue is filed, a webhook fires, or a cron tick lands. AgenticKode handles the workspace, the prompt rendering, the retries, and the human-approval gate. Self-hosted, pluggable, and honest about what your agent actually does.**
+**Give an agent a prompt and it runs: AgenticKode picks a workspace, fetches the context, runs the agent to completion, and opens a PR — when an issue is filed, a webhook fires, or a cron tick lands. It handles the workspace, the prompt rendering, the retries, and the human-approval gate. Self-hosted, pluggable, and honest about what your agent actually does.**
 
 <br>
 
@@ -39,7 +39,7 @@ Most AI coding tools are chat-based — you type prompts, copy-paste code, manua
 
 **What makes AgenticKode different:**
 
-- **Composable `bash` + `agent` steps with first-class triggers** — Workflows are arrays of steps. Each step is either a shell command on the workspace or an agent invocation with a rendered prompt. Both share the same rules (timeout, retry, failure_mode, trigger_mode). The legacy 8-phase shape is preserved as one of several seeded templates ([ADR-007](claudedocs/decisions/007-composable-step-workflows.md)).
+- **Flow prompts — one agent call, not a pipeline** — A run is a single agent invocation: you write the prompt, AgenticKode auto-fetches the context (repo, issue body, PR diff) and the agent returns the run's outcome (opens the PR, posts the review). `implement` and `pr-review` ship built-in; add your own by flow type. The legacy composable `bash` + `agent` step workflows still run for back-compat ([ADR-009](claudedocs/decisions/009-flow-prompts.md) supersedes [ADR-007](claudedocs/decisions/007-composable-step-workflows.md)).
 - **Trigger-driven, not just manual** — Templates declare what fires them: GitHub/Gitea/GitLab/Plane/Notion webhooks, schedule (cron), labels, PR events, or manual.
 - **Self-hosted & private** — Your code never leaves your infrastructure. Run it on your own servers with your own models.
 - **7+ AI agents** — Claude CLI, Codex, Gemini, Aider, OpenCode, Kimi, Copilot, Ollama, OpenHands — all with auto-install. Mix and match per step.
@@ -76,7 +76,7 @@ Every task runs a **workflow** — a user-composed sequence of `bash` and `agent
 | Kind | What it does | Typical use |
 |------|--------------|-------------|
 | **`bash`** | Runs a shell command on the workspace server via `CommandExecutor`. Captures stdout/stderr/exit. | Build, test, lint, `gh pr create`, anything CLI. |
-| **`agent`** | Invokes a role (planner / coder / reviewer / custom) through `RoleResolver` with a rendered prompt. Supports `mode: generate` or `mode: task`, session continuity (`session_id`, `new_session`), and per-step `agent_override`. | Decompose work, write code, review a diff, summarize logs, anything LLM-shaped. |
+| **`agent`** | Invokes an agent — named per-step (`agent: claude`) or the project/global default — resolved by `AgentResolver`, with a rendered prompt. Supports `mode: generate` or `mode: task`, session continuity (`session_id`, `new_session`), and per-step `agent_override`. | Decompose work, write code, review a diff, summarize logs, anything LLM-shaped. |
 | **`legacy_phase`** | Invokes one of the original domain modules (`planning`, `coding`, `testing`, `reviewing`, `approval`, `finalization`, `pr_fetch`, `task_creation`, `agent_loop`). Kept indefinitely for back-compat. | The `default` workflow template uses this kind for every step — existing templates keep running unchanged. |
 
 ### Triggers
@@ -133,7 +133,7 @@ These connect over HTTP to a running service. No workspace server SSH needed.
 
 #### LLM Providers (for Planning & Reviewing)
 
-These are used for text generation roles (planner, reviewer) rather than direct code execution.
+These are used for text-generation steps (e.g. planning, review) rather than direct code execution.
 
 | Provider | Models | GPU Dashboard | Best For |
 |----------|--------|:------------:|----------|
@@ -152,12 +152,12 @@ AgenticKode's plugin architecture makes it easy to add new agents:
 Use different agents for different steps in the same workflow:
 
 ```
-plan    →  agent[role: planner]   →  Ollama (qwen2.5-coder:32b)   # Fast, free, local
-code    →  agent[role: coder]     →  Claude CLI                    # Best code quality
-review  →  agent[role: reviewer]  →  Ollama (qwen2.5-coder:14b)   # Cost-effective review
+plan    step  →  agent: ollama  (qwen2.5-coder:32b)   # Fast, free, local
+code    step  →  agent: claude  (Claude CLI)           # Best code quality
+review  step  →  agent: ollama  (qwen2.5-coder:14b)    # Cost-effective review
 ```
 
-**Workflow templates**: Create templates that auto-fire on triggers (`label: bug`, `issue_event: opened`, `schedule: "0 * * * *"`, etc.). Each step inside a template can override the agent, prompt, and timeout independently. See [ADR-007](claudedocs/decisions/007-composable-step-workflows.md) for the design rationale.
+**Triggers**: Runs auto-fire on triggers (`label: bug`, `issue_event: opened`, `schedule: "0 * * * *"`, PR events, etc.) and dispatch to a flow prompt — `implement` for issues, `pr-review` for review requests. Legacy step-based workflow templates remain available for back-compat. See [ADR-009](claudedocs/decisions/009-flow-prompts.md) for the current model and [ADR-007](claudedocs/decisions/007-composable-step-workflows.md) for the superseded composable design.
 
 <img src="docs/screenshots/workflows.png" alt="Workflow Templates" width="100%">
 
@@ -252,7 +252,7 @@ AgenticKode includes a dedicated dashboard for managing your Ollama LLM servers:
 - **Register multiple Ollama servers** — connect to Ollama instances across your infrastructure
 - **Health monitoring** — automatic status checks with last-seen timestamps
 - **Model discovery** — auto-fetch available models from each server
-- **Role assignment** — assign specific servers and models to roles (planner, coder, reviewer, custom)
+- **Agent/model selection** — pick which agent and model runs each step (per-step `agent`, or project/global default)
 
 #### GPU Monitoring
 - **Real-time GPU status** — see VRAM usage per loaded model across all servers
@@ -432,7 +432,8 @@ agentickode/
 │   │   ├── notifications/# Slack, Discord, Telegram, webhooks
 │   │   └── backup/       # Export/import with encryption
 │   ├── worker/           # Workflow engine + step runners (bash, agent)
-│   │   └── phases/       # legacy phase implementations (deprecated; see ADR-007)
+│   │   ├── phases/       # legacy phase implementations (deprecated; see ADR-007)
+│   │   └── flow/         # flow-prompt executor + data sources (ADR-009)
 │   ├── repositories/     # Database access layer
 │   ├── models/           # SQLAlchemy models (16+ entities)
 │   └── schemas/          # Pydantic request/response schemas
@@ -456,9 +457,10 @@ agentickode/
 | Document | Description |
 |----------|-------------|
 | [`CLAUDE.md`](CLAUDE.md) | AI agent instructions and project conventions |
-| [`docs/workflows.md`](docs/workflows.md) | Composable workflow reference — step kinds, triggers, templating, migration |
+| [`claudedocs/decisions/009-flow-prompts.md`](claudedocs/decisions/009-flow-prompts.md) | ADR-009 — flow prompts (current model): one agent call + auto-fetched data |
+| [`docs/workflows.md`](docs/workflows.md) | Legacy composable workflow reference — step kinds, triggers, templating (superseded by ADR-009) |
 | [`docs/WORKER_PIPELINE.md`](docs/WORKER_PIPELINE.md) | Legacy 8-phase pipeline reference (preserved for back-compat; see `workflows.md`) |
-| [`claudedocs/decisions/007-composable-step-workflows.md`](claudedocs/decisions/007-composable-step-workflows.md) | ADR-007 — design rationale for the composable model |
+| [`claudedocs/decisions/007-composable-step-workflows.md`](claudedocs/decisions/007-composable-step-workflows.md) | ADR-007 — design rationale for the composable model (superseded by ADR-009) |
 | [`docs/guides/09-webhook-setup.md`](docs/guides/09-webhook-setup.md) | Webhook setup for GitHub, GitLab, Gitea, Plane |
 | [`claudedocs/decisions/`](claudedocs/decisions/) | Architecture decision records |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution guidelines |

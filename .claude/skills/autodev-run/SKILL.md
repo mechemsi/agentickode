@@ -1,6 +1,6 @@
 ---
 name: autodev-run
-description: Use when the user wants to dispatch a coding task to a remote workspace — fixing bugs, implementing features, running the 8-phase pipeline, or creating a PR automatically. Use this even if the user just says "fix the login bug on myproject" or "run this task" or "create a run" or "implement X on Y". Also use when the user asks to approve or reject a pending run.
+description: Use when the user wants to dispatch a coding task to a remote workspace — fixing bugs, implementing features, running an agentic coding run, or creating a PR automatically. Use this even if the user just says "fix the login bug on myproject" or "run this task" or "create a run" or "implement X on Y". Also use when the user asks to approve or reject a pending run.
 ---
 
 # Create & Monitor Run
@@ -102,4 +102,4 @@ for entry in logs[-20:]:
 - Polling interval: 15 seconds for active runs
 - Report each phase change to the user as it happens
 - If a run takes more than 10 minutes, ask the user if they want to keep waiting
-- The 8 phases are: workspace_setup, init, planning, coding, testing, reviewing, approval, finalization
+- The default pipeline steps are: workspace_setup, init, planning, coding, testing, reviewing, approval, finalization (flow prompts replace these with a single agent call — ADR-009)
