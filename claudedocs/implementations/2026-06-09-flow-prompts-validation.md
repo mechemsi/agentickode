@@ -48,6 +48,20 @@ wrongly run an implement (code-writing) job against a PR. **Fix** (`backend/work
 `_defaults_to_implement_flow(run)` excludes `review_mode` runs from the implement default; they
 fall through to the template path. Regression test added.
 
+## Implement (task) flow — validated structurally; blocked on non-root agent provisioning
+Ran a real implement task (run #49) on the local platform server. **`workspace_setup` now works**
+(fixed: `LocalCommandService` lacked a `port` attr that `workspace_setup` logs) — it cloned the
+repo, created the branch, fetched context, and dispatched the agent. The agent call then failed:
+claude `run_task` uses `--dangerously-skip-permissions`, which **refuses to run as root**. So
+claude task-mode *requires* a non-root user — but the local container has no provisioned non-root
+agent user (with claude creds + binary). PR-review (`generate`) works as root; implement (`task`)
+does not. This is the **same provisioning gap** and would block the **template path's coding phase
+identically** — an environment/ops task (WorkerUserService-style provisioning of the platform
+server's worker user), not a flow-prompt defect.
+
+**Net:** both engines (template and flow) are equally unable to run autonomous *coding* tasks on
+the platform server until a non-root, claude-authenticated worker user is provisioned there.
+
 ## Follow-up noted
 - The flow executor uses the pure `run_agent_step`, which does **not** record an
   `AgentInvocation` — so flow runs currently lack per-run agent cost records. To wire up before
