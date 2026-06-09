@@ -293,17 +293,28 @@ async def _skip_phases_for_consolidated(
 async def execute_pipeline(run: TaskRun, session: AsyncSession, services: ServiceContainer) -> None:
     """Execute the pipeline phase-by-phase using PhaseExecution rows.
 
-    ADR-009: when flow prompts are enabled and the run is bound to one, hand off
-    to the slimmed single-agent-call executor instead of the phase pipeline.
-    Additive — off by default, templates unaffected.
+    ADR-009: when flow prompts are enabled, runs execute via the slimmed
+    single-agent-call flow path. Phase 1/2 bound specific runs (e.g. PR-review)
+    to a flow prompt; Phase 3 makes flow prompts the DEFAULT — a run with no
+    explicit ``flow_prompt_id`` falls back to the ``implement`` flow prompt.
+    Off by default, templates unaffected.
     """
     from backend.config import settings
 
-    if settings.flow_prompts_enabled and run.flow_prompt_id:
-        from backend.worker.flow.executor import execute_flow_prompt
+    if settings.flow_prompts_enabled:
+        if not run.flow_prompt_id:
+            # Phase 3: default new runs to the implement flow prompt.
+            from backend.repositories.flow_prompt_repo import FlowPromptRepository
 
-        await execute_flow_prompt(run, session, services)
-        return
+            default_flow = await FlowPromptRepository(session).get_by_flow_type("implement")
+            if default_flow:
+                run.flow_prompt_id = default_flow.id
+                await session.commit()
+        if run.flow_prompt_id:
+            from backend.worker.flow.executor import execute_flow_prompt
+
+            await execute_flow_prompt(run, session, services)
+            return
 
     run.status = "running"
     run.started_at = run.started_at or datetime.now(UTC)

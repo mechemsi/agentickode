@@ -4,12 +4,14 @@
 
 """Workflow template CRUD + label matching endpoint."""
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import settings
 from backend.database import get_db
 from backend.models import WorkflowTemplate
 from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
@@ -20,6 +22,8 @@ from backend.schemas import (
 )
 from backend.services.triggers import TriggerEvent, TriggerMatcher
 from backend.worker.phases.registry import discover_phases
+
+logger = logging.getLogger("agentickode.api.workflow_templates")
 
 router = APIRouter(tags=["workflow-templates"])
 
@@ -151,6 +155,15 @@ async def create_workflow_template(
     body: WorkflowTemplateCreate,
     repo: WorkflowTemplateRepository = Depends(_get_repo),
 ):
+    # ADR-009 Phase 3: workflow templates are deprecated in favour of flow prompts.
+    # Creation still works (for transition), but is discouraged when flow prompts
+    # are enabled — new runs default to the implement flow prompt.
+    if settings.flow_prompts_enabled:
+        logger.warning(
+            "Workflow template creation is deprecated (ADR-009) — flow prompts are enabled; "
+            "new runs default to the implement flow prompt. Created template %r anyway.",
+            body.name,
+        )
     template = WorkflowTemplate(
         name=body.name,
         description=body.description,
