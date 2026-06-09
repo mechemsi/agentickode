@@ -221,6 +221,7 @@ async def check_workspace_readiness(
                         server_name=server.name,
                         status="ready",
                         path=expected_path,
+                        worker_user=server.worker_user,
                     )
                 )
             else:
@@ -230,6 +231,7 @@ async def check_workspace_readiness(
                         server_name=server.name,
                         status="not_cloned",
                         path=expected_path,
+                        worker_user=server.worker_user,
                     )
                 )
         except Exception as exc:
@@ -239,6 +241,7 @@ async def check_workspace_readiness(
                     server_name=server.name,
                     status="unreachable",
                     error=str(exc)[:200],
+                    worker_user=server.worker_user,
                 )
             )
 

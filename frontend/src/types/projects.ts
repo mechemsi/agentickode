@@ -68,6 +68,7 @@ export interface WorkspaceReadinessItem {
   status: "ready" | "not_cloned" | "error" | "unreachable";
   path: string | null;
   error: string | null;
+  worker_user?: string | null;
 }
 
 export interface WorkspaceReadinessResponse {

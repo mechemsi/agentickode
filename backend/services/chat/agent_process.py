@@ -131,11 +131,20 @@ def _wrap_runuser(cmd_str: str, run_as_user: str | None) -> str:
     return f"runuser -l {shlex.quote(run_as_user)} -c {shlex.quote(cmd_str)}"
 
 
-def _make_readable(*paths: str) -> None:
-    """Make temp files readable by a non-root ``runuser`` child (0o644)."""
+def _grant_user_read(run_as_user: str, *paths: str) -> None:
+    """Give the ``runuser`` child read access to temp files without exposing them
+    to every other local user: chown to the target uid, keep mode 0o600.
+    """
+    import pwd
+
+    try:
+        uid = pwd.getpwnam(run_as_user).pw_uid
+    except KeyError:
+        return
     for path in paths:
         with contextlib.suppress(OSError):
-            os.chmod(path, 0o644)
+            os.chown(path, uid, -1)
+            os.chmod(path, 0o600)
 
 
 def is_agent_available(agent_name: str) -> bool:
@@ -193,7 +202,7 @@ async def invoke_agent(
     msg_path = _write_message_file(message)
     mcp_config_path = _write_mcp_config(platform_url)
     if run_as_user:
-        _make_readable(msg_path, mcp_config_path)
+        _grant_user_read(run_as_user, msg_path, mcp_config_path)
 
     try:
         # Build command
@@ -281,7 +290,7 @@ async def invoke_agent_streaming(
     msg_path = _write_message_file(message)
     mcp_config_path = _write_mcp_config(platform_url)
     if run_as_user:
-        _make_readable(msg_path, mcp_config_path)
+        _grant_user_read(run_as_user, msg_path, mcp_config_path)
 
     try:
         template = cmds["new"] if is_new_session else cmds["resume"]

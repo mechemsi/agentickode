@@ -36,11 +36,19 @@ NULL `worker_user` keep the current in-container-root behaviour (zero regression
 - Backend import smoke OK; new unit tests pass; full suite green; ruff + pyright clean.
 - 37 related (chat/seed/terminal/ws) tests pass.
 
-## Deferred (follow-up)
-- **tmux local-terminal sessions** (`local_terminals.py` create/resume + `ws.py:_attach_to_tmux`)
-  with a `run_as_user` column + migration — more PTY/ownership complexity.
-- **`LaunchAgentModal`** passing `worker_user` instead of hard-coded `"root"`.
-- The **host-side setup** (WSL2 `sshd`, authorized_keys) is the operator's step per the runbook.
+## Follow-up — now also done (2026-06-09)
+The deferred bits landed in a second pass:
+- **tmux local-terminal sessions**: `local_terminals.py` (`_tmux` helper) wraps create/resume/close
+  + `_tmux_exists`; `ws.py:_attach_to_tmux` (`_runuser` helper) wraps has-session/new-session/
+  send-keys/attach. The user is stored on `local_terminal_sessions.run_as_user` (migration 042 +
+  main.py guard) so resume/attach hit the same per-user tmux server.
+- **`LaunchAgentModal`**: passes `ws.worker_user || "root"`; `worker_user` added to
+  `WorkspaceReadinessItem` (backend schema + `check_workspace_readiness` + frontend type).
+- **Security fix**: chat temp files are now chowned to the target uid and kept 0o600 (was 0o644,
+  flagged by the security review) — `agent_process._grant_user_read`.
+
+## Still the operator's step
+- The **host-side setup** (WSL2 `sshd`, authorized_keys) for the SSH-to-host path — per the runbook.
 
 ## Notes
 - Activation is gated entirely on the platform server's `worker_user` (set via `PLATFORM_USER`)

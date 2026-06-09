@@ -1,6 +1,6 @@
 ---
 title: "Terminal + Chat Agent Launch as Selected User"
-status: partial
+status: implemented
 date: 2026-06-08
 related:
   - plans/2026-05-24-workspace-config.md
@@ -9,13 +9,18 @@ related:
 
 # Terminal + Chat Agent Launch as Selected User
 
-> **STATUS (2026-06-09): partial.** Done (no-op when `worker_user` is unset): the local
-> **terminal PTY** (`ws.py:_local_pty_terminal` runs `runuser -l <user>`) and the **chat agent**
-> (`agent_process.invoke_agent`/`invoke_agent_streaming` wrap the command via `runuser`, temp
-> files made readable; `chat_service` resolves the user via `get_platform_run_as_user`).
-> **Deferred:** local-terminal **tmux** create/resume/attach (`local_terminals.py` + `ws.py:_attach_to_tmux`)
-> with the `run_as_user` column, and the `LaunchAgentModal` frontend default. Activates only
-> once the platform server's `worker_user` is set (via `PLATFORM_USER`, see host-default-workspace).
+> **STATUS (2026-06-09): implemented** (all no-op when `worker_user` is unset).
+> - **Terminal PTY** — `ws.py:_local_pty_terminal` runs `runuser -l <user> -c bash`.
+> - **Chat agent** — `agent_process` wraps the command via `runuser`; temp files chowned to the
+>   target uid (kept 0o600); `chat_service` resolves the user via `get_platform_run_as_user`.
+> - **Local-terminal tmux** — `local_terminals.py` (create/resume/close) + `ws.py:_attach_to_tmux`
+>   wrap every tmux op (`new-session`/`set-option`/`send-keys`/`attach`/`has-session`/`kill`) with
+>   `runuser`; the chosen user is stored on `local_terminal_sessions.run_as_user` (migration 042)
+>   so resume/attach use the same user (tmux server is per-user).
+> - **LaunchAgentModal** — passes the server's `worker_user` (now on `WorkspaceReadinessItem`)
+>   instead of hard-coded `"root"`.
+>
+> Activates once the platform server's `worker_user` is set (via `PLATFORM_USER`).
 
 ## Goal
 
