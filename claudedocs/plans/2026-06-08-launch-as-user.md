@@ -1,6 +1,6 @@
 ---
 title: "Terminal + Chat Agent Launch as Selected User"
-status: planned
+status: partial
 date: 2026-06-08
 related:
   - plans/2026-05-24-workspace-config.md
@@ -8,6 +8,14 @@ related:
 ---
 
 # Terminal + Chat Agent Launch as Selected User
+
+> **STATUS (2026-06-09): partial.** Done (no-op when `worker_user` is unset): the local
+> **terminal PTY** (`ws.py:_local_pty_terminal` runs `runuser -l <user>`) and the **chat agent**
+> (`agent_process.invoke_agent`/`invoke_agent_streaming` wrap the command via `runuser`, temp
+> files made readable; `chat_service` resolves the user via `get_platform_run_as_user`).
+> **Deferred:** local-terminal **tmux** create/resume/attach (`local_terminals.py` + `ws.py:_attach_to_tmux`)
+> with the `run_as_user` column, and the `LaunchAgentModal` frontend default. Activates only
+> once the platform server's `worker_user` is set (via `PLATFORM_USER`, see host-default-workspace).
 
 ## Goal
 

@@ -21,6 +21,7 @@ import contextlib
 import json
 import logging
 import os
+import shlex
 import shutil
 import tempfile
 from collections.abc import AsyncIterator
@@ -119,6 +120,24 @@ def _write_message_file(message: str) -> str:
     return msg_path
 
 
+def _wrap_runuser(cmd_str: str, run_as_user: str | None) -> str:
+    """Wrap a shell command to run as ``run_as_user`` via ``runuser`` (login shell).
+
+    No-op when ``run_as_user`` is falsy (runs as the backend process user — the
+    pre-existing behaviour).
+    """
+    if not run_as_user:
+        return cmd_str
+    return f"runuser -l {shlex.quote(run_as_user)} -c {shlex.quote(cmd_str)}"
+
+
+def _make_readable(*paths: str) -> None:
+    """Make temp files readable by a non-root ``runuser`` child (0o644)."""
+    for path in paths:
+        with contextlib.suppress(OSError):
+            os.chmod(path, 0o644)
+
+
 def is_agent_available(agent_name: str) -> bool:
     """Check if an agent CLI is installed locally."""
     cmds = AGENT_COMMANDS.get(agent_name)
@@ -137,6 +156,7 @@ async def invoke_agent(
     is_new_session: bool = True,
     platform_url: str = "http://localhost:8000",
     timeout: float = 120.0,
+    run_as_user: str | None = None,
 ) -> InvocationResult:
     """Invoke an agent with a single message.
 
@@ -172,6 +192,8 @@ async def invoke_agent(
     # Write message to file to avoid shell escaping issues
     msg_path = _write_message_file(message)
     mcp_config_path = _write_mcp_config(platform_url)
+    if run_as_user:
+        _make_readable(msg_path, mcp_config_path)
 
     try:
         # Build command
@@ -191,6 +213,7 @@ async def invoke_agent(
                 mcp_config=mcp_config_path,
             )
 
+        cmd_str = _wrap_runuser(cmd_str, run_as_user)
         env = {**os.environ, "AGENTICKODE_URL": platform_url}
 
         logger.info("Invoking %s (session=%s, new=%s)", agent_name, session_id[:8], is_new_session)
@@ -240,6 +263,7 @@ async def invoke_agent_streaming(
     is_new_session: bool = True,
     platform_url: str = "http://localhost:8000",
     timeout: float = 120.0,
+    run_as_user: str | None = None,
 ) -> AsyncIterator[str]:
     """Invoke an agent and stream output chunks as they arrive.
 
@@ -256,6 +280,8 @@ async def invoke_agent_streaming(
 
     msg_path = _write_message_file(message)
     mcp_config_path = _write_mcp_config(platform_url)
+    if run_as_user:
+        _make_readable(msg_path, mcp_config_path)
 
     try:
         template = cmds["new"] if is_new_session else cmds["resume"]
@@ -272,6 +298,7 @@ async def invoke_agent_streaming(
                 mcp_config=mcp_config_path,
             )
 
+        cmd_str = _wrap_runuser(cmd_str, run_as_user)
         env = {**os.environ, "AGENTICKODE_URL": platform_url}
 
         proc = await asyncio.create_subprocess_shell(

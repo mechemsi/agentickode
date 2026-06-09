@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     default_ssh_key_path: str = "/app/.ssh/id_ed25519"
     sandbox_templates_path: str = "/opt/agentickode/docker/sandboxes"
 
+    # Platform (built-in "platform" workspace server = the host machine)
+    # platform_user: OS user that platform terminal/chat/agent launches run as
+    #   (via runuser). Empty = run as the backend process user (root) — default.
+    platform_user: str = ""
+    # platform_ssh_host: when set (e.g. "host-gateway"), the platform server is
+    #   seeded as a REMOTE SSH target so it executes on the real host instead of
+    #   inside the backend container. Requires host sshd + the container's key in
+    #   the host's authorized_keys (see runbooks/platform-host-execution.md).
+    #   Empty = keep in-container local execution — default, no host setup needed.
+    platform_ssh_host: str = ""
+    platform_ssh_port: int = 22
+    platform_workspace_root: str = ""  # host-side workspace root when SSH-to-host
+
     # Encryption
     encryption_key: str = ""
 

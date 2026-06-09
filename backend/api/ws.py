@@ -57,8 +57,13 @@ async def ws_global_events(websocket: WebSocket):
         broadcaster.unsubscribe_global(queue)
 
 
-async def _local_pty_terminal(websocket: WebSocket) -> None:
-    """Bridge a browser xterm.js to a local bash PTY (for the platform server)."""
+async def _local_pty_terminal(websocket: WebSocket, run_as_user: str | None = None) -> None:
+    """Bridge a browser xterm.js to a local bash PTY (for the platform server).
+
+    When ``run_as_user`` is set, the shell launches as that OS user via
+    ``runuser`` (the platform container runs as root). When ``None`` it runs as
+    the backend process user — the pre-existing behaviour.
+    """
     import fcntl
     import pty
     import struct
@@ -66,7 +71,10 @@ async def _local_pty_terminal(websocket: WebSocket) -> None:
 
     pid, fd = pty.fork()
     if pid == 0:  # child
-        os.execvp("bash", ["bash"])
+        if run_as_user:
+            os.execvp("runuser", ["runuser", "-l", run_as_user, "-c", "bash"])
+        else:
+            os.execvp("bash", ["bash"])
         return
 
     # Set initial terminal size
@@ -138,9 +146,10 @@ async def ws_terminal(websocket: WebSocket, server_id: int, user: str | None = N
         await websocket.close()
         return
 
-    # Local platform server: use a local PTY via subprocess
+    # Local platform server: use a local PTY via subprocess, as the configured
+    # worker user when set (else as root — current behaviour).
     if getattr(server, "server_type", "remote") == "local":
-        await _local_pty_terminal(websocket)
+        await _local_pty_terminal(websocket, run_as_user=server.worker_user or None)
         return
 
     ssh = SSHService.for_server(server)
