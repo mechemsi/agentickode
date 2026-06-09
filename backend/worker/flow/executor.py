@@ -28,7 +28,11 @@ from backend.repositories.flow_prompt_repo import FlowPromptRepository
 from backend.services.container import ServiceContainer
 from backend.worker.broadcaster import broadcaster
 from backend.worker.flow.data_sources import fetch_flow_data
-from backend.worker.phases._helpers import close_run_session, get_workspace_server_id
+from backend.worker.phases._helpers import (
+    close_run_session,
+    ensure_agent_ready,
+    get_workspace_server_id,
+)
 from backend.worker.steps.agent_step import run_agent_step
 
 logger = logging.getLogger("agentickode.flow.executor")
@@ -97,6 +101,21 @@ async def execute_flow_prompt(
         run.current_phase = "agent"
         await broadcaster.event(run.id, "phase_changed", {"phase": "agent"})
         await broadcaster.log(run.id, f"Running flow prompt: {flow.name}", phase="agent")
+
+        # Ensure the CLI agent is installed for the run-as (worker) user before
+        # invoking it — parity with the legacy coding/reviewing phases. No-op for
+        # root / non-CLI adapters; installs into the worker user's home otherwise.
+        resolved = await services.agent_resolver.resolve_agent(
+            flow.agent, session, run.workspace_server_id, project_id=run.project_id
+        )
+
+        async def _agent_log(msg: str, level: str = "info") -> None:
+            await broadcaster.log(run.id, msg, level=level, phase="agent")
+
+        await ensure_agent_ready(
+            resolved.adapter, log_fn=_agent_log, agent_settings=resolved.agent_settings
+        )
+
         result = await run_agent_step(
             run,
             session,
