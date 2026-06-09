@@ -19,7 +19,6 @@ from backend.schemas import (
     AgentInvocationDetail,
     AgentInvocationOut,
     PhaseExecutionOut,
-    PickWinnerRequest,
     PlanReviewRequest,
 )
 
@@ -143,46 +142,3 @@ async def get_invocation_detail(
     if not inv:
         raise HTTPException(404, "Invocation not found")
     return inv
-
-
-@router.post("/runs/{run_id}/comparison/pick-winner")
-async def pick_comparison_winner(
-    run_id: int,
-    body: PickWinnerRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    repo = TaskRunRepository(db)
-    run = await repo.get_by_id(run_id)
-    if not run:
-        raise HTTPException(404, "Run not found")
-
-    coding: dict = {**(run.coding_results or {})}
-    if not coding.get("comparison_mode"):
-        raise HTTPException(400, "Run is not in comparison mode")
-
-    if body.winner not in ("a", "b"):
-        raise HTTPException(400, "winner must be 'a' or 'b'")
-
-    agents = coding.get("agents", {})
-    if body.winner not in agents:
-        raise HTTPException(400, f"No agent data for '{body.winner}'")
-
-    # Update winner in coding_results
-    coding["winner"] = body.winner
-    run.coding_results = coding
-    run.updated_at = datetime.now(UTC)
-    await db.commit()
-
-    winner_info = agents[body.winner]
-    logger.info(
-        "Run #%d comparison winner: %s (%s)",
-        run_id,
-        body.winner,
-        winner_info.get("agent_name"),
-    )
-    return {
-        "status": "winner_picked",
-        "winner": body.winner,
-        "agent_name": winner_info.get("agent_name"),
-        "branch": winner_info.get("branch"),
-    }

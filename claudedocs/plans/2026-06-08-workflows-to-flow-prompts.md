@@ -38,7 +38,17 @@ related:
 >
 > **Phase 3 (default + deprecate templates) — DONE 2026-06-09** (flag on → runs with no explicit
 > flow prompt default to the `implement` flow prompt; template creation logs a deprecation warning).
-> See [implementation](../implementations/2026-06-09-flow-prompts-phase3-default.md). Phases 4–5 pending.
+> See [implementation](../implementations/2026-06-09-flow-prompts-phase3-default.md).
+>
+> **Both flows validated live** (real agent output): PR-review #48 + implement #51; 7 bugs fixed.
+> See [validation](../implementations/2026-06-09-flow-prompts-validation.md).
+>
+> **Phase 4 (partial) — comparison mode removed 2026-06-09** (ADR-009 OQ-5): deleted
+> `_comparison.py`, the coding-phase A/B branch, the pick-winner endpoint + `PickWinnerRequest`,
+> and the frontend `ComparisonResultsPanel`/types/api. **Remaining Phase 4:** remove the
+> WorkflowTemplates UI (pages/components/nav + NewRun/Dashboard/RunDetail references).
+> **Phase 5 (irreversible) held** — needs flow prompts as the working prod default first
+> (durable non-root claude-worker provisioning + flag-on + devbox claude auth).
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
