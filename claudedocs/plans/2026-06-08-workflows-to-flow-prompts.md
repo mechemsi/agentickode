@@ -26,6 +26,11 @@ related:
 > - OQ-7 → **drop** the `workflow_templates` table; null the FK (irreversible, accepted).
 >
 > Implementation is now unblocked; ADR-009 defines a 5-phase rollout (additive first, table drops last).
+>
+> **Phase 1 (additive, flag-gated) — DONE 2026-06-09** (`flow_prompts` table + `flow_prompt_id` +
+> data-source registry + `execute_flow_prompt` executor + `FLOW_PROMPTS_ENABLED` flag, off by
+> default; seed). See [implementation](../implementations/2026-06-09-flow-prompts-phase1.md).
+> Phases 2–5 pending.
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require

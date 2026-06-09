@@ -110,6 +110,27 @@ async def _run_migrations() -> None:
     await _run_migration_step("ALTER TABLE workspace_servers ADD COLUMN setup_log JSONB")
     await _run_migration_step("ALTER TABLE workspace_servers ADD COLUMN workspace_folders JSONB")
     await _run_migration_step("ALTER TABLE local_terminal_sessions ADD COLUMN run_as_user TEXT")
+    # ADR-009 flow prompts (Phase 1, additive)
+    await _run_migration_step("""
+        CREATE TABLE IF NOT EXISTS flow_prompts (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            flow_type TEXT NOT NULL DEFAULT 'implement',
+            prompt TEXT NOT NULL,
+            agent TEXT,
+            agent_mode TEXT NOT NULL DEFAULT 'task',
+            extra_data_sources JSONB,
+            triggers JSONB,
+            is_system BOOLEAN NOT NULL DEFAULT FALSE,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+    await _run_migration_step(
+        "ALTER TABLE task_runs ADD COLUMN flow_prompt_id INTEGER "
+        "REFERENCES flow_prompts(id) ON DELETE SET NULL"
+    )
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS agent_settings (
             id SERIAL PRIMARY KEY,

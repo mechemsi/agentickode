@@ -29,6 +29,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [Simplify project creation](implementations/2026-06-08-simplify-project-creation.md) | 2026-06-08 | Minimal `ProjectForm` (URL + name + polling) with Advanced disclosure for autopopulated fields |
 | [gh CLI check + multiple workspace folders](implementations/2026-06-08-gh-check-and-workspace-folders.md) | 2026-06-08 | `check_gh_cli` endpoint + GitAccessPanel badge; `workspace_folders` JSONB multi-root scan + form UI (migration 041) |
 | [Platform run-as-user + SSH-to-host scaffolding](implementations/2026-06-09-host-execution-runuser.md) | 2026-06-09 | Terminal/chat run as `worker_user` via `runuser`; `PLATFORM_*` config + seed switch to SSH-to-host (OFF by default); runbook |
+| [Flow prompts — Phase 1](implementations/2026-06-09-flow-prompts-phase1.md) | 2026-06-09 | ADR-009 Phase 1 (additive, flag-gated): `flow_prompts` table + `flow_prompt_id` + data-source registry + single-agent-call executor; off by default (migration 043) |
 
 ## Decisions
 

@@ -81,6 +81,9 @@ class TaskRun(Base):
     # Workflow linkage
     parent_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=True)
     workflow_template_id = Column(Integer, ForeignKey("workflow_templates.id"), nullable=True)
+    # ADR-009: when set (and FLOW_PROMPTS_ENABLED), the run uses the slimmed
+    # single-agent-call flow-prompt path instead of the phase pipeline.
+    flow_prompt_id = Column(Integer, ForeignKey("flow_prompts.id"), nullable=True)
 
     project = relationship("ProjectConfig", back_populates="runs")
     logs = relationship("TaskLog", back_populates="run", cascade="all, delete-orphan")

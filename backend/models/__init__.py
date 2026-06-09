@@ -12,6 +12,7 @@ from backend.models.agents import (
 from backend.models.base import Base
 from backend.models.chat import ChatSession
 from backend.models.episodes import Episode
+from backend.models.flow_prompts import FlowPrompt
 from backend.models.git_connections import GitConnection
 from backend.models.instructions import ProjectInstruction, ProjectInstructionVersion, ProjectSecret
 from backend.models.notifications import NotificationChannel
@@ -37,6 +38,7 @@ __all__ = [
     "CliSession",
     "DiscoveredAgent",
     "Episode",
+    "FlowPrompt",
     "GitConnection",
     "MonitoringRule",
     "NotificationChannel",
