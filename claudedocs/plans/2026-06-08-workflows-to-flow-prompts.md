@@ -43,10 +43,13 @@ related:
 > **Both flows validated live** (real agent output): PR-review #48 + implement #51; 7 bugs fixed.
 > See [validation](../implementations/2026-06-09-flow-prompts-validation.md).
 >
-> **Phase 4 (partial) — comparison mode removed 2026-06-09** (ADR-009 OQ-5): deleted
-> `_comparison.py`, the coding-phase A/B branch, the pick-winner endpoint + `PickWinnerRequest`,
-> and the frontend `ComparisonResultsPanel`/types/api. **Remaining Phase 4:** remove the
-> WorkflowTemplates UI (pages/components/nav + NewRun/Dashboard/RunDetail references).
+> **Phase 4 — DONE 2026-06-09** (frontend UI removal + comparison removal):
+> - 4a: comparison (A/B) mode removed (`_comparison.py`, coding-phase branch, pick-winner
+>   endpoint + `PickWinnerRequest`, frontend `ComparisonResultsPanel`/types/api).
+> - 4b: WorkflowTemplates UI removed — page, step editors, nav link, route; untangled the
+>   `NewRun` template selector, `Dashboard`/`TaskRunTable` workflow-name column, and `RunDetail`
+>   workflow display; deleted `api/workflows.ts`. Backend template API/model **kept** (Phase 5).
+>
 > **Phase 5 (irreversible) held** — needs flow prompts as the working prod default first
 > (durable non-root claude-worker provisioning + flag-on + devbox claude auth).
 

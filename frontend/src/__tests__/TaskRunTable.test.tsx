@@ -53,27 +53,4 @@ describe("TaskRunTable", () => {
     expect(link).toHaveAttribute("href", "/runs/1");
   });
 
-  it("shows workflow name when workflowNames map is provided", () => {
-    const runWithWorkflow: TaskRun = { ...baseMockRun, workflow_template_id: 3 };
-    const workflowNames = new Map([[3, "pr-review"]]);
-    render(
-      <MemoryRouter>
-        <TaskRunTable runs={[runWithWorkflow]} workflowNames={workflowNames} />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("pr-review")).toBeInTheDocument();
-  });
-
-  it("shows dash when run has no workflow template", () => {
-    render(
-      <MemoryRouter>
-        <TaskRunTable
-          runs={[baseMockRun]}
-          workflowNames={new Map([[1, "default"]])}
-        />
-      </MemoryRouter>,
-    );
-    // The Workflow column header exists
-    expect(screen.getByText("Workflow")).toBeInTheDocument();
-  });
 });

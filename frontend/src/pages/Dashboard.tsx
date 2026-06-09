@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutDashboard, Search } from "lucide-react";
-import { getAnalytics, getRuns, getStats, getWorkflowTemplates } from "../api";
+import { getAnalytics, getRuns, getStats } from "../api";
 import { BASE } from "../api/client";
 import AnalyticsCharts from "../components/shared/AnalyticsCharts";
 import FilterBar from "../components/shared/FilterBar";
@@ -26,9 +26,6 @@ export default function Dashboard() {
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [workflowNames, setWorkflowNames] = useState<Map<number, string>>(
-    new Map(),
-  );
 
   // Debounce search
   useEffect(() => {
@@ -43,7 +40,7 @@ export default function Dashboard() {
   useEffect(() => { setOffset(0); }, [filter]);
 
   const load = useCallback(async () => {
-    const [r, s, templates, a] = await Promise.all([
+    const [r, s, a] = await Promise.all([
       getRuns({
         status: filter || undefined,
         search: debouncedSearch || undefined,
@@ -53,13 +50,11 @@ export default function Dashboard() {
         offset,
       }),
       getStats(),
-      getWorkflowTemplates(),
       getAnalytics(),
     ]);
     setRuns(r.items);
     setTotal(r.total);
     setStats(s);
-    setWorkflowNames(new Map(templates.map((t) => [t.id, t.name])));
     setAnalytics(a);
   }, [filter, debouncedSearch, sortBy, sortOrder, offset]);
 
@@ -118,7 +113,6 @@ export default function Dashboard() {
       <FilterBar value={filter} onChange={setFilter} />
       <TaskRunTable
         runs={runs}
-        workflowNames={workflowNames}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}

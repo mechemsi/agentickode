@@ -15,7 +15,6 @@ import NewRun from "./pages/NewRun";
 import Projects from "./pages/Projects";
 import RunDetail from "./pages/RunDetail";
 import Settings from "./pages/Settings";
-import WorkflowTemplates from "./pages/WorkflowTemplates";
 import Chat from "./pages/Chat";
 import WorkspaceServers from "./pages/WorkspaceServers";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
@@ -38,7 +37,6 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/workspace-servers" element={<WorkspaceServers />} />
                 <Route path="/gpu-dashboard" element={<GpuDashboard />} />
                 <Route path="/agents" element={<AgentSettingsPage />} />
-                <Route path="/workflows" element={<WorkflowTemplates />} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/chat/:sessionId" element={<Chat />} />
                 <Route path="/settings" element={<Settings />} />
