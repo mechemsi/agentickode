@@ -40,7 +40,6 @@ function formatCost(cost: number | null): string | null {
 
 interface Props {
   runs: TaskRun[];
-  workflowNames?: Map<number, string>;
   sortBy?: string;
   sortOrder?: string;
   onSort?: (column: string) => void;
@@ -51,7 +50,7 @@ function SortIcon({ column, sortBy, sortOrder }: { column: string; sortBy?: stri
   return sortOrder === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
 }
 
-export default function TaskRunTable({ runs, workflowNames, sortBy, sortOrder, onSort }: Props) {
+export default function TaskRunTable({ runs, sortBy, sortOrder, onSort }: Props) {
   if (!runs.length)
     return (
       <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
@@ -91,7 +90,6 @@ export default function TaskRunTable({ runs, workflowNames, sortBy, sortOrder, o
             <th className="py-2.5 pr-4 hidden md:table-cell text-gray-500 font-medium text-xs uppercase tracking-wider">
               <span className="inline-flex items-center gap-1"><DollarSign className="w-3 h-3" />Cost</span>
             </th>
-            <th className="py-2.5 pr-4 hidden sm:table-cell text-gray-500 font-medium text-xs uppercase tracking-wider">Workflow</th>
             <th
               className="py-2.5 hidden sm:table-cell text-gray-500 font-medium text-xs uppercase tracking-wider cursor-pointer hover:text-gray-300 select-none"
               onClick={() => onSort?.("created_at")}
@@ -145,11 +143,6 @@ export default function TaskRunTable({ runs, workflowNames, sortBy, sortOrder, o
                   {cost ? (
                     <span className="text-green-400">{cost}</span>
                   ) : "—"}
-                </td>
-                <td className="py-2.5 pr-4 text-gray-400 hidden sm:table-cell">
-                  {r.workflow_template_id
-                    ? (workflowNames?.get(r.workflow_template_id) ?? "—")
-                    : "—"}
                 </td>
                 <td className="py-2.5 text-gray-500 hidden sm:table-cell">
                   {timeAgo(r.created_at)}

@@ -9,7 +9,6 @@ import {
   advancePhase,
   cancelRun,
   getRun,
-  getWorkflowTemplate,
   restartRun,
   retryRun,
 } from "../api";
@@ -40,21 +39,12 @@ export default function RunDetail() {
   const runId = Number(id);
   const [run, setRun] = useState<TRD | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
-  const [workflowName, setWorkflowName] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
 
   const load = useCallback(async () => {
     const r = await getRun(runId);
     setRun(r);
-    if (r.workflow_template_id && !workflowName) {
-      try {
-        const t = await getWorkflowTemplate(r.workflow_template_id);
-        setWorkflowName(t.name);
-      } catch {
-        setWorkflowName(null);
-      }
-    }
-  }, [runId, workflowName]);
+  }, [runId]);
 
   useEffect(() => {
     load();
@@ -151,12 +141,6 @@ export default function RunDetail() {
           <Info label="Source" value={`${run.task_source} / ${run.git_provider}`} />
           <Info label="Workspace" value={run.workspace_path} />
           <Info label="Retries" value={`${run.retry_count} / ${run.max_retries ?? 3}`} />
-          {run.workflow_template_id && (
-            <Info
-              label="Workflow"
-              value={workflowName ?? `Template #${run.workflow_template_id}`}
-            />
-          )}
           {run.use_claude_api && <Info label="Claude API" value="Yes" />}
           {sourcePrUrl && (
             <Info

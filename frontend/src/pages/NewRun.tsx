@@ -9,22 +9,16 @@ import {
   createRun,
   getProjectIssues,
   getProjects,
-  getWorkflowTemplates,
   getWorkspaceServers,
 } from "../api";
 import { useToast } from "../components/shared/Toast";
 import { AGENT_NAMES } from "../types";
-import type { GitIssue, ProjectConfig, WorkflowTemplate, WorkspaceServer } from "../types";
+import type { GitIssue, ProjectConfig, WorkspaceServer } from "../types";
 
 /**
  * Phase names whose per-step agent the user can override at run-create time.
- *
- * Used as a fallback when no `workflow_template_id` is selected yet. When a
- * template IS selected, we pull the list from that template's `phases[]` so
- * composable workflows (with bash/agent steps named anything) show the right
- * override slots.
  */
-const FALLBACK_PHASES_WITH_AGENTS = [
+const PHASES_WITH_AGENTS = [
   "workspace_setup",
   "init",
   "planning",
@@ -38,14 +32,12 @@ export default function NewRun() {
   const toast = useToast();
 
   const [projects, setProjects] = useState<ProjectConfig[]>([]);
-  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [servers, setServers] = useState<WorkspaceServer[]>([]);
 
   const [projectId, setProjectId] = useState("");
   const selectedProject = projects.find((p) => p.project_id === projectId) ?? null;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [workflowTemplateId, setWorkflowTemplateId] = useState<number | "">("");
   const [labels, setLabels] = useState("");
   const [runType] = useState("ai_task");
 
@@ -65,13 +57,10 @@ export default function NewRun() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    Promise.all([getProjects(), getWorkflowTemplates(), getWorkspaceServers()]).then(
-      ([p, t, s]) => {
-        setProjects(p);
-        setTemplates(t);
-        setServers(s);
-      },
-    );
+    Promise.all([getProjects(), getWorkspaceServers()]).then(([p, s]) => {
+      setProjects(p);
+      setServers(s);
+    });
   }, []);
 
   useEffect(() => {
@@ -146,7 +135,6 @@ export default function NewRun() {
         project_id: projectId,
         title: title.trim(),
         description: description.trim(),
-        workflow_template_id: workflowTemplateId !== "" ? workflowTemplateId : null,
         labels: labelList,
         run_type: runType,
         agent_override: agentOverride || null,
@@ -287,28 +275,6 @@ export default function NewRun() {
             />
           </div>
 
-          {/* Workflow Template */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Workflow Template
-            </label>
-            <select
-              value={workflowTemplateId}
-              onChange={(e) =>
-                setWorkflowTemplateId(e.target.value !== "" ? parseInt(e.target.value) : "")
-              }
-              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
-            >
-              <option value="">None (use project default)</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.is_default ? " (default)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Labels */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -432,35 +398,25 @@ export default function NewRun() {
                   Per-Step Agent Overrides
                 </label>
                 <div className="space-y-2">
-                  {(() => {
-                    const tpl = templates.find((t) => t.id === workflowTemplateId);
-                    const phaseNames = tpl
-                      ? tpl.phases
-                          .filter(
-                            (p) => (p.kind ?? "legacy_phase") !== "bash",
-                          )
-                          .map((p) => p.phase_name)
-                      : FALLBACK_PHASES_WITH_AGENTS;
-                    return phaseNames.map((phase) => (
-                      <div key={phase} className="flex items-center gap-3">
-                        <span className="text-sm text-gray-400 w-36 shrink-0 font-mono">
-                          {phase}
-                        </span>
-                        <select
-                          value={phaseOverrides[phase] ?? ""}
-                          onChange={(e) => setPhaseAgent(phase, e.target.value)}
-                          className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
-                        >
-                          <option value="">Inherit</option>
-                          {AGENT_NAMES.map((a) => (
-                            <option key={a} value={a}>
-                              {a}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ));
-                  })()}
+                  {PHASES_WITH_AGENTS.map((phase) => (
+                    <div key={phase} className="flex items-center gap-3">
+                      <span className="text-sm text-gray-400 w-36 shrink-0 font-mono">
+                        {phase}
+                      </span>
+                      <select
+                        value={phaseOverrides[phase] ?? ""}
+                        onChange={(e) => setPhaseAgent(phase, e.target.value)}
+                        className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                      >
+                        <option value="">Inherit</option>
+                        {AGENT_NAMES.map((a) => (
+                          <option key={a} value={a}>
+                            {a}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

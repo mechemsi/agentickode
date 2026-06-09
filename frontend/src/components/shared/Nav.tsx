@@ -9,7 +9,6 @@ import {
   Bot,
   Cpu,
   FolderKanban,
-  GitBranch,
   LayoutDashboard,
   Menu,
   MessageSquare,
@@ -27,7 +26,6 @@ const links = [
   { to: "/workspace-servers", label: "Servers", icon: Server },
   { to: "/gpu-dashboard", label: "GPU", icon: Activity },
   { to: "/agents", label: "Agents", icon: Bot },
-  { to: "/workflows", label: "Workflows", icon: GitBranch },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
