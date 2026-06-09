@@ -23,6 +23,7 @@ from backend.api._pr_webhook_helpers import (
     GITHUB_PR_ACTIONS,
     build_pr_review_run,
     handle_pr_event,
+    resolve_pr_review_flow_prompt_id,
 )
 from backend.api.webhooks import _get_repo
 from backend.config import settings
@@ -123,6 +124,7 @@ async def trigger_pr_review(
         repo_full_name=payload.repo,
         labels=payload.labels,
         template_id=template.id,
+        flow_prompt_id=await resolve_pr_review_flow_prompt_id(db),
     )
     db.add(run)
     await db.commit()

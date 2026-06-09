@@ -206,6 +206,31 @@ class TestCiPrReviewEndpoint:
         assert run.task_source_meta["review_mode"] == "comment"
         assert run.max_retries == 0
 
+    async def test_ci_trigger_binds_flow_prompt_when_enabled(
+        self, client: AsyncClient, github_project, pr_review_template, db_session, monkeypatch
+    ):
+        # Regression (ADR-009 live validation): the CI endpoint must bind the
+        # pr_review flow prompt when the flag is on, else Phase 3's default
+        # mis-routes the PR review to the implement flow.
+        from backend.config import settings
+        from backend.models import FlowPrompt
+        from backend.repositories.flow_prompt_repo import FlowPromptRepository
+
+        monkeypatch.setattr(settings, "flow_prompts_enabled", True)
+        flow = await FlowPromptRepository(db_session).create(
+            FlowPrompt(name="pr-review", flow_type="pr_review", prompt="x", agent_mode="generate")
+        )
+        await db_session.commit()
+
+        resp = await client.post(
+            "/api/webhooks/pr-review",
+            json={"provider": "github", "repo": "myorg/myrepo", "pr_number": 24},
+        )
+        assert resp.status_code == 200
+        run = await db_session.get(TaskRun, resp.json()["run_id"])
+        assert run is not None
+        assert run.flow_prompt_id == flow.id
+
     async def test_ci_trigger_rejects_nonpositive_pr_number(
         self, client: AsyncClient, github_project, pr_review_template
     ):
