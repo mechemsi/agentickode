@@ -40,6 +40,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 | [006 — Multi-Source Task Intake](decisions/006-multi-source-task-intake.md) | 2026-03 | Webhooks from Plane, GitHub, Gitea, GitLab for task ingestion |
 | [007 — Composable Step Workflows](decisions/007-composable-step-workflows.md) | 2026-05 | Generic bash + agent step kinds; legacy phases preserved as kind: legacy_phase; triggers as first-class |
 | [008 — Direct Agent Selection](decisions/008-direct-agent-selection.md) | 2026-06 | Remove roles; workflow steps name the agent; project/global default; irreversible table drop |
+| [009 — Flow Prompts](decisions/009-flow-prompts.md) | 2026-06 | Replace workflow templates with a single agent call (prompt + fetched data); supersedes ADR-007; drop phase_executions + workflow_templates; deprecate comparison; 5-phase rollout |
 
 ## Reference Docs
 

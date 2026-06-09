@@ -19,10 +19,13 @@ related:
 > - **Break custom multi-step templates** — no migration path. (Resolves OQ-3.)
 > - **PR-review is also a flow prompt** — same single-call mechanism, different prompt. (Resolves OQ-6.)
 >
-> **Still blocking (posted to the Notion task as a discussion):** OQ-1 (audit/`phase_executions`
-> + cost FK fate), OQ-2 (which data AgenticKode auto-fetches & how declared), OQ-5 (comparison
-> mode), OQ-7 (irreversible migration of `task_runs.workflow_template_id` / run history).
-> ADR-009 to be written once these four are answered.
+> **RESOLVED (2026-06-09) — see [ADR-009](../decisions/009-flow-prompts.md), accepted:**
+> - OQ-1 → **drop** `phase_executions`; result → `task_runs.coding_results`.
+> - OQ-2 → data is **fixed per flow type** AND additionally **declarable per prompt**.
+> - OQ-5 → **deprecate** comparison (A/B) mode.
+> - OQ-7 → **drop** the `workflow_templates` table; null the FK (irreversible, accepted).
+>
+> Implementation is now unblocked; ADR-009 defines a 5-phase rollout (additive first, table drops last).
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
