@@ -12,7 +12,7 @@ Based on the requirements analysis, design the architecture and create an implem
 ## Architecture Rules (MUST follow)
 
 - **GitProvider Protocol**: All git ops through Protocol, never direct API calls. Factory: `get_git_provider(provider_name, client)`
-- **RoleAdapter Protocol**: All AI agent interactions through Protocol. Use `RoleResolver` for mapping.
+- **RoleAdapter Protocol**: All AI agent interactions through Protocol. Use `AgentResolver` for mapping.
 - **ServiceContainer**: Worker phases receive `services: ServiceContainer`. Never import services directly.
 - **Repository Pattern**: Use `TaskRunRepository` / `ProjectConfigRepository` for DB access. No inline SQLAlchemy in routes.
 - **Shared HTTP Client**: Use `get_http_client()` — never create standalone httpx clients.

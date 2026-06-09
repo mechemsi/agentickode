@@ -1,8 +1,10 @@
-# AgenticKode Workflows — Composable Step Reference
+# AgenticKode Workflows — Composable Step Reference (Legacy)
 
-> **What changed:** the framework no longer ships a single fixed 8-phase pipeline as its only execution model. Workflows are now composable arrays of steps. Each step is either a `bash` command or an `agent` invocation with a rendered prompt. Two built-in steps (`workspace_setup`, `init`) always run first; the rest is per-template. This document is the authoritative reference for the new model.
+> **Superseded by flow prompts.** As of [ADR-009 — Flow Prompts](../claudedocs/decisions/009-flow-prompts.md), a run is a single agent call: you write the prompt, AgenticKode auto-fetches the context (repo, issue body, PR diff) and the agent returns the run outcome. The composable step model documented below still runs for back-compat but is no longer the default. New work should target flow prompts.
 >
-> See [ADR-007 — Composable Step Workflows](../claudedocs/decisions/007-composable-step-workflows.md) for the design rationale and trade-offs against the legacy fixed-phase model.
+> **What this document covers:** the composable step model — workflows as arrays of steps, each a `bash` command or an `agent` invocation with a rendered prompt. Two built-in steps (`workspace_setup`, `init`) always run first; the rest is per-template.
+>
+> See [ADR-007 — Composable Step Workflows](../claudedocs/decisions/007-composable-step-workflows.md) for the design rationale (superseded by ADR-009).
 
 ---
 
@@ -114,7 +116,7 @@ On non-zero exit:
 
 ### `agent`
 
-Resolves a role to a concrete adapter via `RoleResolver` and invokes the agent with a rendered prompt.
+Resolves the step's agent to a concrete adapter via `AgentResolver` and invokes it with a rendered prompt.
 
 **Params:**
 
@@ -183,7 +185,7 @@ Every step kind reads the following fields from its `PhaseConfig` entry:
 | `failure_mode` | `fail` \| `skip` | `fail` | On error, fail the run or skip the step and continue. |
 | `notify_source` | bool | `false` | If true, the configured `TaskSourceUpdater` is called when the step completes. |
 | `params` | dict | `{}` | Kind-specific parameters (see each kind above). |
-| `role` | string | `coder` for `agent` | Role name resolved by `RoleResolver`. |
+| `role` | string | `coder` for `agent` | Step role label; the agent is resolved by `AgentResolver`. |
 | `agent_override` | string | none | Force a specific adapter regardless of role config. |
 | `cli_flags` | dict | none | Per-step CLI flags forwarded to adapters. |
 | `environment_vars` | dict | none | Per-step env vars. |

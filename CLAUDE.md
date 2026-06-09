@@ -2,7 +2,7 @@
 
 ## Overview
 
-Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. The backend runs an 8-phase worker pipeline (workspace_setup → init → planning → coding → testing → reviewing → approval → finalization) that dispatches AI coding tasks to remote workspace servers, creates PRs, and gates on human approval.
+Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. The backend dispatches AI coding tasks to workspace servers, creates PRs, and gates on human approval. The execution model is moving from a configurable multi-step **worker pipeline** (the legacy phases workspace_setup → init → planning → coding → testing → reviewing → approval → finalization, still the default) to **agentic flow prompts** — a single agent call given a prompt + fetched data ([ADR-009](claudedocs/decisions/009-flow-prompts.md)), gated behind `FLOW_PROMPTS_ENABLED`.
 
 ## Tech Stack
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy (async), Pydantic, Alembic
@@ -22,10 +22,11 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 ## Key Features
 
 - **Multi-provider git integration**: GitHub, Gitea, GitLab, Bitbucket (via GitProvider Protocol)
-- **Pluggable AI agents**: Ollama, OpenHands, Claude CLI, custom agents (via RoleAdapter Protocol)
-- **8-phase worker pipeline**: With per-phase status tracking, trigger modes (auto/manual/approval), comparison mode
+- **Pluggable AI agents**: Ollama, OpenHands, Claude CLI, custom agents (via the `RoleAdapter` adapter protocol)
+- **Worker pipeline**: Configurable multi-step run with per-step status tracking and trigger modes (auto/manual/approval)
+- **Flow prompts (ADR-009)**: Single-agent-call runs (prompt + auto-fetched data) — `FLOW_PROMPTS_ENABLED`; replacing the pipeline
 - **Remote workspace servers**: SSH-based execution with worker user isolation, agent discovery/install
-- **Workflow templates**: Label-based routing with per-phase agent/role configuration
+- **Workflow templates**: Label-based routing with per-step agent selection (being superseded by flow prompts)
 - **Per-project instructions & secrets**: Global + phase-specific instructions, encrypted secrets with auto-injection
 - **Real-time UI**: WebSocket log streaming, SSE dashboard updates, SSH terminal bridge (xterm.js)
 - **Notifications**: Slack, Discord, Telegram, webhook callbacks
@@ -33,8 +34,7 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 - **Cost tracking**: Per-invocation token counting and cost estimation with analytics dashboard
 - **Backup/export**: Full config export/import with optional AES encryption
 - **GPU dashboard**: Ollama server GPU monitoring and model management
-- **Role configs**: Customizable roles (planner, coder, reviewer) with per-agent prompt overrides
-- **Comparison mode**: Run multiple agents in parallel, pick winner
+- **Direct agent selection**: Each step names the agent (or uses the project/global default) via `AgentResolver` — no role indirection ([ADR-008](claudedocs/decisions/008-direct-agent-selection.md))
 - **Platform crons**: Self-scheduling agent loop for autonomous monitoring
 - **Session resume**: Claude conversation state resumption with `--resume` flag
 
@@ -50,7 +50,7 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 │   │   ├── workspace/          # SSH workspace server management
 │   │   ├── notifications/      # Notification dispatching
 │   │   └── backup/             # Backup & export/import
-│   ├── worker/                 # Worker engine + 8-phase pipeline
+│   ├── worker/                 # Worker engine: phase pipeline + flow-prompt executor
 │   │   └── phases/             # Individual phase implementations
 │   ├── config.py               # Pydantic Settings
 │   ├── database.py             # SQLAlchemy async session
@@ -146,7 +146,7 @@ docker compose -f docker-compose.dev.yml exec frontend npm run lint:fix
 ### SOLID Principles
 
 1. **GitProvider Protocol**: Use `get_git_provider(provider_name, client)` factory. Never call git APIs directly.
-2. **RoleAdapter Protocol**: Use `RoleResolver` to map roles to providers. Never call agent APIs directly.
+2. **Agent selection**: Use `AgentResolver` to resolve the agent (per-step `agent` field → project/global default) and the `RoleAdapter` adapter protocol to talk to it. Never call agent APIs directly.
 3. **Service Classes**: Injectable via constructor (`OllamaService`, `OpenHandsService`, `ChromaDBService`). Never create `httpx.AsyncClient()` in service functions.
 4. **ServiceContainer**: Worker phases receive `services: ServiceContainer`. Never import service modules directly in phases.
 5. **Repository Pattern**: Use `TaskRunRepository`, `ProjectConfigRepository` for DB access. No inline SQLAlchemy in route handlers.
@@ -213,13 +213,13 @@ docker compose -f docker-compose.dev.yml exec frontend npx vitest run src/__test
 - Frontend: Vitest + React Testing Library, mock API with `vi.mock("../api", ...)`
 - Wrap routed components in `<MemoryRouter>`
 
-### Worker Pipeline
+### Worker Pipeline (legacy) + Flow Prompts (ADR-009)
 
-- 8 phases: workspace_setup → init → planning → coding → testing → reviewing → approval → finalization
+- **Pipeline (default)**: legacy phases workspace_setup → init → planning → coding → testing → reviewing → approval → finalization, dispatched from a workflow template.
+- **Flow prompts (`FLOW_PROMPTS_ENABLED`)**: a run bound to a `flow_prompt_id` skips the phase loop and runs `workspace_setup`/`init` → fetch the flow's data → **a single agent call** → `finalization` (`backend/worker/flow/executor.py`). The agent's response is the run outcome.
 - Approval phase returns `"awaiting"` to park run for human review
 - Phase signature: `async def run(task_run, session, services) -> None | str`
 - Trigger modes: `auto`, `wait_for_trigger`, `wait_for_approval`
-- Comparison mode: run multiple agents in parallel, user picks winner
 
 ## Documentation Workflow
 
