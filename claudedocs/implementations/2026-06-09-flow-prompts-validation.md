@@ -59,8 +59,28 @@ does not. This is the **same provisioning gap** and would block the **template p
 identically** — an environment/ops task (WorkerUserService-style provisioning of the platform
 server's worker user), not a flow-prompt defect.
 
-**Net:** both engines (template and flow) are equally unable to run autonomous *coding* tasks on
-the platform server until a non-root, claude-authenticated worker user is provisioned there.
+**Net (first pass):** both engines were equally unable to run autonomous *coding* tasks until a
+non-root, claude-authenticated worker user was provisioned.
+
+### Implement flow — now FULLY validated (run #51)
+Provisioned a `coder` worker on the platform server and ran a real implement task. Two more
+fixes were needed:
+- **Executor didn't ensure the agent for the worker user** (`executor.py`): added
+  `ensure_agent_ready` before the agent call (parity with the legacy coding phase) — it installs
+  the CLI agent into the worker user's home. (Also fixed a `_agent_log` arity bug.)
+- **WorkerUserService cred copy missed dotfiles** (`worker_user_service.py`): `cp /root/.claude/*`
+  skips hidden files, so `.credentials.json` wasn't copied — changed to `cp /root/.claude/.`.
+
+After provisioning (`coder` + claude creds) + these fixes, run #51 completed end-to-end:
+`ensure_agent_ready` installed claude for `coder`, then claude (non-root) **created the file,
+committed, pushed, and opened a real PR (#35)** — a full autonomous coding run. (PR #35 was a
+throwaway, since closed + branch deleted.)
+
+**Both flows now validated with real output:** PR-review (#48, 3498-char review) and implement
+(#51, real code + PR).
+
+Minor follow-up: the agent opens its own PR (agentic), so `task_run.pr_url` isn't captured by
+finalization ("No PR URL found"). Cosmetic — consider parsing the agent's PR URL into the run.
 
 ## Follow-up noted
 - The flow executor uses the pure `run_agent_step`, which does **not** record an

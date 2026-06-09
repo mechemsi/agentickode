@@ -74,7 +74,8 @@ class WorkerUserService:
             # Copy Claude config + API keys (merge, don't destroy session data)
             f"cp -fL /root/.claude.json {home}/.claude.json 2>/dev/null || true",
             f"mkdir -p {home}/.claude",
-            f"cp -rnL /root/.claude/* {home}/.claude/ 2>/dev/null || true",
+            # Use '/.' (not '/*') so hidden files like .credentials.json are copied too.
+            f"cp -rnL /root/.claude/. {home}/.claude/ 2>/dev/null || true",
             # Copy SSH keys so worker user has same git provider access as root
             f"mkdir -p {home}/.ssh && chmod 700 {home}/.ssh",
             f"cp -fL /root/.ssh/id_ed25519 {home}/.ssh/id_ed25519 2>/dev/null || true",
