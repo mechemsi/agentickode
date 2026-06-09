@@ -104,6 +104,17 @@ async def execute_flow_prompt(
             "mode": result.get("mode"),
             "response": result.get("response"),
         }
+        # PR-review flows: surface the response as review_result so finalization
+        # posts it as a PR comment + flips the label (parity with the template path).
+        if flow.flow_type == "pr_review":
+            resp = result.get("response")
+            review_text = resp if isinstance(resp, str) else json.dumps(resp, default=str)
+            run.review_result = {
+                "summary": review_text,
+                "approved": False,
+                "issues": [],
+                "suggestions": [],
+            }
         await session.commit()
 
         await _run_phase("finalization", run, session, services)
