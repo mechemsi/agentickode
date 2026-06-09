@@ -28,6 +28,7 @@ class LocalCommandService:
 
     def __init__(self) -> None:
         self.hostname = "localhost"
+        self.port = 0  # parity with SSHService (no real port for local execution)
         self.username = os.environ.get("USER", "root")
 
     async def run_command(self, cmd: str, timeout: int = 30) -> tuple[str, str, int]:
