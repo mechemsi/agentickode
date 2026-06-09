@@ -12,7 +12,6 @@ export * from "./workflows";
 export * from "./analytics";
 export * from "./health";
 export * from "./git";
-export * from "./comparison";
 export * from "./settings";
 export * from "./backup";
 export * from "./instructions";

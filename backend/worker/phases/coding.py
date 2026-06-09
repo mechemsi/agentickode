@@ -119,21 +119,7 @@ async def run(
 
     ws_id = await get_workspace_server_id(task_run, session)
 
-    # Check for A/B comparison mode
-    comparison_cfg = (phase_config or {}).get("params", {}).get("comparison")
-    if comparison_cfg and isinstance(comparison_cfg, dict):
-        from backend.worker.phases._comparison import run_comparison
-
-        await run_comparison(
-            task_run,
-            session,
-            services,
-            phase_config,
-            subtasks,
-            phase_exec_row,
-            ws_id,
-        )
-        return
+    # Comparison (A/B) mode removed per ADR-009 (superseded by flow prompts).
 
     agent_name = get_phase_agent("coding", phase_config, phase_exec_row)
     resolved = await services.agent_resolver.resolve_agent(

@@ -113,9 +113,3 @@ export const reviewPlan = (
     rejection_reason?: string | null;
   },
 ) => post<{ status: string }>(`/runs/${runId}/plan-review`, payload);
-
-export const pickComparisonWinner = (runId: number, winner: "a" | "b") =>
-  post<{ status: string; winner: string; agent_name: string; branch: string }>(
-    `/runs/${runId}/comparison/pick-winner`,
-    { winner },
-  );

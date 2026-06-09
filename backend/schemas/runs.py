@@ -101,10 +101,6 @@ class RejectRequest(BaseModel):
     reason: str = ""
 
 
-class PickWinnerRequest(BaseModel):
-    winner: str  # "a" or "b"
-
-
 class AdvancePhaseRequest(BaseModel):
     force: bool = False
 

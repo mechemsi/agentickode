@@ -17,7 +17,6 @@ import AgentActivityPanel from "../components/runs/AgentActivityPanel";
 import RunCostSummary from "../components/runs/RunCostSummary";
 import ApprovalButtons from "../components/runs/ApprovalButtons";
 import CodingResultsPanel from "../components/runs/CodingResultsPanel";
-import ComparisonResultsPanel from "../components/runs/ComparisonResultsPanel";
 import GenericStepResult from "../components/runs/GenericStepResult";
 import PlanReviewPanel from "../components/runs/PlanReviewPanel";
 import CollapsibleJSON from "../components/shared/CollapsibleJSON";
@@ -28,7 +27,7 @@ import PhaseTimeline from "../components/runs/PhaseTimeline";
 import RunTerminalDrawer from "../components/runs/RunTerminalDrawer";
 import StatusBadge from "../components/shared/StatusBadge";
 import SafeHtml from "../components/shared/SafeHtml";
-import type { ComparisonResults, StepKind, TaskRunDetail as TRD } from "../types";
+import type { StepKind, TaskRunDetail as TRD } from "../types";
 
 function phaseLabel(p: string): string {
   return p
@@ -291,8 +290,6 @@ export default function RunDetail() {
               phaseName={pe.phase_name}
               kind={(pe.phase_config?.kind as StepKind | undefined) ?? "legacy_phase"}
               data={pe.result!}
-              runId={runId}
-              onRefresh={load}
             />
           ))
       ) : (
@@ -301,15 +298,7 @@ export default function RunDetail() {
             <CollapsibleJSON title="Planning Result" data={run.planning_result} />
           )}
           {run.coding_results && (
-            run.coding_results.comparison_mode ? (
-              <ComparisonResultsPanel
-                runId={runId}
-                comparison={run.coding_results as unknown as ComparisonResults}
-                onWinnerPicked={load}
-              />
-            ) : (
-              <CodingResultsPanel data={run.coding_results as Record<string, unknown>} />
-            )
+            <CodingResultsPanel data={run.coding_results as Record<string, unknown>} />
           )}
           {run.review_result && (
             <ReviewResultPanel data={run.review_result as Record<string, unknown>} />
@@ -334,14 +323,10 @@ function PhaseResult({
   phaseName,
   kind,
   data,
-  runId,
-  onRefresh,
 }: {
   phaseName: string;
   kind: StepKind;
   data: Record<string, unknown>;
-  runId: number;
-  onRefresh: () => void;
 }) {
   // Generic kinds (bash / agent) get their own kind-specific viewer.
   if (kind === "bash" || kind === "agent") {
@@ -349,15 +334,6 @@ function PhaseResult({
   }
   // Legacy-phase: keep the rich per-phase panels.
   if (phaseName === "coding") {
-    if (data.comparison_mode) {
-      return (
-        <ComparisonResultsPanel
-          runId={runId}
-          comparison={data as unknown as ComparisonResults}
-          onWinnerPicked={onRefresh}
-        />
-      );
-    }
     return <CodingResultsPanel data={data} />;
   }
   if (phaseName === "reviewing") {
