@@ -17,6 +17,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.seed.agent_settings import DEFAULT_AGENT_SETTINGS, seed_agent_settings
+from backend.seed.flow_prompts import seed_flow_prompts
 from backend.seed.platform_server import seed_platform_server
 from backend.seed.workflow_templates import DEFAULT_WORKFLOW_TEMPLATES, seed_workflow_templates
 
@@ -38,5 +39,6 @@ async def seed_all(db: AsyncSession) -> None:
     """Run all seed operations. Safe to call repeatedly (idempotent)."""
     await seed_agent_settings(db)
     await seed_workflow_templates(db)
+    await seed_flow_prompts(db)
     await seed_platform_server(db)
     logger.info("Seed data applied successfully")

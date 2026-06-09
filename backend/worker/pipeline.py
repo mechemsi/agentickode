@@ -291,7 +291,20 @@ async def _skip_phases_for_consolidated(
 
 
 async def execute_pipeline(run: TaskRun, session: AsyncSession, services: ServiceContainer) -> None:
-    """Execute the pipeline phase-by-phase using PhaseExecution rows."""
+    """Execute the pipeline phase-by-phase using PhaseExecution rows.
+
+    ADR-009: when flow prompts are enabled and the run is bound to one, hand off
+    to the slimmed single-agent-call executor instead of the phase pipeline.
+    Additive — off by default, templates unaffected.
+    """
+    from backend.config import settings
+
+    if settings.flow_prompts_enabled and run.flow_prompt_id:
+        from backend.worker.flow.executor import execute_flow_prompt
+
+        await execute_flow_prompt(run, session, services)
+        return
+
     run.status = "running"
     run.started_at = run.started_at or datetime.now(UTC)
     await session.commit()
