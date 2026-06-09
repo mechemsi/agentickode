@@ -63,8 +63,13 @@ def build_pr_review_run(
     labels: list[str],
     template_id: int,
     pr_head_sha: str = "",
+    flow_prompt_id: int | None = None,
 ) -> TaskRun:
-    """Create a single-pass, comment-mode PR-review run bound to a template."""
+    """Create a single-pass, comment-mode PR-review run.
+
+    Bound to the workflow template; when ``flow_prompt_id`` is provided (ADR-009,
+    flow prompts enabled) it is also set, and the pipeline runs the flow path.
+    """
     run = create_task_run(
         task_id=f"pr-{pr_number}",
         project=project,
@@ -85,7 +90,24 @@ def build_pr_review_run(
         workflow_template_id=template_id,
     )
     run.max_retries = 0  # single-pass review — never auto-fix an un-checked-out workspace
+    if flow_prompt_id is not None:
+        run.flow_prompt_id = flow_prompt_id
     return run
+
+
+async def resolve_pr_review_flow_prompt_id(db) -> int | None:
+    """The pr-review flow prompt id when flow prompts are enabled, else None.
+
+    Returning None keeps PR-review on the workflow-template path (current default).
+    """
+    from backend.config import settings
+
+    if not settings.flow_prompts_enabled:
+        return None
+    from backend.repositories.flow_prompt_repo import FlowPromptRepository
+
+    flow = await FlowPromptRepository(db).get_by_flow_type("pr_review")
+    return int(flow.id) if flow else None
 
 
 async def handle_pr_event(
@@ -138,6 +160,7 @@ async def handle_pr_event(
         repo_full_name=repo_full_name,
         labels=label_names,
         template_id=template.id,
+        flow_prompt_id=await resolve_pr_review_flow_prompt_id(db),
     )
     db.add(run)
     await db.commit()

@@ -16,7 +16,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api._pr_webhook_helpers import build_pr_review_run
+from backend.api._pr_webhook_helpers import build_pr_review_run, resolve_pr_review_flow_prompt_id
 from backend.models import ProjectConfig, TaskRun
 from backend.repositories.git_connection_repo import GitConnectionRepository
 from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
@@ -101,6 +101,10 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
         logger.debug("No pr-review template — skipping PR poll for %s", project.project_id)
         return []
 
+    # ADR-009: when flow prompts are enabled, also bind runs to the pr-review
+    # flow prompt so the pipeline runs the single-agent-call path. None otherwise.
+    flow_prompt_id = await resolve_pr_review_flow_prompt_id(session)
+
     token = await _resolve_token(project, session)
     provider = get_git_provider(project.git_provider, get_http_client(), access_token=token)
     repo_path = f"{project.repo_owner}/{project.repo_name}"
@@ -140,6 +144,7 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
             labels=labels,
             template_id=template.id,
             pr_head_sha=head_sha,
+            flow_prompt_id=flow_prompt_id,
         )
         session.add(run)
         await session.flush()

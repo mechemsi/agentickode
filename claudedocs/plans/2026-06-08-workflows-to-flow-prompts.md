@@ -30,7 +30,11 @@ related:
 > **Phase 1 (additive, flag-gated) — DONE 2026-06-09** (`flow_prompts` table + `flow_prompt_id` +
 > data-source registry + `execute_flow_prompt` executor + `FLOW_PROMPTS_ENABLED` flag, off by
 > default; seed). See [implementation](../implementations/2026-06-09-flow-prompts-phase1.md).
-> Phases 2–5 pending.
+>
+> **Phase 2 (PR-review on a flow prompt) — DONE 2026-06-09** (poller + webhook bind PR-review runs
+> to the `pr-review` flow prompt when the flag is on; executor sets `review_result` so finalization
+> posts the comment + flips the label — parity with the template path).
+> See [implementation](../implementations/2026-06-09-flow-prompts-phase2-pr-review.md). Phases 3–5 pending.
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
