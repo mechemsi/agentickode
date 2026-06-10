@@ -19,7 +19,7 @@ from sqlalchemy import select
 from backend.config import settings
 from backend.database import async_session
 from backend.dependencies import get_service_container
-from backend.models import PhaseExecution, TaskRun
+from backend.models import TaskRun
 from backend.models.servers import WorkspaceServer
 from backend.repositories.app_setting_repo import AppSettingRepository
 from backend.services.container import ServiceContainer
@@ -94,18 +94,8 @@ class WorkerEngine:
             interrupted_ids: set[int] = set()
             for run in interrupted:
                 interrupted_ids.add(run.id)
-                # Reset any phase that was mid-execution back to pending
-                phase_result = await session.execute(
-                    select(PhaseExecution).where(
-                        PhaseExecution.run_id == run.id,
-                        PhaseExecution.status == "running",
-                    )
-                )
-                for pe in phase_result.scalars().all():
-                    pe.status = "pending"
-                    pe.started_at = None
-                # Mark agent_loop executions for recovery
-                await self._mark_agent_loop_for_recovery(session, run.id)
+                # Flow runs are single-shot and idempotent (workspace_setup
+                # re-clones); just reset to pending so the dispatcher re-runs.
                 run.status = "pending"
                 logger.info(f"Recovered interrupted run #{run.id}, resetting to pending")
             await session.commit()
@@ -116,24 +106,6 @@ class WorkerEngine:
             )
             valid_ids = {r[0] for r in active_result.all()}
             await queue_service.cleanup_stale_entries(valid_ids)
-
-    async def _mark_agent_loop_for_recovery(self, session, run_id: int) -> None:
-        """Mark interrupted agent_loop executions for recovery on re-dispatch."""
-        from backend.models import AgentLoopExecution
-
-        ale_result = await session.execute(
-            select(AgentLoopExecution).where(
-                AgentLoopExecution.task_run_id == run_id,
-                AgentLoopExecution.status == "running",
-            )
-        )
-        for ale in ale_result.scalars().all():
-            ale.recovery_count = (ale.recovery_count or 0) + 1
-            ale.status = "recovering"
-            logger.info(
-                f"Marked agent_loop execution #{ale.id} for recovery "
-                f"(attempt {ale.recovery_count})"
-            )
 
     async def _tick(self):
         # Cleanup completed/failed tasks from active set
@@ -264,60 +236,31 @@ class WorkerEngine:
             else:
                 await self._reject_run(run, session)
 
-        # 2. Runs waiting for external trigger where phase was advanced
+        # 2. Runs waiting for an external trigger — resume them.
         result = await session.execute(
             select(TaskRun).where(TaskRun.status == "waiting_for_trigger")
         )
         for run in result.scalars().all():
             if run.id in self._active_runs:
                 continue
-            pending = await session.execute(
-                select(PhaseExecution).where(
-                    PhaseExecution.run_id == run.id,
-                    PhaseExecution.status == "pending",
-                )
-            )
-            if pending.scalar_one_or_none():
-                logger.info(f"Resuming run #{run.id} after trigger advance")
-                run.status = "pending"
-                await session.commit()
-                task = asyncio.create_task(self._run_pipeline(run.id))
-                self._active_runs[run.id] = task
+            logger.info(f"Resuming run #{run.id} after trigger advance")
+            run.status = "pending"
+            await session.commit()
+            task = asyncio.create_task(self._run_pipeline(run.id))
+            self._active_runs[run.id] = task
 
     async def _resume_approved_run(self, run: TaskRun, session) -> None:
-        """Mark the waiting approval phase complete and re-queue the run."""
+        """Re-queue an approved run (the flow re-runs from the idempotent setup)."""
         logger.info(f"Resuming run #{run.id} after approval")
-        waiting_phase = await session.execute(
-            select(PhaseExecution).where(
-                PhaseExecution.run_id == run.id,
-                PhaseExecution.status == "waiting",
-                PhaseExecution.trigger_mode == "wait_for_approval",
-            )
-        )
-        pe = waiting_phase.scalar_one_or_none()
-        if pe:
-            pe.status = "completed"
-            pe.completed_at = datetime.now(UTC)
         run.status = "pending"
         await session.commit()
         task = asyncio.create_task(self._run_pipeline(run.id))
         self._active_runs[run.id] = task
 
     async def _reject_run(self, run: TaskRun, session) -> None:
-        """Mark the waiting phase and the run itself as failed due to rejection."""
+        """Mark a rejected run as failed."""
         logger.info(f"Run #{run.id} was rejected")
         reason = f"Rejected: {run.rejection_reason or 'No reason given'}"
-        waiting_phase = await session.execute(
-            select(PhaseExecution).where(
-                PhaseExecution.run_id == run.id,
-                PhaseExecution.status == "waiting",
-            )
-        )
-        pe = waiting_phase.scalar_one_or_none()
-        if pe:
-            pe.status = "failed"
-            pe.error_message = reason
-            pe.completed_at = datetime.now(UTC)
         run.status = "failed"
         run.error_message = reason
         run.completed_at = datetime.now(UTC)

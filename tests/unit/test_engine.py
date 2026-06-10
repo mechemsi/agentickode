@@ -7,7 +7,7 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.models import AppSetting, PhaseExecution, ProjectConfig
+from backend.models import AppSetting, ProjectConfig
 from backend.worker.engine import WorkerEngine
 
 
@@ -55,22 +55,10 @@ class TestWorkerEngine:
         await db_session.commit()
         await db_session.refresh(run)
 
-        # Create a waiting PhaseExecution
-        pe = PhaseExecution(
-            run_id=run.id,
-            phase_name="approval",
-            order_index=5,
-            trigger_mode="wait_for_approval",
-            status="waiting",
-        )
-        db_session.add(pe)
-        await db_session.commit()
-
         engine = WorkerEngine()
         with patch.object(engine, "_run_pipeline", new_callable=AsyncMock):
             await engine._handle_waiting(db_session)
             assert run.status == "pending"
-            assert pe.status == "completed"
 
     async def test_handle_waiting_rejected(self, db_session, make_task_run):
         project = ProjectConfig(
@@ -84,16 +72,6 @@ class TestWorkerEngine:
         await db_session.commit()
         await db_session.refresh(run)
 
-        pe = PhaseExecution(
-            run_id=run.id,
-            phase_name="approval",
-            order_index=5,
-            trigger_mode="wait_for_approval",
-            status="waiting",
-        )
-        db_session.add(pe)
-        await db_session.commit()
-
         engine = WorkerEngine()
         with patch(
             "backend.worker.engine.broadcaster",
@@ -102,7 +80,6 @@ class TestWorkerEngine:
             await engine._handle_waiting(db_session)
             assert run.status == "failed"
             assert "Rejected" in run.error_message
-            assert pe.status == "failed"
 
     async def test_handle_waiting_trigger_advanced(self, db_session, make_task_run):
         project = ProjectConfig(
@@ -113,17 +90,6 @@ class TestWorkerEngine:
         db_session.add(run)
         await db_session.commit()
         await db_session.refresh(run)
-
-        # Phase was advanced externally: status changed from "waiting" to "pending"
-        pe = PhaseExecution(
-            run_id=run.id,
-            phase_name="init",
-            order_index=1,
-            trigger_mode="wait_for_trigger",
-            status="pending",
-        )
-        db_session.add(pe)
-        await db_session.commit()
 
         engine = WorkerEngine()
         with patch.object(engine, "_run_pipeline", new_callable=AsyncMock):

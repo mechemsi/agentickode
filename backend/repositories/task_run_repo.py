@@ -8,7 +8,6 @@ from typing import ClassVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from backend.models import AgentInvocation, TaskRun
 
@@ -85,11 +84,7 @@ class TaskRunRepository:
         return runs, total
 
     async def get_by_id(self, run_id: int) -> TaskRun | None:
-        result = await self._session.execute(
-            select(TaskRun)
-            .where(TaskRun.id == run_id)
-            .options(selectinload(TaskRun.phase_executions))
-        )
+        result = await self._session.execute(select(TaskRun).where(TaskRun.id == run_id))
         return result.scalar_one_or_none()
 
     async def get_stats(self) -> dict[str, int]:

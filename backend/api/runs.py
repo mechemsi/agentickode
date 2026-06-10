@@ -105,7 +105,7 @@ async def create_run(req: CreateRunRequest, db: AsyncSession = Depends(get_db)):
         task_source_meta=meta,
         run_type=req.run_type,
         status="pending",
-        workflow_template_id=req.workflow_template_id,
+        flow_prompt_id=req.flow_prompt_id,
         workspace_config=project.workspace_config,
         execution_mode=execution_mode,
     )

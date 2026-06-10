@@ -47,7 +47,6 @@ from backend.api import (
     webhooks_pr,
     webhooks_pr_comment,
     webhooks_slack,
-    workflow_templates,
     workspace_commands,
     ws,
     ws_office,
@@ -131,6 +130,15 @@ async def _run_migrations() -> None:
         "ALTER TABLE task_runs ADD COLUMN flow_prompt_id INTEGER "
         "REFERENCES flow_prompts(id) ON DELETE SET NULL"
     )
+    # ADR-009 Phase 5: remove the legacy workflow-template / phase-execution
+    # engine. IRREVERSIBLE — drops historical per-step records and template
+    # linkage. FK-bearing columns are dropped before their referenced tables.
+    await _run_migration_step("ALTER TABLE task_runs DROP COLUMN IF EXISTS workflow_template_id")
+    await _run_migration_step(
+        "ALTER TABLE agent_invocations DROP COLUMN IF EXISTS phase_execution_id"
+    )
+    await _run_migration_step("DROP TABLE IF EXISTS phase_executions")
+    await _run_migration_step("DROP TABLE IF EXISTS workflow_templates")
     await _run_migration_step("""
         CREATE TABLE IF NOT EXISTS agent_settings (
             id SERIAL PRIMARY KEY,
@@ -173,7 +181,6 @@ async def _run_migrations() -> None:
         CREATE TABLE IF NOT EXISTS agent_invocations (
             id SERIAL PRIMARY KEY,
             run_id INTEGER NOT NULL REFERENCES task_runs(id) ON DELETE CASCADE,
-            phase_execution_id INTEGER REFERENCES phase_executions(id) ON DELETE SET NULL,
             workspace_server_id INTEGER REFERENCES workspace_servers(id) ON DELETE SET NULL,
             agent_name TEXT NOT NULL,
             phase_name TEXT,
@@ -436,7 +443,6 @@ app.include_router(server_projects_router, prefix="/api")
 app.include_router(ollama_servers.router, prefix="/api")
 app.include_router(ssh_keys_router, prefix="/api")
 app.include_router(notification_channels.router, prefix="/api")
-app.include_router(workflow_templates.router, prefix="/api")
 app.include_router(webhook_callbacks.router, prefix="/api")
 app.include_router(worker_user_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")

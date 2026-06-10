@@ -24,7 +24,7 @@ const baseMockRun: TaskRun = {
   approved: null,
   rejection_reason: null,
   parent_run_id: null,
-  workflow_template_id: null,
+  flow_prompt_id: null,
   total_cost_usd: null,
   execution_mode: "structured",
   created_at: new Date().toISOString(),

@@ -5,7 +5,6 @@
 import type {
   AgentInvocation,
   AnalyticsSummary,
-  PhaseExecution,
   Stats,
   TaskLog,
   TaskRun,
@@ -49,7 +48,7 @@ export const createRun = (data: {
   project_id: string;
   title: string;
   description?: string;
-  workflow_template_id?: number | null;
+  flow_prompt_id?: number | null;
   labels?: string[];
   run_type?: string;
   agent_override?: string | null;
@@ -86,12 +85,6 @@ export const getRunLogs = (
   return get<TaskLog[]>(`/runs/${id}/logs${qs ? `?${qs}` : ""}`);
 };
 
-export const getRunPhases = (id: number) =>
-  get<PhaseExecution[]>(`/runs/${id}/phases`);
-
-export const advancePhase = (runId: number, phaseName: string) =>
-  post(`/runs/${runId}/phases/${encodeURIComponent(phaseName)}/advance`);
-
 export const getRunInvocations = (id: number, sessionId?: string) => {
   const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
   return get<AgentInvocation[]>(`/runs/${id}/invocations${qs}`);
@@ -104,12 +97,3 @@ export const getInvocationDetail = (runId: number, invocationId: number) =>
 
 export const runTerminalAction = (runId: number, action: string) =>
   post<{ status: string }>(`/runs/${runId}/terminal-action`, { action });
-
-export const reviewPlan = (
-  runId: number,
-  payload: {
-    action: "approve" | "reject";
-    modified_subtasks?: Record<string, unknown>[] | null;
-    rejection_reason?: string | null;
-  },
-) => post<{ status: string }>(`/runs/${runId}/plan-review`, payload);

@@ -29,7 +29,6 @@ from backend.api.webhooks import _get_repo
 from backend.config import settings
 from backend.database import get_db
 from backend.repositories.project_config_repo import ProjectConfigRepository
-from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
 from backend.services.webhook_security import verify_shared_secret
 
 logger = logging.getLogger("agentickode.webhooks")
@@ -93,8 +92,8 @@ async def trigger_pr_review(
 ):
     """Launch a PR-review run for ``repo``#``pr_number`` (CI/manual trigger).
 
-    Unlike the webhook, this is an explicit request — it forces the ``pr-review``
-    template by name and does not require the ``ai-review`` label. When
+    Unlike the webhook, this is an explicit request — it runs the ``pr_review``
+    flow prompt and does not require the ``ai-review`` label. When
     ``CI_TRIGGER_SECRET`` is configured, callers must present a matching
     ``X-CI-Token`` header (constant-time compared); when it is unset the endpoint
     is open (protect it at the network layer).
@@ -109,10 +108,6 @@ async def trigger_pr_review(
     if not project:
         raise HTTPException(status_code=404, detail=f"No project for {payload.repo}")
 
-    template = await WorkflowTemplateRepository(db).get_by_name("pr-review")
-    if not template:
-        raise HTTPException(status_code=503, detail="pr-review template not seeded")
-
     run = build_pr_review_run(
         project,
         task_source=payload.provider,
@@ -123,7 +118,6 @@ async def trigger_pr_review(
         pr_url="",
         repo_full_name=payload.repo,
         labels=payload.labels,
-        template_id=template.id,
         flow_prompt_id=await resolve_pr_review_flow_prompt_id(db),
     )
     db.add(run)

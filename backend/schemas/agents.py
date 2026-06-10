@@ -94,7 +94,6 @@ class AgentManagementStatus(BaseModel):
 class AgentInvocationOut(BaseModel):
     id: int
     run_id: int
-    phase_execution_id: int | None = None
     workspace_server_id: int | None = None
     agent_name: str
     phase_name: str | None = None

@@ -7,10 +7,9 @@
 import pytest
 from sqlalchemy import select
 
-from backend.models import AgentSettings, WorkflowTemplate
+from backend.models import AgentSettings, FlowPrompt
 from backend.seed import (
     DEFAULT_AGENT_SETTINGS,
-    DEFAULT_WORKFLOW_TEMPLATES,
     seed_all,
 )
 
@@ -75,53 +74,16 @@ class TestSeedAll:
         openhands = result.scalar_one()
         assert openhands.agent_type == "api_service"
 
-    async def test_seeds_all_workflow_templates(self, seeded_db):
-        result = await seeded_db.execute(select(WorkflowTemplate))
-        templates = result.scalars().all()
-        names = {t.name for t in templates}
-        expected = {d["name"] for d in DEFAULT_WORKFLOW_TEMPLATES}
-        assert names == expected
+    async def test_seeds_flow_prompts(self, seeded_db):
+        """ADR-009: seed_all installs the implement + pr_review flow prompts."""
+        result = await seeded_db.execute(select(FlowPrompt))
+        flow_types = {f.flow_type for f in result.scalars().all()}
+        assert {"implement", "pr_review"} <= flow_types
 
-    async def test_exactly_one_default_workflow(self, seeded_db):
-        result = await seeded_db.execute(
-            select(WorkflowTemplate).where(WorkflowTemplate.is_default.is_(True))
-        )
-        defaults = result.scalars().all()
-        assert len(defaults) == 1
-        assert defaults[0].name == "default"
-
-    async def test_all_workflow_templates_are_system(self, seeded_db):
-        result = await seeded_db.execute(select(WorkflowTemplate))
-        for t in result.scalars().all():
-            assert t.is_system is True, f"{t.name} should be is_system=True"
-
-    async def test_workflow_templates_have_phases(self, seeded_db):
-        result = await seeded_db.execute(select(WorkflowTemplate))
-        for t in result.scalars().all():
-            assert t.phases, f"{t.name} has no phases"
-
-    async def test_example_composable_template_uses_bash_and_agent_kinds(self, seeded_db):
-        """example-composable demonstrates the ADR-007 step model."""
-        result = await seeded_db.execute(
-            select(WorkflowTemplate).where(WorkflowTemplate.name == "example-composable")
-        )
-        tpl = result.scalar_one()
-        assert tpl.label_rules == [], "example-composable should be manual-trigger only"
-
-        kinds_by_name = {p["phase_name"]: p.get("kind", "legacy_phase") for p in tpl.phases}
-        assert kinds_by_name == {
-            "workspace_setup": "legacy_phase",
-            "init": "legacy_phase",
-            "build": "bash",
-            "implement": "agent",
-            "deploy": "bash",
-        }
-        # Bash step has a command in params; agent step has a prompt
-        build = next(p for p in tpl.phases if p["phase_name"] == "build")
-        assert build["params"]["command"] == "make build"
-        implement = next(p for p in tpl.phases if p["phase_name"] == "implement")
-        assert "{{run.title}}" in implement["params"]["prompt"]
-        assert implement["params"]["mode"] == "task"
+    async def test_flow_prompts_are_system(self, seeded_db):
+        result = await seeded_db.execute(select(FlowPrompt))
+        for f in result.scalars().all():
+            assert f.is_system is True, f"{f.name} should be is_system=True"
 
 
 class TestSeedIdempotent:
@@ -134,8 +96,9 @@ class TestSeedIdempotent:
         settings = (await db_session.execute(select(AgentSettings))).scalars().all()
         assert len(settings) == len(DEFAULT_AGENT_SETTINGS)
 
-        templates = (await db_session.execute(select(WorkflowTemplate))).scalars().all()
-        assert len(templates) == len(DEFAULT_WORKFLOW_TEMPLATES)
+        flows = (await db_session.execute(select(FlowPrompt))).scalars().all()
+        # No duplicates on second seed — count stays equal to distinct names.
+        assert len(flows) == len({f.name for f in flows})
 
     async def test_backfills_command_templates(self, db_session):
         """Existing agent settings with empty templates get backfilled."""

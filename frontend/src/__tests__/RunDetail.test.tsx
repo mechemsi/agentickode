@@ -19,15 +19,14 @@ vi.mock("../api", () => ({
     task_source_meta: {}, use_claude_api: false, workspace_config: null,
     workspace_result: null, planning_result: null, coding_results: null,
     test_results: null, review_result: null, approval_requested_at: null,
-    phase_started_at: null, phase_executions: [],
-    workflow_template_id: null, parent_run_id: null, execution_mode: "structured",
+    phase_started_at: null,
+    flow_prompt_id: null, parent_run_id: null, execution_mode: "structured",
   }),
   getRunInvocations: vi.fn().mockResolvedValue([]),
   getRunLogs: vi.fn().mockResolvedValue([]),
   retryRun: vi.fn(),
   restartRun: vi.fn(),
   cancelRun: vi.fn(),
-  advancePhase: vi.fn(),
 }));
 
 import RunDetail from "../pages/RunDetail";

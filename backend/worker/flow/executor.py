@@ -2,15 +2,15 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Flow-prompt executor (ADR-009, Phase 1).
+"""Flow-prompt executor (ADR-009).
 
-The slimmed run path: workspace setup (task-mode only) -> fetch the flow's data
--> a SINGLE agent call -> finalization. The agent's response is the run outcome,
-stored on ``task_runs.coding_results`` (no per-step ``phase_executions``).
+The run path: workspace setup (task-mode only) -> fetch the flow's data -> a
+SINGLE agent call -> finalization. The agent's response is the run outcome,
+stored on ``task_runs.coding_results``.
 
-Gated behind ``settings.flow_prompts_enabled`` + a run's ``flow_prompt_id`` — see
-the fork at the top of ``pipeline.execute_pipeline``. Additive: when off, nothing
-here runs and workflow templates behave exactly as before.
+This is the only execution path: ``pipeline.execute_pipeline`` resolves the run's
+flow prompt (``pr_review`` for review runs, ``implement`` otherwise) and delegates
+here.
 """
 
 from __future__ import annotations

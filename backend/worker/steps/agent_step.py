@@ -4,9 +4,9 @@
 
 """Generic agent step runner — single-shot prompt → response via AgentResolver.
 
-Used by workflow templates whose ``phases[]`` entries have ``kind == "agent"``.
-Stays intentionally pure: no DB mutations, no PhaseExecution writes, no
-broadcaster calls. The pipeline (Task 1.5) wraps this and records results.
+The flow-prompt executor (ADR-009) calls this for its single agent invocation.
+Stays intentionally pure: no DB mutations, no broadcaster calls — the caller
+records the result on the run.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 // Commercial licensing: info@mechemsi.com
 
 import { describe, it, expect } from "vitest";
-import type { TaskRun, TaskRunDetail, PhaseExecution, ProjectConfig, Stats } from "../types";
+import type { TaskRun, TaskRunDetail, ProjectConfig, Stats } from "../types";
 
 describe("TypeScript interfaces", () => {
   it("TaskRun has required fields", () => {
@@ -27,7 +27,7 @@ describe("TypeScript interfaces", () => {
       started_at: null,
       completed_at: null,
       parent_run_id: null,
-      workflow_template_id: null,
+      flow_prompt_id: null,
       total_cost_usd: null,
       execution_mode: "structured",
     };
@@ -56,7 +56,7 @@ describe("TypeScript interfaces", () => {
       started_at: "2024-01-01T00:00:01Z",
       completed_at: null,
       parent_run_id: null,
-      workflow_template_id: null,
+      flow_prompt_id: null,
       max_retries: 3,
       workspace_path: "/workspaces/proj-1",
       repo_owner: "org",
@@ -76,35 +76,9 @@ describe("TypeScript interfaces", () => {
       phase_started_at: null,
       total_cost_usd: null,
       execution_mode: "structured",
-      phase_executions: [],
     };
     expect(detail.max_retries).toBe(3);
     expect(detail.workspace_path).toBe("/workspaces/proj-1");
-    expect(detail.phase_executions).toEqual([]);
-  });
-
-  it("PhaseExecution has required fields", () => {
-    const pe: PhaseExecution = {
-      id: 1,
-      run_id: 1,
-      phase_name: "coding",
-      order_index: 3,
-      trigger_mode: "auto",
-      status: "completed",
-      result: { ok: true },
-      error_message: null,
-      retry_count: 0,
-      max_retries: 3,
-      agent_override: null,
-      notify_source: false,
-      phase_config: null,
-      started_at: "2024-01-01T00:00:01Z",
-      completed_at: "2024-01-01T00:00:05Z",
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:05Z",
-    };
-    expect(pe.phase_name).toBe("coding");
-    expect(pe.status).toBe("completed");
   });
 
   it("ProjectConfig has required fields", () => {

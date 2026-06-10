@@ -13,8 +13,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from backend.config import settings
-from backend.models import ProjectConfig, TaskRun, WorkflowTemplate
-from backend.seed.workflow_templates import seed_workflow_templates
+from backend.models import FlowPrompt, ProjectConfig, TaskRun
+from backend.seed.flow_prompts import seed_flow_prompts
 
 
 @pytest.fixture()
@@ -37,11 +37,9 @@ async def github_project(db_session):
 
 @pytest.fixture()
 async def pr_review_template(db_session):
-    await seed_workflow_templates(db_session)
-    result = await db_session.execute(
-        select(WorkflowTemplate).where(WorkflowTemplate.name == "pr-review")
-    )
-    return result.scalar_one()
+    await seed_flow_prompts(db_session)
+    result = await db_session.execute(select(FlowPrompt).where(FlowPrompt.flow_type == "pr_review"))
+    return result.scalars().first()
 
 
 def _pr_payload(
@@ -80,7 +78,7 @@ class TestGithubPrWebhook:
 
         run = await db_session.get(TaskRun, data["run_id"])
         assert run is not None
-        assert run.workflow_template_id == pr_review_template.id
+        assert run.flow_prompt_id == pr_review_template.id
         assert run.task_id == "pr-11"
         assert run.task_source_meta["review_mode"] == "comment"
         assert run.task_source_meta["pr_number"] == 11
@@ -200,28 +198,16 @@ class TestCiPrReviewEndpoint:
 
         run = await db_session.get(TaskRun, data["run_id"])
         assert run is not None
-        assert run.workflow_template_id == pr_review_template.id
+        assert run.flow_prompt_id == pr_review_template.id
         assert run.task_id == "pr-22"
         assert run.task_source_meta["pr_number"] == 22
         assert run.task_source_meta["review_mode"] == "comment"
         assert run.max_retries == 0
 
-    async def test_ci_trigger_binds_flow_prompt_when_enabled(
-        self, client: AsyncClient, github_project, pr_review_template, db_session, monkeypatch
+    async def test_ci_trigger_binds_pr_review_flow(
+        self, client: AsyncClient, github_project, pr_review_template, db_session
     ):
-        # Regression (ADR-009 live validation): the CI endpoint must bind the
-        # pr_review flow prompt when the flag is on, else Phase 3's default
-        # mis-routes the PR review to the implement flow.
-        from backend.config import settings
-        from backend.models import FlowPrompt
-        from backend.repositories.flow_prompt_repo import FlowPromptRepository
-
-        monkeypatch.setattr(settings, "flow_prompts_enabled", True)
-        flow = await FlowPromptRepository(db_session).create(
-            FlowPrompt(name="pr-review", flow_type="pr_review", prompt="x", agent_mode="generate")
-        )
-        await db_session.commit()
-
+        # ADR-009: the CI endpoint binds the seeded pr_review flow prompt.
         resp = await client.post(
             "/api/webhooks/pr-review",
             json={"provider": "github", "repo": "myorg/myrepo", "pr_number": 24},
@@ -229,7 +215,7 @@ class TestCiPrReviewEndpoint:
         assert resp.status_code == 200
         run = await db_session.get(TaskRun, resp.json()["run_id"])
         assert run is not None
-        assert run.flow_prompt_id == flow.id
+        assert run.flow_prompt_id == pr_review_template.id
 
     async def test_ci_trigger_rejects_nonpositive_pr_number(
         self, client: AsyncClient, github_project, pr_review_template
@@ -279,10 +265,17 @@ class TestCiPrReviewEndpoint:
         assert resp.status_code == 200
         assert resp.json()["status"] == "accepted"
 
-    async def test_ci_trigger_without_template_503(self, client: AsyncClient, github_project):
-        # No pr_review_template fixture → template absent → cannot review.
+    async def test_ci_trigger_without_seeded_flow_still_creates_run(
+        self, client: AsyncClient, github_project, db_session
+    ):
+        # No pr_review flow seeded → run is still created (review_mode meta);
+        # the dispatcher resolves the pr_review flow at run time.
         resp = await client.post(
             "/api/webhooks/pr-review",
             json={"provider": "github", "repo": "myorg/myrepo", "pr_number": 1},
         )
-        assert resp.status_code == 503
+        assert resp.status_code == 200
+        run = await db_session.get(TaskRun, resp.json()["run_id"])
+        assert run is not None
+        assert run.flow_prompt_id is None
+        assert run.task_source_meta["review_mode"] == "comment"

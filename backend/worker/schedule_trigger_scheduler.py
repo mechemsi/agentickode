@@ -2,15 +2,15 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Background scheduler that fires WorkflowTemplate ScheduleTrigger entries.
+"""Background scheduler that fires FlowPrompt ScheduleTrigger entries.
 
-Polls workflow_templates for triggers of type ``schedule``, evaluates each
-cron against the last tick window, and dispatches a TaskRun bound to the
-matching template via ``TriggerMatcher`` (so all routing goes through one
-choke point).
+Polls flow_prompts for triggers of type ``schedule``, evaluates each cron
+against the last tick window, and dispatches a TaskRun bound to the matching
+flow prompt via ``TriggerMatcher`` (so all routing goes through one choke
+point).
 
 Notes:
-* Each template can have multiple schedule triggers; each fires independently.
+* Each flow prompt can have multiple schedule triggers; each fires independently.
 * A ``project_id`` is required to create a TaskRun. The scheduler reads it
   from the top-level ``project_id`` field on the schedule trigger entry
   (matching the ``ScheduleTrigger`` Pydantic schema); if absent, the trigger
@@ -30,7 +30,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backend.models import ProjectConfig, WorkflowTemplate
+from backend.models import FlowPrompt, ProjectConfig
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.services.cron_parser import next_occurrence
 from backend.services.run_factory import create_task_run
@@ -40,7 +40,7 @@ logger = logging.getLogger("agentickode.schedule_trigger_scheduler")
 
 
 class ScheduleTriggerScheduler:
-    """Polls WorkflowTemplate.triggers for ``schedule`` entries and fires them."""
+    """Polls FlowPrompt.triggers for ``schedule`` entries and fires them."""
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class ScheduleTriggerScheduler:
         self._session_factory = session_factory
         self._poll_seconds = poll_seconds
         self._running = False
-        # In-memory dedup: (template_id, cron_expr) -> last_fired_at
+        # In-memory dedup: (flow_prompt_id, cron_expr) -> last_fired_at
         self._last_fired: dict[tuple[int, str], datetime] = {}
 
     async def run(self) -> None:
@@ -71,38 +71,38 @@ class ScheduleTriggerScheduler:
         """One poll cycle: find due schedule triggers and dispatch them."""
         now = datetime.now(UTC)
         async with self._session_factory() as session:
-            templates = await self._templates_with_schedules(session)
-            for template in templates:
-                for trigger in template.triggers or []:
+            flows = await self._flows_with_schedules(session)
+            for flow in flows:
+                for trigger in flow.triggers or []:
                     if trigger.get("type") != "schedule":
                         continue
                     cron = trigger.get("cron")
                     if not isinstance(cron, str) or not cron.strip():
                         continue
-                    if not self._is_due(template.id, cron, now):
+                    if not self._is_due(flow.id, cron, now):
                         continue
-                    await self._dispatch(template, trigger, session)
+                    await self._dispatch(flow, trigger, session)
             await session.commit()
 
     @staticmethod
-    async def _templates_with_schedules(session: AsyncSession) -> list[WorkflowTemplate]:
-        """Load every template (filtering by JSON content varies across dialects)."""
-        result = await session.execute(select(WorkflowTemplate))
-        templates = list(result.scalars().all())
+    async def _flows_with_schedules(session: AsyncSession) -> list[FlowPrompt]:
+        """Load every flow prompt (filtering by JSON content varies across dialects)."""
+        result = await session.execute(select(FlowPrompt).where(FlowPrompt.enabled.is_(True)))
+        flows = list(result.scalars().all())
         return [
-            t
-            for t in templates
-            if any((entry or {}).get("type") == "schedule" for entry in (t.triggers or []))
+            f
+            for f in flows
+            if any((entry or {}).get("type") == "schedule" for entry in (f.triggers or []))
         ]
 
-    def _is_due(self, template_id: int, cron: str, now: datetime) -> bool:
+    def _is_due(self, flow_id: int, cron: str, now: datetime) -> bool:
         """Return True iff this cron's next fire time has elapsed since last seen.
 
         Compares the cron's next-after-last-fire timestamp against ``now``. If
-        we've never fired this template+cron pair, prime the bookkeeping with
-        the next future occurrence to avoid back-firing on first boot.
+        we've never fired this flow+cron pair, prime the bookkeeping with the
+        next future occurrence to avoid back-firing on first boot.
         """
-        key = (template_id, cron)
+        key = (flow_id, cron)
         last = self._last_fired.get(key)
         if last is None:
             # First time seeing this trigger — don't fire retroactively. Just
@@ -114,7 +114,7 @@ class ScheduleTriggerScheduler:
         try:
             due_at = next_occurrence(cron, last)
         except Exception:
-            logger.warning("Invalid cron %r on template %d, skipping", cron, template_id)
+            logger.warning("Invalid cron %r on flow prompt %d, skipping", cron, flow_id)
             return False
 
         if due_at <= now:
@@ -124,7 +124,7 @@ class ScheduleTriggerScheduler:
 
     async def _dispatch(
         self,
-        template: WorkflowTemplate,
+        flow: FlowPrompt,
         trigger: dict,
         session: AsyncSession,
     ) -> None:
@@ -136,25 +136,25 @@ class ScheduleTriggerScheduler:
         project_id = trigger.get("project_id")
         if not project_id:
             logger.debug(
-                "Template %d schedule trigger has no project_id, skipping dispatch",
-                template.id,
+                "Flow prompt %d schedule trigger has no project_id, skipping dispatch",
+                flow.id,
             )
             return
 
         project = await self._resolve_project(session, project_id)
         if project is None:
             logger.warning(
-                "Template %d schedule trigger references unknown project %s",
-                template.id,
+                "Flow prompt %d schedule trigger references unknown project %s",
+                flow.id,
                 project_id,
             )
             return
 
         # Route through TriggerMatcher so dispatch precedence stays unified —
-        # if the user added a more-specific schedule trigger to another
-        # template with the same cron, the matcher honors that priority.
+        # if the user added a more-specific schedule trigger to another flow
+        # prompt with the same cron, the matcher honors that priority.
         # ``project_id`` is forwarded so cross-project cron collisions don't
-        # bind the run to the wrong template.
+        # bind the run to the wrong flow prompt.
         matched = await TriggerMatcher(session).match(
             TriggerEvent(
                 type="schedule",
@@ -163,21 +163,21 @@ class ScheduleTriggerScheduler:
                 project_id=project_id,
             )
         )
-        bind_to = matched or template
+        bind_to = matched or flow
 
-        task_id = f"sched-tpl-{template.id}-{uuid.uuid4().hex[:8]}"
+        task_id = f"sched-flow-{flow.id}-{uuid.uuid4().hex[:8]}"
         cron = trigger.get("cron", "")
         run = create_task_run(
             task_id=task_id,
             project=project,
-            title=f"[Schedule] {template.name}",
-            description=f"Triggered by cron '{cron}' on template '{template.name}'",
+            title=f"[Schedule] {flow.name}",
+            description=f"Triggered by cron '{cron}' on flow prompt '{flow.name}'",
             task_source="schedule",
             task_source_meta={
                 "schedule_cron": cron,
-                "workflow_template_name": template.name,
+                "flow_prompt_name": flow.name,
             },
-            workflow_template_id=bind_to.id,
+            flow_prompt_id=bind_to.id,
         )
         session.add(run)
         await session.flush()
@@ -187,8 +187,8 @@ class ScheduleTriggerScheduler:
         except Exception:
             next_at = "unknown"
         logger.info(
-            "Schedule trigger fired template=%s cron=%s -> run #%d (next: %s)",
-            template.name,
+            "Schedule trigger fired flow=%s cron=%s -> run #%d (next: %s)",
+            flow.name,
             cron,
             run.id,
             next_at,

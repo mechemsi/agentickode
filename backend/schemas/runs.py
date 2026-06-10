@@ -24,35 +24,13 @@ class TaskRunOut(BaseModel):
     approved: bool | None
     rejection_reason: str | None
     parent_run_id: int | None = None
-    workflow_template_id: int | None = None
+    flow_prompt_id: int | None = None
     total_cost_usd: float | None = None
     execution_mode: str = "structured"
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
-
-    model_config = {"from_attributes": True}
-
-
-class PhaseExecutionOut(BaseModel):
-    id: int
-    run_id: int
-    phase_name: str
-    order_index: int
-    trigger_mode: str
-    status: str
-    result: dict[str, Any] | None
-    error_message: str | None
-    retry_count: int
-    max_retries: int
-    agent_override: str | None
-    notify_source: bool
-    phase_config: dict[str, Any] | None
-    started_at: datetime | None
-    completed_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -75,7 +53,6 @@ class TaskRunDetail(TaskRunOut):
     review_result: dict[str, Any] | None
     approval_requested_at: datetime | None
     phase_started_at: datetime | None
-    phase_executions: list[PhaseExecutionOut] = []
 
 
 class PaginatedRunsResponse(BaseModel):
@@ -101,10 +78,6 @@ class RejectRequest(BaseModel):
     reason: str = ""
 
 
-class AdvancePhaseRequest(BaseModel):
-    force: bool = False
-
-
 class TerminalActionRequest(BaseModel):
     action: str  # "continue" | "pause" | "complete"
 
@@ -119,7 +92,7 @@ class CreateRunRequest(BaseModel):
     project_id: str
     title: str
     description: str = ""
-    workflow_template_id: int | None = None
+    flow_prompt_id: int | None = None
     labels: list[str] = []
     run_type: str = "ai_task"
     agent_override: str | None = None

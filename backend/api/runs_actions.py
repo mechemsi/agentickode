@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.models import ProjectConfig
-from backend.repositories.phase_execution_repo import PhaseExecutionRepository
 from backend.repositories.task_run_repo import TaskRunRepository
 from backend.schemas import RejectRequest, TerminalActionRequest
 
@@ -70,15 +69,6 @@ async def retry_run(run_id: int, db: AsyncSession = Depends(get_db)):
     run.retry_count = 0
     run.updated_at = datetime.now(UTC)
 
-    # Reset failed/waiting phase executions back to pending
-    pe_repo = PhaseExecutionRepository(db)
-    phases = await pe_repo.get_by_run(run_id)
-    for phase in phases:
-        if phase.status in ("failed", "waiting", "cancelled"):
-            phase.status = "pending"
-            phase.error_message = None
-            phase.retry_count = 0
-
     await db.commit()
     logger.info(f"Run #{run_id} retried")
     return {"status": "retried"}
@@ -113,17 +103,6 @@ async def restart_run(run_id: int, db: AsyncSession = Depends(get_db)):
     run.test_results = None
     run.review_result = None
     run.updated_at = datetime.now(UTC)
-
-    # Reset ALL phase executions back to pending
-    pe_repo = PhaseExecutionRepository(db)
-    phases = await pe_repo.get_by_run(run_id)
-    for phase in phases:
-        phase.status = "pending"
-        phase.error_message = None
-        phase.retry_count = 0
-        phase.started_at = None
-        phase.completed_at = None
-        phase.result = None
 
     await db.commit()
     logger.info(f"Run #{run_id} fully restarted")

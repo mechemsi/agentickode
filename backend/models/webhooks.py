@@ -9,23 +9,6 @@ from sqlalchemy.orm import relationship
 from backend.models.base import Base
 
 
-class WorkflowTemplate(Base):
-    __tablename__ = "workflow_templates"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(Text, unique=True, nullable=False)
-    description = Column(Text, nullable=False, default="")
-    label_rules = Column(JSONB, nullable=False, default=list)
-    triggers = Column(JSONB, nullable=False, default=list, server_default="[]")
-    phases = Column(JSONB, nullable=False, default=list)
-    is_default = Column(Boolean, nullable=False, default=False)
-    is_system = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-
-
 class WebhookCallback(Base):
     __tablename__ = "webhook_callbacks"
 

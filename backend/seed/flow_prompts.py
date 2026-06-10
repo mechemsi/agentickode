@@ -2,10 +2,10 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Seed default flow prompts (ADR-009, Phase 1).
+"""Seed default flow prompts (ADR-009).
 
-Idempotent insert-if-not-exists by name. These are inert until
-``FLOW_PROMPTS_ENABLED`` is set and a run is bound to one.
+Idempotent insert-if-not-exists by name. The ``implement`` and ``pr_review``
+flow prompts are the default run definitions resolved by the dispatcher.
 """
 
 import logging

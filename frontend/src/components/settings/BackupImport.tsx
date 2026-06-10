@@ -19,7 +19,7 @@ const ENTITY_LABELS: Record<string, string> = {
   app_settings: "App Settings",
   agent_settings: "Agent Settings",
   notification_channels: "Notification Channels",
-  workflow_templates: "Workflow Templates",
+  flow_prompts: "Flow Prompts",
   project_configs: "Projects",
 };
 

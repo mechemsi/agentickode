@@ -10,7 +10,6 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -78,21 +77,14 @@ class TaskRun(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     phase_started_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Workflow linkage
+    # Run linkage
     parent_run_id = Column(Integer, ForeignKey("task_runs.id"), nullable=True)
-    workflow_template_id = Column(Integer, ForeignKey("workflow_templates.id"), nullable=True)
-    # ADR-009: when set (and FLOW_PROMPTS_ENABLED), the run uses the slimmed
-    # single-agent-call flow-prompt path instead of the phase pipeline.
+    # ADR-009: the run executes via its bound flow prompt (single agent call).
+    # Resolved by the dispatcher from the run's flow type when not set explicitly.
     flow_prompt_id = Column(Integer, ForeignKey("flow_prompts.id"), nullable=True)
 
     project = relationship("ProjectConfig", back_populates="runs")
     logs = relationship("TaskLog", back_populates="run", cascade="all, delete-orphan")
-    phase_executions = relationship(
-        "PhaseExecution",
-        back_populates="run",
-        cascade="all, delete-orphan",
-        order_by="PhaseExecution.order_index",
-    )
     webhook_callbacks = relationship(
         "WebhookCallback", back_populates="run", cascade="all, delete-orphan"
     )
@@ -104,33 +96,6 @@ class TaskRun(Base):
     agent_loop_executions = relationship(
         "AgentLoopExecution", back_populates="task_run", cascade="all, delete-orphan"
     )
-
-
-class PhaseExecution(Base):
-    __tablename__ = "phase_executions"
-    __table_args__ = (UniqueConstraint("run_id", "phase_name", name="uq_run_phase"),)
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(Integer, ForeignKey("task_runs.id", ondelete="CASCADE"), nullable=False)
-    phase_name = Column(Text, nullable=False)
-    order_index = Column(Integer, nullable=False)
-    trigger_mode = Column(Text, nullable=False, default="auto")
-    status = Column(Text, nullable=False, default="pending")
-    result = Column(JSONB, nullable=True)
-    error_message = Column(Text, nullable=True)
-    retry_count = Column(Integer, nullable=False, default=0)
-    max_retries = Column(Integer, nullable=False, default=3)
-    agent_override = Column(Text, nullable=True)
-    notify_source = Column(Boolean, nullable=False, default=False)
-    phase_config = Column(JSONB, nullable=True)
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-
-    run = relationship("TaskRun", back_populates="phase_executions")
 
 
 class TaskLog(Base):
@@ -152,9 +117,6 @@ class AgentInvocation(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(Integer, ForeignKey("task_runs.id", ondelete="CASCADE"), nullable=False)
-    phase_execution_id = Column(
-        Integer, ForeignKey("phase_executions.id", ondelete="SET NULL"), nullable=True
-    )
     workspace_server_id = Column(
         Integer, ForeignKey("workspace_servers.id", ondelete="SET NULL"), nullable=True
     )
@@ -199,5 +161,4 @@ class AgentInvocation(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     run = relationship("TaskRun", back_populates="agent_invocations")
-    phase_execution = relationship("PhaseExecution")
     workspace_server = relationship("WorkspaceServer")

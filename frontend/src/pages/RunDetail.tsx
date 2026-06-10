@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ExternalLink, FileText, RefreshCcw, RotateCw, Terminal, XCircle } from "lucide-react";
 import {
-  advancePhase,
   cancelRun,
   getRun,
   restartRun,
@@ -16,8 +15,6 @@ import AgentActivityPanel from "../components/runs/AgentActivityPanel";
 import RunCostSummary from "../components/runs/RunCostSummary";
 import ApprovalButtons from "../components/runs/ApprovalButtons";
 import CodingResultsPanel from "../components/runs/CodingResultsPanel";
-import GenericStepResult from "../components/runs/GenericStepResult";
-import PlanReviewPanel from "../components/runs/PlanReviewPanel";
 import CollapsibleJSON from "../components/shared/CollapsibleJSON";
 import Info from "../components/shared/Info";
 import ReviewResultPanel from "../components/runs/ReviewResultPanel";
@@ -26,19 +23,12 @@ import PhaseTimeline from "../components/runs/PhaseTimeline";
 import RunTerminalDrawer from "../components/runs/RunTerminalDrawer";
 import StatusBadge from "../components/shared/StatusBadge";
 import SafeHtml from "../components/shared/SafeHtml";
-import type { StepKind, TaskRunDetail as TRD } from "../types";
-
-function phaseLabel(p: string): string {
-  return p
-    .replace("_", " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import type { TaskRunDetail as TRD } from "../types";
 
 export default function RunDetail() {
   const { id } = useParams<{ id: string }>();
   const runId = Number(id);
   const [run, setRun] = useState<TRD | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -60,11 +50,6 @@ export default function RunDetail() {
     : [];
   const sourcePrUrl = (meta?.pr_url as string) || null;
   const sourcePrNumber = (meta?.pr_number as number) || null;
-
-  // Find the selected phase execution for the info bar
-  const selectedPE = selectedPhase
-    ? run.phase_executions?.find((pe) => pe.phase_name === selectedPhase)
-    : null;
 
   return (
     <>
@@ -91,43 +76,10 @@ export default function RunDetail() {
         </div>
       )}
 
-      {/* Phase Timeline */}
+      {/* Current step */}
       <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-6 backdrop-blur-sm">
-        <PhaseTimeline
-          phases={run.phase_executions}
-          currentPhase={run.current_phase}
-          status={run.status}
-          selectedPhase={selectedPhase}
-          onPhaseClick={setSelectedPhase}
-          onAdvance={async (phaseName) => {
-            await advancePhase(runId, phaseName);
-            load();
-          }}
-        />
+        <PhaseTimeline currentPhase={run.current_phase} status={run.status} />
       </div>
-
-      {/* Phase Info Bar (when a specific phase is selected) */}
-      {selectedPE && (
-        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-6 backdrop-blur-sm flex flex-wrap items-center gap-4 text-sm">
-          <span className="font-medium text-gray-200">
-            {phaseLabel(selectedPE.phase_name)}
-          </span>
-          <StatusBadge status={selectedPE.status} />
-          {selectedPE.started_at && (
-            <span className="text-gray-400">
-              Started: {new Date(selectedPE.started_at).toLocaleTimeString()}
-            </span>
-          )}
-          {selectedPE.started_at && selectedPE.completed_at && (
-            <span className="text-gray-400">
-              Duration: {formatPhaseDuration(selectedPE.started_at, selectedPE.completed_at)}
-            </span>
-          )}
-          {selectedPE.error_message && (
-            <span className="text-red-400 text-xs">{selectedPE.error_message}</span>
-          )}
-        </div>
-      )}
 
       {/* Info Grid */}
       <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
@@ -236,26 +188,13 @@ export default function RunDetail() {
         </div>
       )}
 
-      {/* Plan Review Panel */}
-      {run.status === "waiting_for_trigger" &&
-        run.current_phase === "coding" &&
-        (run.planning_result as Record<string, unknown> | undefined)?.subtasks && (
-          <PlanReviewPanel
-            runId={runId}
-            subtasks={(run.planning_result as { subtasks: Array<{ id?: number; title: string; description?: string; files_likely_affected?: string[]; complexity?: string }> }).subtasks}
-            complexity={(run.planning_result as Record<string, unknown>)?.estimated_complexity as string | undefined}
-            notes={(run.planning_result as Record<string, unknown>)?.notes as string | undefined}
-            onReviewed={load}
-          />
-        )}
-
       {/* Logs */}
       <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-gray-400" />
-          {selectedPhase ? `Logs — ${phaseLabel(selectedPhase)}` : "Logs"}
+          Logs
         </h2>
-        <LogViewer runId={runId} phase={selectedPhase} />
+        <LogViewer runId={runId} phase={null} />
       </div>
 
       {/* Cost Summary */}
@@ -264,30 +203,12 @@ export default function RunDetail() {
       {/* Agent Activity */}
       <AgentActivityPanel runId={runId} />
 
-      {/* Phase results — use PhaseExecution results when available, fall back to top-level fields */}
-      {run.phase_executions?.some((pe) => pe.result) ? (
-        run.phase_executions
-          .filter((pe) => pe.result)
-          .map((pe) => (
-            <PhaseResult
-              key={pe.id}
-              phaseName={pe.phase_name}
-              kind={(pe.phase_config?.kind as StepKind | undefined) ?? "legacy_phase"}
-              data={pe.result!}
-            />
-          ))
-      ) : (
-        <>
-          {run.planning_result && (
-            <CollapsibleJSON title="Planning Result" data={run.planning_result} />
-          )}
-          {run.coding_results && (
-            <CodingResultsPanel data={run.coding_results as Record<string, unknown>} />
-          )}
-          {run.review_result && (
-            <ReviewResultPanel data={run.review_result as Record<string, unknown>} />
-          )}
-        </>
+      {/* Run results */}
+      {run.coding_results && (
+        <CodingResultsPanel data={run.coding_results as Record<string, unknown>} />
+      )}
+      {run.review_result && (
+        <ReviewResultPanel data={run.review_result as Record<string, unknown>} />
       )}
 
       {/* Terminal Drawer */}
@@ -301,30 +222,6 @@ export default function RunDetail() {
       )}
     </>
   );
-}
-
-function PhaseResult({
-  phaseName,
-  kind,
-  data,
-}: {
-  phaseName: string;
-  kind: StepKind;
-  data: Record<string, unknown>;
-}) {
-  // Generic kinds (bash / agent) get their own kind-specific viewer.
-  if (kind === "bash" || kind === "agent") {
-    return <GenericStepResult phaseName={phaseName} kind={kind} data={data} />;
-  }
-  // Legacy-phase: keep the rich per-phase panels.
-  if (phaseName === "coding") {
-    return <CodingResultsPanel data={data} />;
-  }
-  if (phaseName === "reviewing") {
-    return <ReviewResultPanel data={data} />;
-  }
-  const title = phaseName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return <CollapsibleJSON title={`${title} Result`} data={data} />;
 }
 
 function formatDateTime(iso: string): string {

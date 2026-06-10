@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import ProjectConfig, TaskRun
 from backend.repositories.project_config_repo import ProjectConfigRepository
 from backend.services.run_factory import create_task_run
-from backend.services.triggers import TriggerEvent, TriggerMatcher
 from backend.services.webhook_security import verify_hmac_sha256
 
 logger = logging.getLogger("agentickode.webhooks")
@@ -61,14 +60,13 @@ def build_pr_review_run(
     pr_url: str,
     repo_full_name: str,
     labels: list[str],
-    template_id: int,
     pr_head_sha: str = "",
     flow_prompt_id: int | None = None,
 ) -> TaskRun:
-    """Create a single-pass, comment-mode PR-review run.
+    """Create a single-pass, comment-mode PR-review run (ADR-009 flow prompt).
 
-    Bound to the workflow template; when ``flow_prompt_id`` is provided (ADR-009,
-    flow prompts enabled) it is also set, and the pipeline runs the flow path.
+    Bound to the ``pr_review`` flow prompt when ``flow_prompt_id`` is provided;
+    otherwise the dispatcher resolves it from the run's ``review_mode`` meta.
     """
     run = create_task_run(
         task_id=f"pr-{pr_number}",
@@ -87,23 +85,19 @@ def build_pr_review_run(
             "review_mode": "comment",
         },
         use_claude=False,
-        workflow_template_id=template_id,
+        flow_prompt_id=flow_prompt_id,
     )
     run.max_retries = 0  # single-pass review — never auto-fix an un-checked-out workspace
-    if flow_prompt_id is not None:
-        run.flow_prompt_id = flow_prompt_id
     return run
 
 
 async def resolve_pr_review_flow_prompt_id(db) -> int | None:
-    """The pr-review flow prompt id when flow prompts are enabled, else None.
+    """The ``pr_review`` flow prompt id, or None when it isn't seeded.
 
-    Returning None keeps PR-review on the workflow-template path (current default).
+    ADR-009: PR-review always runs the single-agent-call flow path. None is a
+    safe fallback — the dispatcher resolves the flow from the run's
+    ``review_mode`` meta.
     """
-    from backend.config import settings
-
-    if not settings.flow_prompts_enabled:
-        return None
     from backend.repositories.flow_prompt_repo import FlowPromptRepository
 
     flow = await FlowPromptRepository(db).get_by_flow_type("pr_review")
@@ -138,11 +132,10 @@ async def handle_pr_event(
         return {"status": "ignored", "reason": "unknown_project"}
 
     label_names = [lbl.get("name", "") for lbl in pr.get("labels", [])]
-    template = await TriggerMatcher(db).match(
-        TriggerEvent(type="pr_event", source=source, labels=label_names, action=action or None)
-    )
-    if not template:
-        return {"status": "ignored", "reason": "no_matching_template"}
+    # PR-review is opt-in via the ``ai-review`` label (ADR-009: the run dispatches
+    # to the pr_review flow prompt).
+    if "ai-review" not in label_names:
+        return {"status": "ignored", "reason": "no_ai_review_label"}
 
     pr_number = pr.get("number", 0)
     if await _active_review_exists(db, project.project_id, f"pr-{pr_number}"):
@@ -159,7 +152,6 @@ async def handle_pr_event(
         pr_url=pr.get("html_url", ""),
         repo_full_name=repo_full_name,
         labels=label_names,
-        template_id=template.id,
         flow_prompt_id=await resolve_pr_review_flow_prompt_id(db),
     )
     db.add(run)

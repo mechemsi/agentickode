@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api._pr_webhook_helpers import build_pr_review_run, resolve_pr_review_flow_prompt_id
 from backend.models import ProjectConfig, TaskRun
 from backend.repositories.git_connection_repo import GitConnectionRepository
-from backend.repositories.workflow_template_repo import WorkflowTemplateRepository
 from backend.services.encryption import decrypt_value
 from backend.services.git.protocol import get_git_provider
 from backend.services.http_client import get_http_client
@@ -96,13 +95,7 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
     if not project.repo_owner or not project.repo_name:
         return []
 
-    template = await WorkflowTemplateRepository(session).get_by_name("pr-review")
-    if not template:
-        logger.debug("No pr-review template — skipping PR poll for %s", project.project_id)
-        return []
-
-    # ADR-009: when flow prompts are enabled, also bind runs to the pr-review
-    # flow prompt so the pipeline runs the single-agent-call path. None otherwise.
+    # ADR-009: PR-review runs the single-agent-call pr_review flow prompt.
     flow_prompt_id = await resolve_pr_review_flow_prompt_id(session)
 
     token = await _resolve_token(project, session)
@@ -142,7 +135,6 @@ async def poll_pr_reviews(project: ProjectConfig, session: AsyncSession) -> list
             pr_url=pr.get("html_url", ""),
             repo_full_name=repo_path,
             labels=labels,
-            template_id=template.id,
             pr_head_sha=head_sha,
             flow_prompt_id=flow_prompt_id,
         )

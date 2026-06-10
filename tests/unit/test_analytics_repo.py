@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from backend.models import AgentInvocation, PhaseExecution, ProjectConfig, TaskRun
+from backend.models import AgentInvocation, ProjectConfig, TaskRun
 from backend.repositories.analytics_repo import AnalyticsRepository
 
 
@@ -103,33 +103,15 @@ async def test_avg_duration(db_session):
 
 
 @pytest.mark.asyncio
-async def test_phase_durations(db_session):
-    """Phase durations grouped by phase_name."""
+async def test_phase_durations_always_empty(db_session):
+    """Per-phase durations are no longer tracked (ADR-009: single agent call)."""
     _make_project(db_session)
-    run = _make_run(db_session, status="completed")
-    await db_session.flush()
-
-    now = datetime.utcnow()
-    db_session.add(
-        PhaseExecution(
-            run_id=run.id,
-            phase_name="coding",
-            order_index=0,
-            status="completed",
-            started_at=now - timedelta(seconds=30),
-            completed_at=now,
-            created_at=now,
-        )
-    )
+    _make_run(db_session, status="completed")
     await db_session.flush()
 
     repo = AnalyticsRepository(db_session)
     summary = await repo.get_summary(days=14)
-    phases = summary["avg_phase_durations"]
-    assert len(phases) == 1
-    assert phases[0]["phase_name"] == "coding"
-    assert phases[0]["avg_seconds"] == pytest.approx(30.0, abs=1)
-    assert phases[0]["count"] == 1
+    assert summary["avg_phase_durations"] == []
 
 
 @pytest.mark.asyncio

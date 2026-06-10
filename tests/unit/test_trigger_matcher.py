@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from backend.models import WorkflowTemplate
+from backend.models import FlowPrompt
 from backend.services.triggers import TriggerEvent, TriggerMatcher
 
 
@@ -20,15 +20,17 @@ async def _add_template(
     is_default: bool = False,
     is_system: bool = False,
     updated_at: datetime | None = None,
-) -> WorkflowTemplate:
-    tpl = WorkflowTemplate(
+) -> FlowPrompt:
+    # The matcher's default fallback targets the ``implement`` flow type, so a
+    # flow standing in for "the default" is seeded with flow_type="implement".
+    tpl = FlowPrompt(
         name=name,
-        description=f"test template {name}",
-        label_rules=[],
+        flow_type="implement" if is_default else "custom",
+        prompt="do the thing",
+        agent_mode="task",
         triggers=triggers,
-        phases=[{"phase_name": "init", "enabled": True}],
-        is_default=is_default,
         is_system=is_system,
+        enabled=True,
     )
     db_session.add(tpl)
     await db_session.commit()
