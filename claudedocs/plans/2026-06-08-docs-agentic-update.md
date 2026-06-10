@@ -1,6 +1,6 @@
 ---
 title: Bring public docs and skills in line with the agentic model
-status: in-progress
+status: implemented
 date: 2026-06-08
 related:
   - claudedocs/plans/2026-06-05-remove-roles.md
@@ -10,9 +10,11 @@ related:
   - docs/plans/2026-03-22-website-readme-update-design.md
 ---
 
-> **Status (2026-06-09): Part A (this repo) is complete; Part B (agentickodeweb site) is pending — that repo is not checked out here.**
+> **Status (2026-06-10): DONE.** Part A (autodev repo) merged in `mechemsi/agentickode#39`; Part B (agentickodeweb site, the `www/` checkout) merged in `mechemsi/agentickodeweb#3` (`62bafbb`). The `www/` folder is the agentickodeweb repo checked out inside this project (gitignored by the parent).
 >
-> **Ground-truth correction:** the plan assumed `RoleAdapter` was renamed to `AgentAdapter` (ADR-008). Verified against `backend/services/adapters/protocol.py` — that did **not** happen: `RoleAdapter` is still the live adapter protocol name. Only the resolver was renamed (`RoleResolver` → `AgentResolver`). All edits keep `RoleAdapter` as-is and only fix `RoleResolver`, the "8-phase pipeline as the primary model" framing, and add ADR-009 (flow prompts) as the current model. README/CLAUDE.md/skills/legacy docs reframed accordingly.
+> **Ground-truth correction:** the plan assumed `RoleAdapter` was renamed to `AgentAdapter` (ADR-008). Verified against `backend/services/adapters/protocol.py` — that did **not** happen: `RoleAdapter` is still the live adapter protocol name. Only the resolver was renamed (`RoleResolver` → `AgentResolver`). All edits keep `RoleAdapter` as-is and only fix `RoleResolver`, the "8-phase pipeline as the primary model" framing, and add ADR-009 (flow prompts) as the current model. README/CLAUDE.md/skills/legacy docs + the marketing site reframed accordingly.
+>
+> **Follow-ups (not part of this task):** (1) `agentickodeweb` CI has been red on `main` for months — a `vue-router/volar` plugin-resolution + cascading `TS2532` typecheck issue, unrelated to content; worth a separate toolchain-fix task. (2) The public site (agentickode.ai) has no deploy workflow in-repo; the merged content needs whatever external/manual publish step the site uses to go live.
 
 # Docs & Site Agentic Update
 
