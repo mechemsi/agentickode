@@ -1,6 +1,6 @@
 ---
 title: "Replace workflow templates with flow prompts"
-status: planned
+status: implemented
 date: 2026-06-08
 related:
   - claudedocs/decisions/007-composable-step-workflows.md
@@ -50,8 +50,17 @@ related:
 >   `NewRun` template selector, `Dashboard`/`TaskRunTable` workflow-name column, and `RunDetail`
 >   workflow display; deleted `api/workflows.ts`. Backend template API/model **kept** (Phase 5).
 >
-> **Phase 5 (irreversible) held** — needs flow prompts as the working prod default first
-> (durable non-root claude-worker provisioning + flag-on + devbox claude auth).
+> **Phase 5 (irreversible) — DONE 2026-06-10** (`mechemsi/agentickode#41`, deployed to devbox):
+> removed the `WorkflowTemplate` + `PhaseExecution` engine, the phase-dispatch pipeline,
+> bash/legacy_phase step kinds, the dead phase modules, and the `FLOW_PROMPTS_ENABLED` flag
+> (flow prompts are now unconditional). Migration 044 dropped `workflow_templates` +
+> `phase_executions` + the `task_runs.workflow_template_id` / `agent_invocations.phase_execution_id`
+> FK columns (irreversible). Repointed triggers/scheduler/poller/webhooks/backup to flow prompts.
+> Backend 1167 + frontend 250 tests green. See
+> [implementation](../implementations/2026-06-10-flow-prompts-phase5.md).
+>
+> **Operational follow-up:** the live devbox is now flow-prompts-only but has no claude auth, so
+> claude `implement` runs there fail until claude auth + a durable non-root worker are provisioned.
 
 > **WARNING — PRE-DESIGN DOCUMENT**: This plan maps the current system and
 > sketches the replacement model. It contains many open questions that require
