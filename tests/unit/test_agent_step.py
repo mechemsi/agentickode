@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.models import PhaseExecution, ProjectConfig
+from backend.models import ProjectConfig
 from backend.services.adapters.cli_adapter import CLIAdapter
 from backend.services.workspace.usernames import UsernameError
 from backend.worker.steps.agent_step import run_agent_step
@@ -105,38 +105,6 @@ class TestAgentStep:
         assert result["prompt"] == "Help with: Add login"
         # First positional arg to generate is the rendered prompt
         assert adapter.generate.call_args[0][0] == "Help with: Add login"
-
-    async def test_step_output_substitution(self, db_session, mock_services, make_task_run):
-        project = ProjectConfig(
-            project_id="proj-as4", project_slug="as4", repo_owner="o", repo_name="r"
-        )
-        db_session.add(project)
-        run = make_task_run(project_id="proj-as4")
-        db_session.add(run)
-        await db_session.commit()
-        prior = PhaseExecution(
-            run_id=run.id,
-            phase_name="scan",
-            order_index=0,
-            status="completed",
-            result={"vuln_count": 3},
-        )
-        db_session.add(prior)
-        await db_session.commit()
-
-        adapter = MagicMock()
-        adapter.provider_name = "agent/claude"
-        adapter.generate = AsyncMock(return_value="ok")
-        mock_services.agent_resolver.resolve_agent = AsyncMock(return_value=_make_resolved(adapter))
-
-        phase_config = {
-            "phase_name": "fix",
-            "kind": "agent",
-            "params": {"prompt": "Fix {{steps.scan.vuln_count}} vulns"},
-        }
-        await run_agent_step(run, db_session, mock_services, phase_config)
-
-        assert adapter.generate.call_args[0][0] == "Fix 3 vulns"
 
     async def test_custom_agent_passed_to_resolver(self, db_session, mock_services, make_task_run):
         project = ProjectConfig(

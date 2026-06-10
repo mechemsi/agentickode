@@ -15,20 +15,14 @@ class TestDiscoverPhases:
         _reset_cache()
 
     def test_discover_finds_all_builtin_phases(self):
-        """All built-in phase modules are discovered."""
+        """All built-in phase modules are discovered (ADR-009: only the modules
+        the flow executor still uses remain)."""
         phases = discover_phases()
         expected = {
             "workspace_setup",
             "init",
-            "planning",
-            "coding",
-            "testing",
-            "reviewing",
-            "approval",
             "finalization",
-            "task_creation",
             "pr_fetch",
-            "agent_loop",
         }
         assert set(phases.keys()) == expected
 
@@ -43,20 +37,6 @@ class TestDiscoverPhases:
         phases = discover_phases()
         assert "init" in phases
         assert "init_phase" not in phases
-
-    def test_phase_meta_read(self):
-        """Phases with PHASE_META have their metadata populated."""
-        phases = discover_phases()
-
-        planning = phases["planning"]
-        assert planning.description == "Decompose task into subtasks via AI agent"
-        assert planning.default_agent_mode == "generate"
-
-        coding = phases["coding"]
-        assert coding.default_agent_mode == "task"
-
-        reviewing = phases["reviewing"]
-        assert reviewing.default_agent_mode == "generate"
 
     def test_missing_meta_defaults(self):
         """Phases without default_agent_mode get None."""
@@ -81,19 +61,9 @@ class TestDiscoverPhases:
         assert phases["init"].deprecated_in is None
 
     def test_other_phases_marked_legacy_phase_deprecated_in_0_5_0(self):
-        """All phases after the prelude are kind=legacy_phase, deprecated_in=0.5.0."""
+        """The remaining non-prelude phases are kind=legacy_phase, deprecated_in=0.5.0."""
         phases = discover_phases()
-        for name in (
-            "planning",
-            "coding",
-            "testing",
-            "reviewing",
-            "approval",
-            "finalization",
-            "pr_fetch",
-            "task_creation",
-            "agent_loop",
-        ):
+        for name in ("finalization", "pr_fetch"):
             info = phases[name]
             assert info.kind == "legacy_phase", f"{name} kind is {info.kind!r}"
             assert info.deprecated_in == "0.5.0", f"{name} deprecated_in is {info.deprecated_in!r}"

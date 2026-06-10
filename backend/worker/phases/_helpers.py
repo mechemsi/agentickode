@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import DEFAULT_COST_RATE, MODEL_COST_RATES
 from backend.models import (
-    PhaseExecution,
     ProjectConfig,
     ProjectWorkspaceServer,
     TaskRun,
@@ -32,67 +31,6 @@ from backend.services.workspace.command_executor import CommandExecutor, executo
 from backend.services.workspace.worker_user_service import WorkerUserService
 
 logger = logging.getLogger("agentickode.phases.helpers")
-
-_default_modes: dict[str, str] | None = None
-
-
-def _load_defaults() -> None:
-    """Populate the default agent-mode dict from the phase registry (lazy)."""
-    global _default_modes
-    if _default_modes is not None:
-        return
-    from backend.worker.phases.registry import discover_phases
-
-    phases = discover_phases()
-    _default_modes = {n: i.default_agent_mode for n, i in phases.items() if i.default_agent_mode}
-
-
-def get_agent_mode(phase_name: str, phase_config: dict | None) -> str:
-    """Return 'generate' or 'task' for the phase.
-
-    Explicit phase_config['agent_mode'] wins, else use registry defaults.
-    Falls back to 'generate' for unknown phases.
-    """
-    if phase_config:
-        mode = phase_config.get("agent_mode")
-        if mode in ("generate", "task"):
-            return mode
-    _load_defaults()
-    assert _default_modes is not None
-    return _default_modes.get(phase_name, "generate")
-
-
-def phase_uses_agent(phase_name: str, phase_config: dict | None) -> bool:
-    """Decide whether a phase should invoke an AI agent.
-
-    If *phase_config* contains an explicit ``uses_agent`` value, that wins.
-    Otherwise fall back to the registry default: only phases that declare a
-    ``default_agent_mode`` in their PHASE_META use an agent.
-    """
-    if phase_config is not None:
-        flag = phase_config.get("uses_agent")
-        if flag is not None:
-            return bool(flag)
-    _load_defaults()
-    assert _default_modes is not None
-    return phase_name in _default_modes
-
-
-def get_phase_agent(
-    phase_name: str,
-    phase_config: dict | None,
-    phase_execution: PhaseExecution | None = None,
-) -> str | None:
-    """Return the explicit agent name for a phase, or None to use the default.
-
-    Priority: ``PhaseExecution.agent_override`` (now an agent name) > ``phase_config['agent']``.
-    ``None`` means the AgentResolver picks the per-project / global default.
-    """
-    if phase_execution and phase_execution.agent_override:
-        return str(phase_execution.agent_override)
-    if phase_config and phase_config.get("agent"):
-        return str(phase_config["agent"])
-    return None
 
 
 async def get_project_config(task_run: TaskRun, session: AsyncSession) -> ProjectConfig | None:
@@ -319,58 +257,6 @@ async def ensure_agent_ready(
             if not result.success:
                 raise RuntimeError(f"Auto-install of {agent} failed: {result.error}")
             await _log(f"Agent '{agent}' installed successfully", "info")
-
-
-def get_agent_settings_kwargs(
-    agent_settings: object | None, phase_config: dict | None = None
-) -> dict:
-    """Extract runtime kwargs from AgentSettings, with per-phase overrides.
-
-    Merge order: AgentSettings (global DB) → phase_config (per-phase, wins).
-    Returns a dict with cli_flags, environment_vars, and timeout if set.
-    These can be unpacked into adapter.run_task() or adapter.generate() calls.
-    """
-    kwargs: dict = {}
-
-    # Layer 1: agent-level settings
-    if agent_settings is not None:
-        cli_flags = getattr(agent_settings, "cli_flags", None)
-        if cli_flags:
-            kwargs["cli_flags"] = dict(cli_flags)
-        env_vars = getattr(agent_settings, "environment_vars", None)
-        if env_vars:
-            kwargs["environment_vars"] = dict(env_vars)
-        timeout = getattr(agent_settings, "default_timeout", None)
-        if timeout:
-            kwargs["timeout"] = timeout
-
-    # Layer 2: phase-level overrides (shallow merge for dicts, replace for scalar)
-    if phase_config is not None:
-        phase_flags = phase_config.get("cli_flags")
-        if phase_flags:
-            kwargs["cli_flags"] = {**kwargs.get("cli_flags", {}), **phase_flags}
-        phase_env = phase_config.get("environment_vars")
-        if phase_env:
-            kwargs["environment_vars"] = {**kwargs.get("environment_vars", {}), **phase_env}
-        phase_timeout = phase_config.get("timeout_seconds")
-        if phase_timeout is not None:
-            kwargs["timeout"] = phase_timeout
-
-    return kwargs
-
-
-def apply_phase_command_overrides(adapter: RoleAdapter, phase_config: dict | None) -> None:
-    """Apply per-phase command_templates overrides to a CLIAdapter.
-
-    No-op for non-CLI adapters or when phase_config has no command_templates.
-    """
-    if phase_config is None:
-        return
-    overrides = phase_config.get("command_templates")
-    if not overrides:
-        return
-    if isinstance(adapter, CLIAdapter):
-        adapter.apply_command_overrides(overrides)
 
 
 def estimate_cost(

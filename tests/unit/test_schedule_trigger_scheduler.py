@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from backend.models import ProjectConfig, TaskRun, WorkflowTemplate
+from backend.models import FlowPrompt, ProjectConfig, TaskRun
 from backend.worker.schedule_trigger_scheduler import ScheduleTriggerScheduler
 
 
@@ -41,13 +41,14 @@ async def _add_template(
     *,
     name: str,
     triggers: list[dict],
-) -> WorkflowTemplate:
-    tpl = WorkflowTemplate(
+) -> FlowPrompt:
+    tpl = FlowPrompt(
         name=name,
-        description="",
-        label_rules=[],
+        flow_type="custom",
+        prompt="do the thing",
+        agent_mode="task",
         triggers=triggers,
-        phases=[{"phase_name": "init", "enabled": True}],
+        enabled=True,
     )
     db_session.add(tpl)
     await db_session.commit()
@@ -131,9 +132,9 @@ class TestTickDispatches:
         assert len(runs) == 1
         run = runs[0]
         assert run.task_source == "schedule"
-        assert run.workflow_template_id == template.id
+        assert run.flow_prompt_id == template.id
         assert run.task_source_meta["schedule_cron"] == "* * * * *"
-        assert run.task_source_meta["workflow_template_name"] == "hourly"
+        assert run.task_source_meta["flow_prompt_name"] == "hourly"
 
     async def test_tick_skips_template_without_project_id(self, db_session, db_engine):
         await _add_template(

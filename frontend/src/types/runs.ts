@@ -18,33 +18,13 @@ export interface TaskRun {
   approved: boolean | null;
   rejection_reason: string | null;
   parent_run_id: number | null;
-  workflow_template_id: number | null;
+  flow_prompt_id: number | null;
   total_cost_usd: number | null;
   execution_mode: string;
   created_at: string;
   updated_at: string;
   started_at: string | null;
   completed_at: string | null;
-}
-
-export interface PhaseExecution {
-  id: number;
-  run_id: number;
-  phase_name: string;
-  order_index: number;
-  trigger_mode: string;
-  status: string;
-  result: Record<string, unknown> | null;
-  error_message: string | null;
-  retry_count: number;
-  max_retries: number;
-  agent_override: string | null;
-  notify_source: boolean;
-  phase_config: Record<string, unknown> | null;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface TaskRunDetail extends TaskRun {
@@ -65,7 +45,6 @@ export interface TaskRunDetail extends TaskRun {
   review_result: Record<string, unknown> | null;
   approval_requested_at: string | null;
   phase_started_at: string | null;
-  phase_executions: PhaseExecution[];
 }
 
 export interface TaskLog {

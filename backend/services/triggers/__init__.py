@@ -2,7 +2,7 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""Trigger matching — route incoming events to WorkflowTemplate.triggers entries."""
+"""Trigger matching — route incoming events to FlowPrompt.triggers entries."""
 
 from backend.services.triggers.matcher import TriggerEvent, TriggerMatcher
 

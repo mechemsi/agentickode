@@ -11,10 +11,10 @@ from dataclasses import dataclass
 from backend.models import (
     AgentSettings,
     AppSetting,
+    FlowPrompt,
     NotificationChannel,
     OllamaServer,
     ProjectConfig,
-    WorkflowTemplate,
     WorkspaceServer,
 )
 
@@ -110,9 +110,9 @@ ENTITY_CONFIGS: dict[str, EntityConfig] = {
         excluded_fields=_COMMON_EXCLUDED | {"id"},
         secret_fields=(SecretField("config", is_dict=True),),
     ),
-    "workflow_templates": EntityConfig(
-        model=WorkflowTemplate,
-        export_key="workflow_templates",
+    "flow_prompts": EntityConfig(
+        model=FlowPrompt,
+        export_key="flow_prompts",
         match_fields=("name",),
         excluded_fields=_COMMON_EXCLUDED | {"id"},
     ),
@@ -133,7 +133,7 @@ DEPENDENCY_ORDER: list[str] = [
     "app_settings",
     "agent_settings",
     "notification_channels",
-    "workflow_templates",
+    "flow_prompts",
     # Tier 2 — depends on T1
     "project_configs",
 ]

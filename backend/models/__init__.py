@@ -20,12 +20,12 @@ from backend.models.ollama import OllamaServer
 from backend.models.policies import AgentPolicy
 from backend.models.projects import ProjectConfig, ProjectWorkspaceServer
 from backend.models.readiness import WorkspaceReadiness
-from backend.models.runs import AgentInvocation, PhaseExecution, TaskLog, TaskRun
+from backend.models.runs import AgentInvocation, TaskLog, TaskRun
 from backend.models.server_groups import ServerGroup
 from backend.models.servers import DiscoveredAgent, WorkspaceServer
 from backend.models.sessions import CliSession
 from backend.models.settings import AppSetting
-from backend.models.workflows import WebhookCallback, WorkflowTemplate
+from backend.models.webhooks import WebhookCallback
 
 __all__ = [
     "AgentInvocation",
@@ -44,7 +44,6 @@ __all__ = [
     "NotificationChannel",
     "NotificationSource",
     "OllamaServer",
-    "PhaseExecution",
     "ProjectConfig",
     "ProjectInstruction",
     "ProjectInstructionVersion",
@@ -55,7 +54,6 @@ __all__ = [
     "TaskLog",
     "TaskRun",
     "WebhookCallback",
-    "WorkflowTemplate",
     "WorkspaceReadiness",
     "WorkspaceServer",
 ]

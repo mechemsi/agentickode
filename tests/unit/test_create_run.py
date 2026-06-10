@@ -57,34 +57,32 @@ class TestCreateRun:
         )
         assert resp.status_code == 404
 
-    async def test_create_run_with_workflow_template_id(
-        self, client: AsyncClient, project, db_session
-    ):
-        # Seed the template so the FK on TaskRun.workflow_template_id is
+    async def test_create_run_with_flow_prompt_id(self, client: AsyncClient, project, db_session):
+        # Seed the flow prompt so the FK on TaskRun.flow_prompt_id is
         # satisfied under PRAGMA foreign_keys=ON.
-        from backend.models import WorkflowTemplate
+        from backend.models import FlowPrompt
 
-        tpl = WorkflowTemplate(
+        flow = FlowPrompt(
             id=42,
-            name="templated",
-            description="",
-            label_rules=[],
-            phases=[],
+            name="custom-implement",
+            flow_type="implement",
+            prompt="Implement {{run.title}}",
+            agent_mode="task",
         )
-        db_session.add(tpl)
+        db_session.add(flow)
         await db_session.commit()
 
         resp = await client.post(
             "/api/runs",
             json={
                 "project_id": "test-proj",
-                "title": "Templated run",
-                "workflow_template_id": 42,
+                "title": "Flow run",
+                "flow_prompt_id": 42,
             },
         )
         assert resp.status_code == 201
         data = resp.json()
-        assert data["title"] == "Templated run"
+        assert data["title"] == "Flow run"
 
     async def test_create_run_with_agent_override_stored_in_meta(
         self, client: AsyncClient, project, db_session

@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import AgentInvocation, PhaseExecution, TaskRun
+from backend.models import AgentInvocation, TaskRun
 
 
 class AnalyticsRepository:
@@ -78,36 +78,9 @@ class AnalyticsRepository:
         return round(sum(durations) / len(durations), 1) if durations else 0.0
 
     async def _phase_durations(self, cutoff: datetime) -> list[dict[str, Any]]:
-        """Average duration per phase (Python datetime math)."""
-        result = await self.session.execute(
-            select(
-                PhaseExecution.phase_name,
-                PhaseExecution.started_at,
-                PhaseExecution.completed_at,
-            ).where(
-                PhaseExecution.created_at >= cutoff,
-                PhaseExecution.status == "completed",
-                PhaseExecution.started_at.isnot(None),
-                PhaseExecution.completed_at.isnot(None),
-            )
-        )
-        rows = result.all()
-
-        phase_totals: dict[str, list[float]] = {}
-        for phase_name, started, completed in rows:
-            if started and completed:
-                delta = (completed - started).total_seconds()
-                if delta >= 0:
-                    phase_totals.setdefault(phase_name, []).append(delta)
-
-        return [
-            {
-                "phase_name": name,
-                "avg_seconds": round(sum(vals) / len(vals), 1),
-                "count": len(vals),
-            }
-            for name, vals in sorted(phase_totals.items())
-        ]
+        """Per-phase durations are no longer tracked (ADR-009: runs are a single
+        agent call; the legacy ``phase_executions`` table was removed)."""
+        return []
 
     async def _agent_stats(self, cutoff: datetime) -> list[dict[str, Any]]:
         """Agent invocation stats with success rate and avg duration."""

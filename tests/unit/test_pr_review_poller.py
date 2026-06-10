@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy import select
 
-from backend.models import ProjectConfig, TaskRun, WorkflowTemplate
-from backend.seed.workflow_templates import seed_workflow_templates
+from backend.models import FlowPrompt, ProjectConfig, TaskRun
+from backend.seed.flow_prompts import seed_flow_prompts
 from backend.services.task_source_polling.pr_review_poller import poll_pr_reviews
 
 
@@ -35,11 +35,9 @@ async def gitea_project(db_session):
 
 @pytest.fixture()
 async def pr_template(db_session):
-    await seed_workflow_templates(db_session)
-    result = await db_session.execute(
-        select(WorkflowTemplate).where(WorkflowTemplate.name == "pr-review")
-    )
-    return result.scalar_one()
+    await seed_flow_prompts(db_session)
+    result = await db_session.execute(select(FlowPrompt).where(FlowPrompt.flow_type == "pr_review"))
+    return result.scalars().first()
 
 
 def _pr(number=11, labels=("ai-review",), head_sha="sha1"):
@@ -81,7 +79,7 @@ class TestPrReviewPoller:
 
         run = await db_session.get(TaskRun, created[0])
         assert run.task_id == "pr-11"
-        assert run.workflow_template_id == pr_template.id
+        assert run.flow_prompt_id == pr_template.id
         assert run.task_source_meta["review_mode"] == "comment"
         assert run.task_source_meta["pr_head_sha"] == "sha1"
         assert run.max_retries == 0

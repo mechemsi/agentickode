@@ -81,7 +81,7 @@ async def plane_webhook(
         logger.warning(f"No project config for project_id={project_id}")
         return {"status": "ignored", "reason": "unknown_project"}
 
-    template = await TriggerMatcher(db).match(
+    matched_flow = await TriggerMatcher(db).match(
         TriggerEvent(
             type="issue_event",
             source="plane",
@@ -103,7 +103,7 @@ async def plane_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
-        workflow_template_id=template.id if template else None,
+        flow_prompt_id=matched_flow.id if matched_flow else None,
     )
     db.add(run)
     await db.commit()
@@ -144,7 +144,7 @@ async def github_webhook(
         return {"status": "ignored", "reason": "unknown_project"}
 
     task_id = str(issue.get("number", ""))
-    template = await TriggerMatcher(db).match(
+    matched_flow = await TriggerMatcher(db).match(
         TriggerEvent(
             type="issue_event",
             source="github",
@@ -165,7 +165,7 @@ async def github_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
-        workflow_template_id=template.id if template else None,
+        flow_prompt_id=matched_flow.id if matched_flow else None,
     )
     db.add(run)
     await db.commit()
@@ -204,7 +204,7 @@ async def gitea_issue_webhook(
         return {"status": "ignored", "reason": "unknown_project"}
 
     task_id = str(issue.get("number", ""))
-    template = await TriggerMatcher(db).match(
+    matched_flow = await TriggerMatcher(db).match(
         TriggerEvent(
             type="issue_event",
             source="gitea",
@@ -225,7 +225,7 @@ async def gitea_issue_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
-        workflow_template_id=template.id if template else None,
+        flow_prompt_id=matched_flow.id if matched_flow else None,
     )
     db.add(run)
     await db.commit()
@@ -269,7 +269,7 @@ async def gitlab_issue_webhook(
     # GitLab uses 'open'/'update'; normalize to the trigger schema's vocab
     # so triggers configured with action='opened'/'labeled' line up.
     gitlab_action = {"open": "opened", "update": "labeled"}.get(action) or action or None
-    template = await TriggerMatcher(db).match(
+    matched_flow = await TriggerMatcher(db).match(
         TriggerEvent(
             type="issue_event",
             source="gitlab",
@@ -291,7 +291,7 @@ async def gitlab_issue_webhook(
             "labels": label_names,
         },
         use_claude="use-claude" in label_names,
-        workflow_template_id=template.id if template else None,
+        flow_prompt_id=matched_flow.id if matched_flow else None,
     )
     db.add(run)
     await db.commit()
@@ -401,7 +401,7 @@ async def notion_webhook(
     if existing.scalar_one_or_none():
         return {"status": "ignored", "reason": "duplicate"}
 
-    template = await TriggerMatcher(db).match(
+    matched_flow = await TriggerMatcher(db).match(
         TriggerEvent(type="label", source="notion", labels=tags)
     )
 
@@ -422,7 +422,7 @@ async def notion_webhook(
             "event": event_type,
         },
         use_claude=use_claude_tag in tags,
-        workflow_template_id=template.id if template else None,
+        flow_prompt_id=matched_flow.id if matched_flow else None,
     )
     db.add(run)
     await db.commit()

@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import (
     AgentSettings,
     AppSetting,
+    FlowPrompt,
     NotificationChannel,
     OllamaServer,
     ProjectConfig,
-    WorkflowTemplate,
     WorkspaceServer,
 )
 from backend.services.backup.export_service import ExportService
@@ -53,7 +53,9 @@ async def _seed(session: AsyncSession) -> None:
             events=["run.completed"],
         )
     )
-    session.add(WorkflowTemplate(name="default", description="Default workflow"))
+    session.add(
+        FlowPrompt(name="implement", flow_type="implement", prompt="Implement {{run.title}}")
+    )
     proj = ProjectConfig(
         project_id="proj-1",
         project_slug="proj-1",

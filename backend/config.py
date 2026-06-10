@@ -86,10 +86,6 @@ class Settings(BaseSettings):
     max_concurrent_runs: int = 3
     poll_interval_seconds: int = 2
     approval_timeout_hours: int = 24
-
-    # ADR-009 flow prompts (Phase 1): when true, runs bound to a flow_prompt_id
-    # use the slimmed single-agent-call path. Off by default — templates still rule.
-    flow_prompts_enabled: bool = False
     phase_delay_seconds: int = 10
 
     # LLM Models

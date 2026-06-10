@@ -25,34 +25,8 @@ class TestRender:
         result = await render("X={{run.nonexistent}}Y", run, db_session)
         assert result == "X=Y"
 
-    async def test_substitutes_step_output(self, db_session, make_task_run):
-        from backend.models import PhaseExecution, ProjectConfig
-
-        project = ProjectConfig(
-            project_id="proj-tpl",
-            project_slug="tpl",
-            repo_owner="o",
-            repo_name="r",
-        )
-        db_session.add(project)
-        run = make_task_run(project_id="proj-tpl")
-        db_session.add(run)
-        await db_session.commit()
-
-        pe = PhaseExecution(
-            run_id=run.id,
-            phase_name="build",
-            order_index=0,
-            status="completed",
-            result={"sha": "abc123"},
-        )
-        db_session.add(pe)
-        await db_session.commit()
-
-        result = await render("Built {{steps.build.sha}}", run, db_session)
-        assert result == "Built abc123"
-
-    async def test_substitutes_missing_step_to_empty(self, db_session, make_task_run):
+    async def test_unknown_placeholder_left_untouched(self, db_session, make_task_run):
+        # ADR-009: only {{run.X}} is supported; {{steps.X}} is no longer a thing.
         from backend.models import ProjectConfig
 
         project = ProjectConfig(
@@ -67,4 +41,4 @@ class TestRender:
         await db_session.commit()
 
         result = await render("X={{steps.nonexistent.field}}Y", run, db_session)
-        assert result == "X=Y"
+        assert result == "X={{steps.nonexistent.field}}Y"

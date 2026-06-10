@@ -2,12 +2,12 @@
 # Licensed under AGPLv3. See LICENSE file.
 # Commercial licensing: info@mechemsi.com
 
-"""TriggerMatcher — find the WorkflowTemplate whose triggers match an event.
+"""TriggerMatcher — find the FlowPrompt whose triggers match an event.
 
-Used by webhook handlers (and the scheduler in a follow-up) to decide which
-template to dispatch a new TaskRun under. Falls back to the default template
-for plain label events when nothing else matches, preserving back-compat with
-the legacy label-only routing.
+Used by webhook handlers and the schedule scheduler to decide which flow prompt
+(ADR-009) to dispatch a new TaskRun under. Falls back to the ``implement`` flow
+prompt for plain label events when nothing else matches, preserving back-compat
+with the legacy label-only routing.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import WorkflowTemplate
+from backend.models import FlowPrompt
 
 TriggerEventType = Literal["label", "issue_event", "pr_event", "schedule"]
 
@@ -43,51 +43,56 @@ class TriggerEvent:
 
 
 class TriggerMatcher:
-    """Resolve a ``TriggerEvent`` to a ``WorkflowTemplate``.
+    """Resolve a ``TriggerEvent`` to a ``FlowPrompt``.
 
     Priority:
-    1. Non-system templates first (user creations win over seeded ones),
-       ordered by ``updated_at DESC`` so the most-recently edited template
-       wins among ties.
-    2. System templates second, same ordering.
-    3. The default template as last-resort fallback only when the event is a
-       plain label event with no labels.
+    1. Non-system flow prompts first (user creations win over seeded ones),
+       ordered by ``updated_at DESC`` so the most-recently edited one wins
+       among ties.
+    2. System flow prompts second, same ordering.
+    3. The ``implement`` flow prompt as last-resort fallback only when the
+       event is a plain label event with no labels.
+
+    Only ``enabled`` flow prompts are considered.
     """
 
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    async def match(self, event: TriggerEvent) -> WorkflowTemplate | None:
-        """Return the first WorkflowTemplate whose triggers[] match this event."""
-        templates = await self._load_templates_in_priority_order()
+    async def match(self, event: TriggerEvent) -> FlowPrompt | None:
+        """Return the first FlowPrompt whose triggers[] match this event."""
+        flows = await self._load_flows_in_priority_order()
 
-        for tpl in templates:
-            for trigger in tpl.triggers or []:
+        for flow in flows:
+            for trigger in flow.triggers or []:
                 if self._trigger_matches(trigger, event):
-                    return tpl
+                    return flow
 
-        # Fallback: plain label event with no labels falls back to the default
-        # template so that bare "open an issue with ai-task" still gets a run
-        # even when the user hasn't configured any per-source label triggers.
+        # Fallback: plain label event with no labels falls back to the
+        # implement flow so that bare "open an issue with ai-task" still gets a
+        # run even when no per-source label triggers are configured.
         if event.type == "label" and not event.labels:
             return await self._get_default()
 
         return None
 
-    async def _load_templates_in_priority_order(self) -> list[WorkflowTemplate]:
+    async def _load_flows_in_priority_order(self) -> list[FlowPrompt]:
         # Non-system first, then system. Within each bucket, most-recently
         # updated wins.
-        stmt = select(WorkflowTemplate).order_by(
-            WorkflowTemplate.is_system.asc(),
-            WorkflowTemplate.updated_at.desc(),
+        stmt = (
+            select(FlowPrompt)
+            .where(FlowPrompt.enabled.is_(True))
+            .order_by(FlowPrompt.is_system.asc(), FlowPrompt.updated_at.desc())
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def _get_default(self) -> WorkflowTemplate | None:
-        stmt = select(WorkflowTemplate).where(WorkflowTemplate.is_default.is_(True))
+    async def _get_default(self) -> FlowPrompt | None:
+        stmt = select(FlowPrompt).where(
+            FlowPrompt.flow_type == "implement", FlowPrompt.enabled.is_(True)
+        )
         result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     @staticmethod
     def _source_matches(trigger_source: str, event_source: str) -> bool:

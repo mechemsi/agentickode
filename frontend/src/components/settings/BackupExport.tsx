@@ -14,7 +14,7 @@ const ENTITY_TYPES = [
   { key: "app_settings", label: "App Settings" },
   { key: "agent_settings", label: "Agent Settings" },
   { key: "notification_channels", label: "Notification Channels" },
-  { key: "workflow_templates", label: "Workflow Templates" },
+  { key: "flow_prompts", label: "Flow Prompts" },
   { key: "project_configs", label: "Projects" },
 ];
 
