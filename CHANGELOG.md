@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-10
+
+Agentic flow prompts become the execution model. Every run is now a single
+agent call — a prompt plus the data AgenticKode fetches — and the legacy
+multi-step workflow-template / phase-execution engine is gone (ADR-009).
+
+### Added
+
+- **Flow prompts (ADR-009)** — A run is a single agent invocation: a named
+  prompt + a fixed-per-type data fetch (`implement` pulls repo/issue context,
+  `pr_review` pulls the PR diff). The agent runs to completion and opens the
+  PR / posts the review. Seeded `implement` + `pr_review` flow prompts; routing
+  (`TriggerMatcher`, schedule scheduler) and PR-review (poller/webhooks/CI)
+  resolve flow prompts.
+- **Platform host workspace** — The default workspace server can target the
+  host machine (container or bare host) with a selected run-as user; terminal
+  and chat agents launch as that user; multiple workspace folders + single
+  projects; a `gh` CLI readiness check.
+- **Simplified project creation** — Add a project with just a git URL + name;
+  the rest is optional and hidden.
+
+### Changed
+
+- **Single execution model** — Runs dispatch straight to their flow prompt
+  (`pr_review` for review runs, `implement` otherwise). Public docs, README,
+  skills, and the marketing site reframed around the agentic model.
+
+### Removed
+
+- **Workflow-template / phase-execution engine** — `WorkflowTemplate` +
+  `PhaseExecution` models/tables/API/repos/seed, composable `bash` /
+  `legacy_phase` step kinds, the dead phase modules (planning, coding, testing,
+  reviewing, approval, agent_loop, task_creation), `{{steps.*}}` templating,
+  comparison (A/B) mode, and the `FLOW_PROMPTS_ENABLED` flag (flow prompts are
+  unconditional). **Irreversible** migration `044` drops `workflow_templates`,
+  `phase_executions`, and the `task_runs.workflow_template_id` /
+  `agent_invocations.phase_execution_id` FK columns.
+
 ## [0.5.2] - 2026-05-24
 
 Default workflow simplified to five composable steps, agent allowlist
