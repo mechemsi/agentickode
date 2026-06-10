@@ -2,7 +2,7 @@
 
 ## Overview
 
-Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. The backend dispatches AI coding tasks to workspace servers, creates PRs, and gates on human approval. The execution model is moving from a configurable multi-step **worker pipeline** (the legacy phases workspace_setup → init → planning → coding → testing → reviewing → approval → finalization, still the default) to **agentic flow prompts** — a single agent call given a prompt + fetched data ([ADR-009](claudedocs/decisions/009-flow-prompts.md)), gated behind `FLOW_PROMPTS_ENABLED`.
+Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. The backend dispatches AI coding tasks to workspace servers, creates PRs, and gates on human approval. The execution model is **agentic flow prompts** ([ADR-009](claudedocs/decisions/009-flow-prompts.md)): every run is a single agent call given a prompt + auto-fetched data (repo/issue context, or PR diff for reviews); the agent's response is the run outcome. The legacy multi-step workflow-template / phase-execution engine was removed in ADR-009 Phase 5.
 
 ## Tech Stack
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy (async), Pydantic, Alembic
@@ -23,10 +23,9 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 
 - **Multi-provider git integration**: GitHub, Gitea, GitLab, Bitbucket (via GitProvider Protocol)
 - **Pluggable AI agents**: Ollama, OpenHands, Claude CLI, custom agents (via the `RoleAdapter` adapter protocol)
-- **Worker pipeline**: Configurable multi-step run with per-step status tracking and trigger modes (auto/manual/approval)
-- **Flow prompts (ADR-009)**: Single-agent-call runs (prompt + auto-fetched data) — `FLOW_PROMPTS_ENABLED`; replacing the pipeline
+- **Flow prompts (ADR-009)**: Every run is a single agent call — a named prompt + platform-fetched data (`implement` and `pr_review` flow types); the agent runs to completion and opens the PR / posts the review. Trigger modes: auto/manual/approval
 - **Remote workspace servers**: SSH-based execution with worker user isolation, agent discovery/install
-- **Workflow templates**: Label-based routing with per-step agent selection (being superseded by flow prompts)
+- **Trigger routing**: Label / issue / PR / schedule events route to a flow prompt via `TriggerMatcher` (`FlowPrompt.triggers`)
 - **Per-project instructions & secrets**: Global + phase-specific instructions, encrypted secrets with auto-injection
 - **Real-time UI**: WebSocket log streaming, SSE dashboard updates, SSH terminal bridge (xterm.js)
 - **Notifications**: Slack, Discord, Telegram, webhook callbacks
@@ -50,8 +49,9 @@ Full-stack AI task automation platform: FastAPI backend + React/Vite frontend. T
 │   │   ├── workspace/          # SSH workspace server management
 │   │   ├── notifications/      # Notification dispatching
 │   │   └── backup/             # Backup & export/import
-│   ├── worker/                 # Worker engine: phase pipeline + flow-prompt executor
-│   │   └── phases/             # Individual phase implementations
+│   ├── worker/                 # Worker engine + flow-prompt executor
+│   │   ├── flow/               # Flow-prompt executor + data sources (ADR-009)
+│   │   └── phases/             # Builtin phase modules used by the flow path (workspace_setup, init, finalization, pr_fetch)
 │   ├── config.py               # Pydantic Settings
 │   ├── database.py             # SQLAlchemy async session
 │   ├── models.py               # SQLAlchemy models
@@ -213,13 +213,13 @@ docker compose -f docker-compose.dev.yml exec frontend npx vitest run src/__test
 - Frontend: Vitest + React Testing Library, mock API with `vi.mock("../api", ...)`
 - Wrap routed components in `<MemoryRouter>`
 
-### Worker Pipeline (legacy) + Flow Prompts (ADR-009)
+### Flow Prompts (ADR-009) — the execution model
 
-- **Pipeline (default)**: legacy phases workspace_setup → init → planning → coding → testing → reviewing → approval → finalization, dispatched from a workflow template.
-- **Flow prompts (`FLOW_PROMPTS_ENABLED`)**: a run bound to a `flow_prompt_id` skips the phase loop and runs `workspace_setup`/`init` → fetch the flow's data → **a single agent call** → `finalization` (`backend/worker/flow/executor.py`). The agent's response is the run outcome.
-- Approval phase returns `"awaiting"` to park run for human review
-- Phase signature: `async def run(task_run, session, services) -> None | str`
-- Trigger modes: `auto`, `wait_for_trigger`, `wait_for_approval`
+- A run is a **single agent call**. `pipeline.execute_pipeline` resolves the run's flow prompt (`pr_review` for `review_mode` runs, `implement` otherwise) and delegates to `backend/worker/flow/executor.py`.
+- The executor runs: `workspace_setup` → `init` (task mode only) → fetch the flow's data (`backend/worker/flow/data_sources.py`) → **one agent call** (`run_task`, or `generate` for diff-only PR review) → `finalization`. The agent's response is the run outcome (stored on `task_runs.coding_results`).
+- A `FlowPrompt` is a named prompt + `flow_type` + optional `triggers` (routed by `TriggerMatcher` / the schedule scheduler) + agent override. Seeded `implement` + `pr_review` (`backend/seed/flow_prompts.py`).
+- Builtin phase modules kept for the flow path: `workspace_setup`, `init`, `finalization`, `pr_fetch`. Signature: `async def run(task_run, session, services, phase_config=None) -> None | str`.
+- The legacy `WorkflowTemplate` / `PhaseExecution` engine, composable `bash`/`legacy_phase` step kinds, and the `FLOW_PROMPTS_ENABLED` flag were removed in Phase 5 (migration 044 dropped the tables — irreversible).
 
 ## Documentation Workflow
 
