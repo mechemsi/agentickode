@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-16
+
+### Added
+
+- **Production docker-compose overlay** (`docker-compose.prod.yml`) — serves the
+  built React SPA via nginx (immutable image, no dev source bind-mounts) instead
+  of the Vite dev server; nginx proxies `/api` and `/ws` to `backend:8000`. It
+  overrides only the `frontend` service, so it composes on top of the base +
+  Traefik overlays and leaves backend, Postgres, and Redis inherited unchanged.
+
 ## [0.6.0] - 2026-06-10
 
 Agentic flow prompts become the execution model. Every run is now a single

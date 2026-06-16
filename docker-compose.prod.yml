@@ -1,0 +1,39 @@
+# docker-compose.prod.yml — production overlay (built SPA via nginx).
+#
+# Swaps the frontend from the Vite dev server (Dockerfile.frontend.dev, :5173,
+# source bind-mounts) to an immutable nginx image (Dockerfile.frontend, :80)
+# that serves the built React bundle. nginx proxies /api and /ws to
+# backend:8000 (see frontend/nginx.conf), so the UI and API share one origin.
+#
+# Apply ON TOP of the running base + Traefik overlay (devbox routes via
+# Traefik and runs the docker-compose.dev.yml base). Build and recreate ONLY
+# the frontend so the backend, Postgres and Redis stay untouched:
+#
+#   docker compose -p autodev \
+#     -f docker-compose.dev.yml -f docker-compose.traefik.yml -f docker-compose.prod.yml \
+#     build frontend
+#   docker compose -p autodev \
+#     -f docker-compose.dev.yml -f docker-compose.traefik.yml -f docker-compose.prod.yml \
+#     up -d --no-deps frontend
+#
+# This overlay only overrides the frontend service, so it composes with either
+# the docker-compose.yml or docker-compose.dev.yml base. Backend, Postgres and
+# Redis are inherited unchanged.
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    # Distinct tag from the dev image so a prod build never clobbers the dev
+    # frontend image (and vice-versa).
+    image: agentickode-frontend-prod
+    # Immutable built image: drop dev source bind-mounts and the dev host port
+    # (nginx listens on :80, routed by Traefik — no host publish needed).
+    volumes: !reset []
+    ports: !reset []
+    # Point the Traefik frontend router at nginx :80 (overrides the :5173 label
+    # from docker-compose.traefik.yml). Map-form labels merge across files.
+    labels:
+      traefik.http.services.autodev-frontend.loadbalancer.server.port: "80"
+    restart: unless-stopped
