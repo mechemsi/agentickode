@@ -25,6 +25,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      pull: true
     # Distinct tag from the dev image so a prod build never clobbers the dev
     # frontend image (and vice-versa).
     image: agentickode-frontend-prod
