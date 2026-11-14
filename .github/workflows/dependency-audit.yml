@@ -63,7 +63,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - run: pip install -r requirements.txt -r requirements-dev.txt pip-audit
+      - run: pip install -r requirements.txt -r requirements-dev.txt pip-audit 'pip-api>=0.0.35'
 
       - name: pip-audit
         run: pip-audit --format=json --output=backend-vulnerabilities.json 2>&1 || true
