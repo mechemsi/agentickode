@@ -36,11 +36,8 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset offset when filter changes
-  useEffect(() => { setOffset(0); }, [filter]);
-
-  const load = useCallback(async () => {
-    const [r, s, a] = await Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       getRuns({
         status: filter || undefined,
         search: debouncedSearch || undefined,
@@ -51,11 +48,12 @@ export default function Dashboard() {
       }),
       getStats(),
       getAnalytics(),
-    ]);
-    setRuns(r.items);
-    setTotal(r.total);
-    setStats(s);
-    setAnalytics(a);
+    ]).then(([r, s, a]) => {
+      setRuns(r.items);
+      setTotal(r.total);
+      setStats(s);
+      setAnalytics(a);
+    });
   }, [filter, debouncedSearch, sortBy, sortOrder, offset]);
 
   // Initial load + SSE
@@ -106,11 +104,11 @@ export default function Dashboard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search runs..."
-            className="w-full pl-9 pr-3 py-2 bg-gray-900/40 border border-gray-800/60 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 backdrop-blur-sm"
+            className="w-full pl-9 pr-3 py-2 bg-gray-900/40 border border-gray-800/60 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 backdrop-blur-xs"
           />
         </div>
       </div>
-      <FilterBar value={filter} onChange={setFilter} />
+      <FilterBar value={filter} onChange={(value) => { setFilter(value); setOffset(0); }} />
       <TaskRunTable
         runs={runs}
         sortBy={sortBy}

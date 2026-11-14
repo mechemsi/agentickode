@@ -67,7 +67,7 @@ def _server_to_out(server: WorkspaceServer, agent_count: int, project_count: int
 async def _ping_server(server: WorkspaceServer) -> tuple[int, bool, str | None]:
     """Quick SSH ping. Returns (server_id, reachable, error)."""
     if server.status in ("setting_up",):
-        return int(server.id), server.status == "online", None
+        return int(server.id), False, None
     try:
         ssh = executor_for_server(server)
         result = await asyncio.wait_for(ssh.test_connection(), timeout=5)

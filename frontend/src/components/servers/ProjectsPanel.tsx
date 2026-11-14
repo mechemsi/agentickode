@@ -42,7 +42,7 @@ function IDEPicker({
 
   const openIDE = (ide: JetBrainsIDE) => {
     window.localStorage.setItem("agentickode-jetbrains-ide", ide);
-    window.location.href = generateJetBrainsGatewayURI(server, remotePath, ide);
+    window.location.assign(generateJetBrainsGatewayURI(server, remotePath, ide));
     onClose();
   };
 
@@ -128,25 +128,35 @@ function ProjectRow({ project, server }: { project: ProjectConfig; server?: Work
 
 export default function ProjectsPanel({ serverId, server }: { serverId: number; server?: WorkspaceServer }) {
   const [projects, setProjects] = useState<ProjectConfig[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
     setError(null);
-    try {
-      const result = await getProjectsByServer(serverId);
+  }
+
+  const fetchData = useCallback(() => {
+    return getProjectsByServer(serverId).then((result) => {
       setProjects(result);
-    } catch {
+    }).catch(() => {
       setError("Failed to load projects");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   if (loading && !projects) {
     return (

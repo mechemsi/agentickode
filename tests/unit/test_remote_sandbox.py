@@ -52,7 +52,7 @@ class TestStartSandbox:
             ("", "", 0),  # printf .env
             ("", "", 0),  # docker compose up
         ]
-        ok, url = await remote_sandbox.start_sandbox(
+        _ok, url = await remote_sandbox.start_sandbox(
             "/workspaces/proj", template="php", task_id="t1", http_port=9090
         )
         assert url == "http://10.10.50.25:9090"

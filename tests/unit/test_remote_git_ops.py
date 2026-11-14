@@ -83,7 +83,7 @@ class TestCloneOrPull:
             ("", "", 0),  # mkdir -p
             ("", "fatal: repo not found", 128),  # git clone fails
         ]
-        with pytest.raises(RemoteGitError, match="git clone.*failed"):
+        with pytest.raises(RemoteGitError, match=r"git clone.*failed"):
             await remote_git.clone_or_pull("https://example.com/repo.git", "/workspaces/proj")
 
 
@@ -97,5 +97,5 @@ class TestMkdir:
 
     async def test_mkdir_failure_raises(self, remote_git, mock_ssh):
         mock_ssh.run_command.return_value = ("", "Permission denied", 1)
-        with pytest.raises(RemoteGitError, match="mkdir -p.*failed"):
+        with pytest.raises(RemoteGitError, match=r"mkdir -p.*failed"):
             await remote_git.mkdir("/root/forbidden")

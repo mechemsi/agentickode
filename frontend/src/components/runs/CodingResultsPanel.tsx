@@ -28,7 +28,7 @@ export default function CodingResultsPanel({ data }: { data: CodingResults }) {
   const testResults = data.test_results;
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-4 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-4 backdrop-blur-xs">
       <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2 mb-3">
         <Code className="w-4 h-4 text-gray-400" />
         Coding Results

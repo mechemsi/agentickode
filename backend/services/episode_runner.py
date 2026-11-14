@@ -191,7 +191,7 @@ class EpisodeRunner:
             else cmd
         )
 
-        stdout, _, rc = await self._ssh.run_command(wrapped, timeout=30)
+        _stdout, _, rc = await self._ssh.run_command(wrapped, timeout=30)
         if rc != 0:
             return None
 

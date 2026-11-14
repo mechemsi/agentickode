@@ -63,23 +63,30 @@ export default function NewRun() {
     });
   }, []);
 
-  useEffect(() => {
+  const project = projects.find((p) => p.project_id === projectId);
+  const canFetchIssues = !!projectId && !!project && project.task_source !== "plain";
+  const [previousProject, setPreviousProject] = useState(project);
+  if (previousProject !== project) {
+    setPreviousProject(project);
     setIssues([]);
     setSelectedIssue(null);
     setIssuesError("");
-    if (!projectId) return;
-    const project = projects.find((p) => p.project_id === projectId);
-    if (!project || project.task_source === "plain") return;
+    setIssuesLoading(canFetchIssues);
+  }
 
-    setIssuesLoading(true);
+  useEffect(() => {
+    if (!canFetchIssues) return;
+    let active = true;
     getProjectIssues(projectId)
-      .then(setIssues)
+      .then((data) => { if (active) setIssues(data); })
       .catch((err) => {
+        if (!active) return;
         setIssues([]);
         setIssuesError(err instanceof Error ? err.message : "Failed to load issues");
       })
-      .finally(() => setIssuesLoading(false));
-  }, [projectId, projects]);
+      .finally(() => { if (active) setIssuesLoading(false); });
+    return () => { active = false; };
+  }, [projectId, project, canFetchIssues]);
 
   const handleIssueSelect = (issueNumber: string) => {
     if (!issueNumber) {
@@ -170,7 +177,7 @@ export default function NewRun() {
 
       <form onSubmit={handleSubmit} className="max-w-2xl">
         {/* Core fields */}
-        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-sm space-y-4 mb-4">
+        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-xs space-y-4 mb-4">
           {/* Project */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -179,7 +186,7 @@ export default function NewRun() {
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
             >
               <option value="">-- Select project --</option>
               {projects.map((p) => (
@@ -202,7 +209,7 @@ export default function NewRun() {
               <select
                 value={workspaceServerId ?? ""}
                 onChange={(e) => setWorkspaceServerId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:ring-1 focus:ring-blue-500/50"
               >
                 <option value="">Auto-select (least loaded)</option>
                 {servers
@@ -232,7 +239,7 @@ export default function NewRun() {
               <select
                 value={selectedIssue?.number ?? ""}
                 onChange={(e) => handleIssueSelect(e.target.value)}
-                className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
               >
                 <option value="">-- Type manually --</option>
                 {issues.map((issue) => (
@@ -254,7 +261,7 @@ export default function NewRun() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Fix the login form validation"
-              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
             />
             {errors.title && (
               <p className="text-red-400 text-xs mt-1">{errors.title}</p>
@@ -271,7 +278,7 @@ export default function NewRun() {
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="Describe what needs to be done..."
-              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 resize-y"
+              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 resize-y"
             />
           </div>
 
@@ -286,7 +293,7 @@ export default function NewRun() {
               value={labels}
               onChange={(e) => setLabels(e.target.value)}
               placeholder="bug, frontend, urgent"
-              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+              className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
             />
           </div>
 
@@ -308,7 +315,7 @@ export default function NewRun() {
         </div>
 
         {/* Advanced section */}
-        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm mb-6">
+        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs mb-6">
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
@@ -337,7 +344,7 @@ export default function NewRun() {
                 <select
                   value={agentOverride}
                   onChange={(e) => setAgentOverride(e.target.value)}
-                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                 >
                   <option value="">Use project default</option>
                   {AGENT_NAMES.map((a) => (
@@ -358,7 +365,7 @@ export default function NewRun() {
                   onChange={(e) =>
                     setWorkspaceServerId(e.target.value !== "" ? Number(e.target.value) : null)
                   }
-                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                 >
                   <option value="">Use project default</option>
                   {servers.map((s) => (
@@ -377,7 +384,7 @@ export default function NewRun() {
                 <select
                   value={executionMode}
                   onChange={(e) => setExecutionMode(e.target.value as "consolidated" | "batch" | "separate")}
-                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                  className="w-full bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                 >
                   <option value="consolidated">Consolidated — plan + code + review in one call (recommended)</option>
                   <option value="batch">Batch — all subtasks in one prompt</option>
@@ -406,7 +413,7 @@ export default function NewRun() {
                       <select
                         value={phaseOverrides[phase] ?? ""}
                         onChange={(e) => setPhaseAgent(phase, e.target.value)}
-                        className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                        className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
                       >
                         <option value="">Inherit</option>
                         {AGENT_NAMES.map((a) => (
@@ -428,7 +435,7 @@ export default function NewRun() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium inline-flex items-center gap-2 shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium inline-flex items-center gap-2 shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 transition-colors"
           >
             <Plus className="w-4 h-4" />
             {submitting ? "Creating..." : "Create Run"}
@@ -436,7 +443,7 @@ export default function NewRun() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-600/40 transition-colors"
+            className="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-gray-600/40 transition-colors"
           >
             Cancel
           </button>

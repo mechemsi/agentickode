@@ -71,35 +71,34 @@ export default function Settings() {
   const confirm = useConfirm();
   const toast = useToast();
 
-  const loadHealth = async () => {
-    try {
-      setHealth(await getHealth());
+  const loadHealth = () => {
+    return getHealth().then((response) => {
+      setHealth(response);
       setError(null);
-    } catch (e) {
+    }).catch((e) => {
       setError(String(e));
-    }
+    });
   };
 
-  const loadKeys = async () => {
-    try {
-      setKeys(await getSSHKeys());
-    } catch {
-      /* ignore – keys section just stays empty */
-    }
+  const loadKeys = () => {
+    return getSSHKeys().then((response) => {
+      setKeys(response);
+    }).catch(() => {
+      /* ignore: keys section just stays empty */
+    });
   };
 
-  const loadSettings = async () => {
-    try {
-      const settings = await getAppSettings();
+  const loadSettings = () => {
+    return getAppSettings().then((settings) => {
       if (Array.isArray(settings.default_agents)) {
         setDefaultAgents(settings.default_agents as string[]);
       }
       if (typeof settings["workspace.default_root"] === "string") {
         setDefaultWorkspaceRoot(settings["workspace.default_root"] as string);
       }
-    } catch {
+    }).catch(() => {
       /* ignore */
-    }
+    });
   };
 
   const saveDefaultWorkspaceRoot = async () => {
@@ -115,7 +114,9 @@ export default function Settings() {
     }
   };
 
-  const loadOllamaServers = async () => { try { setOllamaServers(await getOllamaServers()); } catch { /* ignore */ } };
+  const loadOllamaServers = () => {
+    return getOllamaServers().then(setOllamaServers).catch(() => { /* ignore */ });
+  };
 
   const handleCreateServer = async (data: { name: string; url: string }) => {
     await createOllamaServer(data);
@@ -237,7 +238,7 @@ export default function Settings() {
       {!healthLoading && health && (
         <div className="space-y-5">
           {/* Overall Status */}
-          <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm">
+          <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs">
             <div className="flex items-center gap-3 flex-wrap">
               <Heart className={`w-5 h-5 ${health.status === "ok" ? "text-green-400 animate-pulse-slow" : "text-yellow-400"}`} />
               <span className="text-sm text-gray-400">Overall:</span>
@@ -275,7 +276,7 @@ export default function Settings() {
               return (
                 <div
                   key={s.name}
-                  className={`rounded-xl p-4 border backdrop-blur-sm transition-all hover:scale-[1.01] ${colorClass}`}
+                  className={`rounded-xl p-4 border backdrop-blur-xs transition-all hover:scale-[1.01] ${colorClass}`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-sm inline-flex items-center gap-2">
@@ -404,7 +405,7 @@ export default function Settings() {
         )}
         <div className="space-y-2">
           {ollamaServers.map((s) => (
-            <div key={s.id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm group">
+            <div key={s.id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs group">
               {editingServer === s.id ? (
                 <OllamaServerForm initial={{ name: s.name, url: s.url }} onSubmit={(data) => handleUpdateServer(s.id, data)} onCancel={() => setEditingServer(null)} />
               ) : (
@@ -458,7 +459,7 @@ export default function Settings() {
         </div>
 
         {showForm && (
-          <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-4 backdrop-blur-sm">
+          <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-4 backdrop-blur-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Key Name</label>
@@ -467,7 +468,7 @@ export default function Settings() {
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder="e.g. my-server"
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                 />
               </div>
               <div>
@@ -477,7 +478,7 @@ export default function Settings() {
                   value={keyComment}
                   onChange={(e) => setKeyComment(e.target.value)}
                   placeholder="e.g. agentickode@production"
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                 />
               </div>
             </div>
@@ -508,7 +509,7 @@ export default function Settings() {
             {keys.map((k) => (
               <div
                 key={k.name}
-                className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm"
+                className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">

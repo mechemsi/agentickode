@@ -11,13 +11,13 @@ import enum
 from pydantic import BaseModel
 
 
-class SecretMode(str, enum.Enum):
+class SecretMode(enum.StrEnum):
     plaintext = "plaintext"
     redacted = "redacted"
     encrypted = "encrypted"
 
 
-class ConflictResolution(str, enum.Enum):
+class ConflictResolution(enum.StrEnum):
     skip = "skip"
     overwrite = "overwrite"
 

@@ -71,9 +71,7 @@ class PlaneTaskManager:
             return {"id": "", "url": ""}
         workspace_slug, project_id = parts
 
-        url = (
-            f"{self._api_url}/api/v1/workspaces/{workspace_slug}" f"/projects/{project_id}/issues/"
-        )
+        url = f"{self._api_url}/api/v1/workspaces/{workspace_slug}/projects/{project_id}/issues/"
         payload: dict = {"name": title, "description_html": body}
         resp = await self._client.post(url, headers=self._headers, json=payload)
         data = resp.json()

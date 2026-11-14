@@ -81,7 +81,7 @@ export default function BackupImport() {
         <Upload className="w-5 h-5 text-blue-400" />
         Import Configuration
       </h2>
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm space-y-4">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs space-y-4">
         {/* Password */}
         <div>
           <label className="block text-xs text-gray-400 mb-1">
@@ -91,7 +91,7 @@ export default function BackupImport() {
             type="password" value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password..."
-            className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           />
         </div>
 

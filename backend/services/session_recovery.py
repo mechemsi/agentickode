@@ -106,7 +106,7 @@ class SessionRecoveryService:
     async def check_for_orphaned_process(self) -> bool:
         """Check if there's an orphaned claude process for this workspace."""
         ws = shlex.quote(self._workspace)
-        stdout, _, rc = await self._ssh.run_command(
+        stdout, _, _rc = await self._ssh.run_command(
             f"pgrep -f 'claude.*{ws}' 2>/dev/null | wc -l",
             timeout=10,
         )

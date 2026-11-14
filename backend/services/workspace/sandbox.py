@@ -89,5 +89,5 @@ class RemoteSandbox:
             return
 
         logger.info(f"Stopping sandbox at {sandbox_dir}")
-        down_cmd = f"cd {shlex.quote(sandbox_dir)} && " f"docker compose down -v --remove-orphans"
+        down_cmd = f"cd {shlex.quote(sandbox_dir)} && docker compose down -v --remove-orphans"
         await self._ssh.run_command(down_cmd, timeout=120)

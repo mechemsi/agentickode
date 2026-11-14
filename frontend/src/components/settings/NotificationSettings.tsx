@@ -39,12 +39,12 @@ export default function NotificationSettings() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = async () => {
-    try {
-      setChannels(await getNotificationChannels());
-    } catch {
+  const load = () => {
+    return getNotificationChannels().then((response) => {
+      setChannels(response);
+    }).catch(() => {
       /* ignore */
-    }
+    });
   };
 
   useEffect(() => {
@@ -132,7 +132,7 @@ export default function NotificationSettings() {
       </div>
 
       {adding && (
-        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-4 backdrop-blur-sm animate-fade-in">
+        <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-4 backdrop-blur-xs animate-fade-in">
           <NotificationChannelForm
             onSubmit={handleCreate}
             onCancel={() => setAdding(false)}
@@ -151,7 +151,7 @@ export default function NotificationSettings() {
           {channels.map((ch) => (
             <div
               key={ch.id}
-              className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm group hover:border-gray-700/60 transition-all"
+              className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs group hover:border-gray-700/60 transition-all"
             >
               {editing === ch.id ? (
                 <NotificationChannelForm

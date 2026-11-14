@@ -47,18 +47,13 @@ export default function EpisodeTimeline({
   const [loading, setLoading] = useState(true);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const fetchEpisodes = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/runs/${runId}/episodes`);
-      if (res.ok) {
-        const data = await res.json();
-        setEpisodes(data);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+  const fetchEpisodes = useCallback(() => {
+    return fetch(`/api/runs/${runId}/episodes`)
+      .then(async (res) => {
+        if (res.ok) setEpisodes(await res.json());
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
   }, [runId]);
 
   useEffect(() => {
@@ -126,7 +121,7 @@ export default function EpisodeTimeline({
     streamEvent?.context_pct ?? activeEpisode?.context_usage_pct ?? 0;
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-gray-200 flex items-center gap-2">
           <Activity className="w-4 h-4" />

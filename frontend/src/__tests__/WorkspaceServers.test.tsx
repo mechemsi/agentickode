@@ -40,6 +40,7 @@ const mockInstallAgent = vi.fn();
 const mockGetProjectsByServer = vi.fn();
 
 vi.mock("../api", () => ({
+  getServerGroups: vi.fn().mockResolvedValue([]),
   getWorkspaceServers: (...args: unknown[]) => mockGetWorkspaceServers(...args),
   createWorkspaceServer: (...args: unknown[]) => mockCreateWorkspaceServer(...args),
   updateWorkspaceServer: (...args: unknown[]) => mockUpdateWorkspaceServer(...args),

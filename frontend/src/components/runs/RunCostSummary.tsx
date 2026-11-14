@@ -100,12 +100,12 @@ export default function RunCostSummary({ runId }: Props) {
   const anyActual = phases.some((p) => p.hasActual);
 
   return (
-    <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+    <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
       <button
         className="w-full flex items-center gap-2 text-left mb-3"
         onClick={() => setCollapsed((v) => !v)}
       >
-        <DollarSign className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        <DollarSign className="w-4 h-4 text-amber-400 shrink-0" />
         <h2 className="text-lg font-semibold flex-1">Cost Summary</h2>
         <span className="text-sm text-amber-400 mr-2">${totals.cost.toFixed(4)}</span>
         <span className="text-xs text-gray-500 mr-2">

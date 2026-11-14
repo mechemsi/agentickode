@@ -395,7 +395,7 @@ export default function Chat() {
                   }`}
                   onClick={() => loadChatSession(s.session_id)}
                 >
-                  <MessageSquare className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                  <MessageSquare className="w-4 h-4 text-violet-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-300 truncate">{s.display_name}</p>
                     <p className="text-xs text-gray-500">{s.agent_name}</p>
@@ -440,7 +440,7 @@ export default function Chat() {
                   }`}
                   onClick={() => resumeTerminal(s)}
                 >
-                  <SquareTerminal className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <SquareTerminal className="w-4 h-4 text-cyan-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     {renamingId === s.session_id ? (
                       <form
@@ -494,7 +494,7 @@ export default function Chat() {
                       key={s.session_id}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/30 border-b border-gray-800/30"
                     >
-                      <SquareTerminal className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                      <SquareTerminal className="w-4 h-4 text-gray-600 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-500 truncate">{s.display_name || s.agent_name}</p>
                         <p className="text-xs text-gray-600">{s.agent_name}</p>
@@ -582,7 +582,7 @@ export default function Chat() {
         {/* Error banner */}
         {error && (
           <div className="flex items-center gap-2 px-4 py-2 bg-red-900/30 border-b border-red-700/50 text-red-300 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{error}</span>
             <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">
               <X className="w-3.5 h-3.5" />

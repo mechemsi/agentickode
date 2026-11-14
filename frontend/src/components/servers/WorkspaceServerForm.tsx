@@ -61,7 +61,7 @@ export default function WorkspaceServerForm({
           name
         </span>
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="coding-01"
@@ -75,7 +75,7 @@ export default function WorkspaceServerForm({
               hostname
             </span>
             <input
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               value={form.hostname}
               onChange={(e) => set("hostname", e.target.value)}
               placeholder="10.10.50.25"
@@ -85,7 +85,7 @@ export default function WorkspaceServerForm({
             <span className="text-xs text-gray-400">port</span>
             <input
               type="number"
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               value={form.port}
               onChange={(e) => set("port", parseInt(e.target.value) || 22)}
             />
@@ -96,7 +96,7 @@ export default function WorkspaceServerForm({
               SSH admin user
             </span>
             <input
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               value={form.username}
               onChange={(e) => set("username", e.target.value)}
             />
@@ -107,7 +107,7 @@ export default function WorkspaceServerForm({
               ssh_key_path
             </span>
             <input
-              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               value={form.ssh_key_path}
               onChange={(e) => set("ssh_key_path", e.target.value)}
               placeholder="(uses server default)"
@@ -121,7 +121,7 @@ export default function WorkspaceServerForm({
           worker user
         </span>
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           value={form.worker_user}
           onChange={(e) => set("worker_user", e.target.value)}
           placeholder="coder"
@@ -133,7 +133,7 @@ export default function WorkspaceServerForm({
           workspace folder
         </span>
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           value={form.workspace_root}
           onChange={(e) => set("workspace_root", e.target.value)}
           placeholder="/home/coder/workspaces (auto-created if empty)"
@@ -147,7 +147,7 @@ export default function WorkspaceServerForm({
         {(form.workspace_folders || []).map((folder, i) => (
           <div key={i} className="flex gap-2">
             <input
-              className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="flex-1 bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               value={folder}
               onChange={(e) =>
                 setForm((p) => ({
@@ -193,7 +193,7 @@ export default function WorkspaceServerForm({
           </span>
           <input
             type="password"
-            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             value={form.setup_password}
             onChange={(e) => set("setup_password", e.target.value)}
             placeholder="leave empty if SSH key is already deployed"
@@ -216,7 +216,7 @@ export default function WorkspaceServerForm({
             onSubmit(data);
           }}
           disabled={loading}
-          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
         >
           {loading ? "Saving..." : "Save"}
         </button>

@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 REDACTED = "***REDACTED***"
 
 
-class SecretMode(str, enum.Enum):
+class SecretMode(enum.StrEnum):
     plaintext = "plaintext"
     redacted = "redacted"
     encrypted = "encrypted"

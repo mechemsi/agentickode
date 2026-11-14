@@ -44,10 +44,11 @@ export default function LogViewer({ runId, phase }: LogViewerProps) {
     return () => { cancelled = true; };
   }, [runId, phase]);
 
-  // Reset live logs when phase filter changes
-  useEffect(() => {
+  const [previousPhase, setPreviousPhase] = useState(phase);
+  if (previousPhase !== phase) {
+    setPreviousPhase(phase);
     setLogs([]);
-  }, [phase]);
+  }
 
   // WebSocket for live logs
   useEffect(() => {

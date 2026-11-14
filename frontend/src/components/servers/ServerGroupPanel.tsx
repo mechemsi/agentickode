@@ -54,15 +54,14 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = async () => {
-    try {
-      const data = await getServerGroups();
+  const load = () => {
+    return getServerGroups().then((data) => {
       setGroups(data);
-    } catch (e) {
+    }).catch((e) => {
       toast.error(e instanceof Error ? e.message : "Failed to load groups");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -214,14 +213,14 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
               placeholder="Group name"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              className="flex-1 px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+              className="flex-1 px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
             />
             <input
               type="text"
               placeholder="Description (optional)"
               value={formDesc}
               onChange={(e) => setFormDesc(e.target.value)}
-              className="flex-1 px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+              className="flex-1 px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -258,13 +257,13 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
                 />
                 <input
                   type="text"
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
-                  className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
                 />
                 <button
                   onClick={() => handleUpdate(g.id)}
@@ -330,7 +329,7 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
                           <select
                             value={tokenProvider}
                             onChange={(e) => setTokenProvider(e.target.value)}
-                            className="px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                            className="px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
                           >
                             {PROVIDER_OPTIONS.map((p) => (
                               <option key={p.value} value={p.value}>{p.label}</option>
@@ -341,7 +340,7 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
                             placeholder="Git token / PAT"
                             value={tokenValue}
                             onChange={(e) => setTokenValue(e.target.value)}
-                            className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                            className="flex-1 px-2.5 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
                           />
                           <button
                             onClick={() => handleSetToken(g.id)}

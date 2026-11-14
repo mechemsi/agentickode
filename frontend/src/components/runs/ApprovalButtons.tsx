@@ -47,7 +47,7 @@ export default function ApprovalButtons({
     return (
       <div className="flex gap-2 items-center">
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white flex-1 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           placeholder="Rejection reason..."
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -55,7 +55,7 @@ export default function ApprovalButtons({
         <button
           onClick={handleReject}
           disabled={loading}
-          className="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded-lg text-sm disabled:opacity-50 shadow-sm shadow-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+          className="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded-lg text-sm disabled:opacity-50 shadow-xs shadow-red-900/30 focus:outline-hidden focus:ring-2 focus:ring-red-500/40"
         >
           Confirm Reject
         </button>
@@ -74,7 +74,7 @@ export default function ApprovalButtons({
       <button
         onClick={handleApprove}
         disabled={loading}
-        className="px-4 py-1.5 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm shadow-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500/40"
+        className="px-4 py-1.5 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm disabled:opacity-50 inline-flex items-center gap-1.5 shadow-xs shadow-green-900/30 focus:outline-hidden focus:ring-2 focus:ring-green-500/40"
       >
         <Check className="w-4 h-4" />
         Approve & Merge
@@ -82,7 +82,7 @@ export default function ApprovalButtons({
       <button
         onClick={() => setRejecting(true)}
         disabled={loading}
-        className="px-4 py-1.5 bg-red-900 hover:bg-red-800 text-white rounded-lg text-sm disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm shadow-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+        className="px-4 py-1.5 bg-red-900 hover:bg-red-800 text-white rounded-lg text-sm disabled:opacity-50 inline-flex items-center gap-1.5 shadow-xs shadow-red-900/30 focus:outline-hidden focus:ring-2 focus:ring-red-500/40"
       >
         <X className="w-4 h-4" />
         Reject

@@ -57,7 +57,7 @@ function Dialog({ state, onClose }: { state: DialogState; onClose: (v: boolean) 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(false); }}
       role="dialog"
       aria-modal="true"
@@ -85,13 +85,13 @@ function Dialog({ state, onClose }: { state: DialogState; onClose: (v: boolean) 
           <button
             onClick={() => onClose(false)}
             autoFocus
-            className="px-4 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500/40"
+            className="px-4 py-1.5 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors focus:outline-hidden focus:ring-2 focus:ring-gray-500/40"
           >
             {state.cancelLabel ?? "Cancel"}
           </button>
           <button
             onClick={() => onClose(true)}
-            className={`px-4 py-1.5 text-sm text-white rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 ${v.btn}`}
+            className={`px-4 py-1.5 text-sm text-white rounded-lg shadow-xs transition-colors focus:outline-hidden focus:ring-2 ${v.btn}`}
           >
             {state.confirmLabel ?? "Confirm"}
           </button>

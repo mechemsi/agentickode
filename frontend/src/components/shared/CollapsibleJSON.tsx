@@ -23,7 +23,7 @@ export default function CollapsibleJSON({ title, data, defaultOpen = false }: { 
         )}
       </button>
       {open && (
-        <pre className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-4 mt-2 text-xs overflow-x-auto animate-fade-in backdrop-blur-sm">
+        <pre className="bg-gray-900/60 border border-gray-800/60 rounded-xl p-4 mt-2 text-xs overflow-x-auto animate-fade-in backdrop-blur-xs">
           {JSON.stringify(data, null, 2)}
         </pre>
       )}

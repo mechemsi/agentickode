@@ -48,7 +48,7 @@ class ImportService:
             items = inner.get("entities", {}).get(cfg.export_key, [])
             entity_results: list[dict] = []
             for item in items:
-                obj, _ = deserialize_entity(item, cfg, handler, name_maps)
+                _obj, _ = deserialize_entity(item, cfg, handler, name_maps)
                 match_values = self._extract_match_values(item, cfg)
                 existing = await self._find_existing(cfg, match_values)
                 action = "update" if existing else "create"

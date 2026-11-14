@@ -110,7 +110,7 @@ export default function NotificationChannelForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="My Telegram Channel"
-          className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
         />
       </div>
 
@@ -123,7 +123,7 @@ export default function NotificationChannelForm({
             setChannelType(e.target.value as typeof channelType);
             setConfig({});
           }}
-          className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
         >
           {CHANNEL_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -145,7 +145,7 @@ export default function NotificationChannelForm({
               value={config[f.key] ?? ""}
               onChange={(e) => handleConfigChange(f.key, e.target.value)}
               placeholder={f.placeholder}
-              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             />
           </div>
         ))}

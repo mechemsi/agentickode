@@ -63,7 +63,7 @@ function InstallDialog({ progress, onClose }: { progress: InstallProgress; onClo
   }, [progress.output]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-xs">
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-lg mx-4 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-white flex items-center gap-2">
@@ -198,7 +198,7 @@ function AuthTerminalModal({
   }, [serverId, tmuxName]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-xs">
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-5xl mx-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-white">
@@ -307,7 +307,7 @@ function AgentRow({
 
 export default function AgentManagementPanel({ serverId }: { serverId: number }) {
   const [status, setStatus] = useState<AgentManagementStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<InstallProgress | null>(null);
@@ -316,22 +316,32 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
     agentName: string;
   } | null>(null);
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
     setError(null);
-    try {
-      const result = await getAgentStatus(serverId);
+  }
+
+  const fetchData = useCallback(() => {
+    return getAgentStatus(serverId).then((result) => {
       setStatus(result);
-    } catch {
+    }).catch(() => {
       setError("Failed to check agent status");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   const handleInstall = async (agentName: string) => {
     const agent = agents.find((a) => a.agent_name === agentName);

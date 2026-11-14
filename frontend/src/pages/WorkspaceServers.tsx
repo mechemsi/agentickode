@@ -61,7 +61,7 @@ const statusColor: Record<string, string> = {
   unknown: "bg-yellow-500",
   setting_up: "bg-blue-500 animate-pulse",
   setup_failed: "bg-red-500",
-};
+  };
 
 const STEP_LABELS: Record<string, string> = {
   ssh_test: "SSH Test",
@@ -73,7 +73,7 @@ const STEP_LABELS: Record<string, string> = {
   generate_ssh_key: "SSH Key",
   discover: "Discovery",
   mark_online: "Finalize",
-};
+  };
 
 /** Check if a running step looks stuck (>10 min since timestamp). */
 function isStepStuck(entry: { status: string; timestamp?: string }): boolean {
@@ -183,17 +183,15 @@ export default function WorkspaceServers() {
       return next;
     });
 
-  const loadGroups = async () => {
-    try {
-      const data = await getServerGroups();
-      setGroups(data);
-    } catch { /* ignore */ }
+  const loadGroups = () => {
+    return getServerGroups().then(setGroups).catch(() => { /* ignore */ });
   };
 
-  const load = async (check?: boolean) => {
-    const data = await getWorkspaceServers(check);
-    setServers(data);
-    setInitialLoading(false);
+  const load = (check?: boolean) => {
+    return getWorkspaceServers(check).then((data) => {
+      setServers(data);
+      setInitialLoading(false);
+    });
   };
   useEffect(() => {
     load(true); // Check connectivity on first load
@@ -412,7 +410,7 @@ export default function WorkspaceServers() {
                   const val = e.target.value ? Number(e.target.value) : null;
                   handleGroupChange(s.id, val, s.server_group_id);
                 }}
-                className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                className="text-xs px-1.5 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
                 title="Server group"
               >
                 <option value="">No group</option>
@@ -626,7 +624,7 @@ export default function WorkspaceServers() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && deployPassword) handleDeployKey(s.id);
                 }}
-                className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+                className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
               />
               <button
                 onClick={() => handleDeployKey(s.id)}
@@ -769,7 +767,7 @@ export default function WorkspaceServers() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && workerPassword) handleSetWorkerPassword(s.id);
                       }}
-                      className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+                      className="flex-1 px-2.5 py-1 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
                     />
                     <button
                       onClick={() => handleSetWorkerPassword(s.id)}
@@ -809,7 +807,7 @@ export default function WorkspaceServers() {
           </button>
           <button
             onClick={() => setAdding(true)}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           >
             <Plus className="w-4 h-4" />
             Add Server
@@ -819,7 +817,7 @@ export default function WorkspaceServers() {
 
       {/* Platform (local) servers always render first */}
       {servers.filter((s) => s.server_type === "local").map((s) => (
-        <div key={s.id} className="bg-gray-900/40 border border-purple-800/40 rounded-xl p-4 hover:border-purple-700/50 hover:bg-gray-900/60 transition-all group backdrop-blur-sm mb-4">
+        <div key={s.id} className="bg-gray-900/40 border border-purple-800/40 rounded-xl p-4 hover:border-purple-700/50 hover:bg-gray-900/60 transition-all group backdrop-blur-xs mb-4">
           {renderServerCard(s)}
         </div>
       ))}
@@ -841,18 +839,18 @@ export default function WorkspaceServers() {
 
       <div className="space-y-3">
         {servers.filter((s) => s.server_type !== "local").map((s) => (
-          <div key={s.id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 hover:border-gray-700/60 hover:bg-gray-900/60 transition-all group backdrop-blur-sm">
+          <div key={s.id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 hover:border-gray-700/60 hover:bg-gray-900/60 transition-all group backdrop-blur-xs">
             {renderServerCard(s)}
           </div>
         ))}
         {initialLoading && servers.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs">
             <Loader2 className="w-6 h-6 mb-2 text-gray-500 animate-spin" />
             <p className="text-sm">Loading servers...</p>
           </div>
         )}
         {!initialLoading && servers.length === 0 && !adding && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs">
             <Server className="w-8 h-8 mb-2 text-gray-600" />
             <p className="text-sm">No workspace servers configured yet.</p>
           </div>

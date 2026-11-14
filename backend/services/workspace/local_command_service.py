@@ -19,7 +19,7 @@ logger = logging.getLogger("agentickode.local_cmd")
 
 # Same extra PATH as SSHService so agents installed in user-space are found.
 _EXTRA_PATH = (
-    "$HOME/.local/bin:$HOME/.claude/bin:$HOME/go/bin" ":$HOME/.cargo/bin:$HOME/.npm-global/bin"
+    "$HOME/.local/bin:$HOME/.claude/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.npm-global/bin"
 )
 
 

@@ -19,7 +19,7 @@ export default function Projects() {
   const [autonomyFor, setAutonomyFor] = useState<string | null>(null);
   const [launchFor, setLaunchFor] = useState<ProjectConfig | null>(null);
 
-  const load = async () => setProjects(await getProjects());
+  const load = () => getProjects().then(setProjects);
   useEffect(() => { load(); getWorkspaceServers().then(setServers); }, []);
 
   const handleCreate = async (data: Record<string, unknown>) => {
@@ -49,7 +49,7 @@ export default function Projects() {
         </h1>
         <button
           onClick={() => setEditing("new")}
-          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
         >
           <Plus className="w-4 h-4" />
           Add Project
@@ -64,7 +64,7 @@ export default function Projects() {
 
       <div className="space-y-3">
         {projects.map((p) => (
-          <div key={p.project_id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 hover:border-gray-700/60 hover:bg-gray-900/60 transition-all group backdrop-blur-sm">
+          <div key={p.project_id} className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 hover:border-gray-700/60 hover:bg-gray-900/60 transition-all group backdrop-blur-xs">
             {editing === p.project_id ? (
               <ProjectForm
                 initial={p}
@@ -149,7 +149,7 @@ export default function Projects() {
           </div>
         ))}
         {projects.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs">
             <FolderKanban className="w-8 h-8 mb-2 text-gray-600" />
             <p className="text-sm">No projects configured yet.</p>
           </div>

@@ -30,18 +30,19 @@ export default function ProjectInstructionsTab({ projectId }: Props) {
   const [versions, setVersions] = useState<InstructionVersion[]>([]);
   const [showVersions, setShowVersions] = useState(false);
 
-  const load = useCallback(async () => {
-    const [instrs, secs] = await Promise.all([getInstructions(projectId), getSecrets(projectId)]);
-    setInstructions(instrs);
-    setSecrets(secs);
-    const global = instrs.find(i => i.phase_name === "__global__");
-    setGlobalContent(global?.content ?? "");
-    const pc: Record<string, string> = {};
-    for (const phase of PHASES) {
-      const found = instrs.find(i => i.phase_name === phase);
-      if (found) pc[phase] = found.content;
-    }
-    setPhaseContent(pc);
+  const load = useCallback(() => {
+    return Promise.all([getInstructions(projectId), getSecrets(projectId)]).then(([instrs, secs]) => {
+      setInstructions(instrs);
+      setSecrets(secs);
+      const global = instrs.find(i => i.phase_name === "__global__");
+      setGlobalContent(global?.content ?? "");
+      const pc: Record<string, string> = {};
+      for (const phase of PHASES) {
+        const found = instrs.find(i => i.phase_name === phase);
+        if (found) pc[phase] = found.content;
+      }
+      setPhaseContent(pc);
+    });
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
@@ -114,7 +115,7 @@ export default function ProjectInstructionsTab({ projectId }: Props) {
           value={globalContent}
           onChange={e => setGlobalContent(e.target.value)}
           placeholder={PLACEHOLDER}
-          className="w-full h-40 bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 text-sm text-gray-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+          className="w-full h-40 bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 text-sm text-gray-200 font-mono resize-y focus:outline-hidden focus:ring-1 focus:ring-blue-500/40"
         />
         <button onClick={saveGlobal} disabled={saving}
           className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
@@ -140,7 +141,7 @@ export default function ProjectInstructionsTab({ projectId }: Props) {
                     value={phaseContent[phase] ?? ""}
                     onChange={e => setPhaseContent(prev => ({ ...prev, [phase]: e.target.value }))}
                     placeholder={`Override instructions for ${phase} phase...`}
-                    className="w-full h-28 bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 text-sm text-gray-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+                    className="w-full h-28 bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 text-sm text-gray-200 font-mono resize-y focus:outline-hidden focus:ring-1 focus:ring-blue-500/40"
                   />
                   <button onClick={() => savePhase(phase)} disabled={saving}
                     className="mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs inline-flex items-center gap-1.5 disabled:opacity-50">

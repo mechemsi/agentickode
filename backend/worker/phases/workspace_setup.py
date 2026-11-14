@@ -257,8 +257,7 @@ async def run(
         base_clone = workspace
         paths = make_worktree_paths(project_root=base_clone, run_id=task_run.id)
         await _log(
-            f"Creating worktree {paths.worktree_dir} on branch {paths.branch} "
-            f"(strategy=worktree)"
+            f"Creating worktree {paths.worktree_dir} on branch {paths.branch} (strategy=worktree)"
         )
         manager = WorktreeManager(ssh, worker_user=worker_user if needs_user_drop else None)
         await manager.create(paths)

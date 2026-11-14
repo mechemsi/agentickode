@@ -48,6 +48,6 @@ def validate_username(name: str, *, field: str = "worker_user") -> str:
         raise UsernameError(f"{field} must be a non-empty string")
     if not _USERNAME_RE.match(name):
         raise UsernameError(
-            f"{field}={name!r} is not a valid POSIX username " "(allowed: [a-z_][a-z0-9_-]{0,31}$?)"
+            f"{field}={name!r} is not a valid POSIX username (allowed: [a-z_][a-z0-9_-]{{0,31}}$?)"
         )
     return name

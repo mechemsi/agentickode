@@ -67,12 +67,11 @@ export default function PlatformCrons() {
   const [formSessionId, setFormSessionId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const fetchCrons = useCallback(async () => {
-    try {
-      const res = await fetch("/api/platform-crons");
-      if (res.ok) setCrons(await res.json());
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+  const fetchCrons = useCallback(() => {
+    return fetch("/api/platform-crons")
+      .then(async (res) => { if (res.ok) setCrons(await res.json()); })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { fetchCrons(); }, [fetchCrons]);
@@ -275,7 +274,7 @@ export default function PlatformCrons() {
           <div key={c.id} className="bg-gray-800/50 border border-gray-700 rounded-lg">
             <div className="flex items-center gap-3 px-4 py-3">
               {/* Status dot */}
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${c.enabled ? "bg-green-400" : "bg-gray-600"}`} />
+              <div className={`w-2 h-2 rounded-full shrink-0 ${c.enabled ? "bg-green-400" : "bg-gray-600"}`} />
 
               {/* Name + schedule */}
               <div

@@ -53,9 +53,9 @@ function CollapsibleSection({
         onClick={() => setOpen((v) => !v)}
       >
         {open ? (
-          <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
         )}
         <span className="text-sm font-medium text-gray-200">{title}</span>
         {charCount != null && (
@@ -88,10 +88,16 @@ export default function InvocationDetailDrawer({ runId, invocationId, onClose }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const requestKey = `${runId}:${invocationId}`;
+  const [previousRequest, setPreviousRequest] = useState(requestKey);
+  if (previousRequest !== requestKey) {
+    setPreviousRequest(requestKey);
     setLoading(true);
     setError(null);
+  }
+
+  useEffect(() => {
+    let active = true;
     getInvocationDetail(runId, invocationId)
       .then((data) => {
         if (active) setDetail(data as AgentInvocationDetail);
@@ -122,7 +128,7 @@ export default function InvocationDetailDrawer({ runId, invocationId, onClose }:
       {/* Modal */}
       <div className="fixed inset-4 sm:inset-8 lg:inset-12 bg-gray-900 border border-gray-700/50 rounded-xl z-[101] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-700/50 flex-shrink-0 rounded-t-xl">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-700/50 shrink-0 rounded-t-xl">
           <Bot className="w-5 h-5 text-blue-400" />
           <div className="flex-1 min-w-0">
             {detail ? (

@@ -82,8 +82,10 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
   const [consolidatedDefault, setConsolidatedDefault] = useState(agent.consolidated_default ?? true);
   const [agentCreatesPr, setAgentCreatesPr] = useState(agent.agent_creates_pr ?? false);
 
-  // Sync when agent prop changes
-  useEffect(() => {
+  const [previousAgent, setPreviousAgent] = useState(agent);
+  if (previousAgent !== agent) {
+    setPreviousAgent(agent);
+
     setDisplayName(agent.display_name);
     setDescription(agent.description);
     setSupportsSession(agent.supports_session);
@@ -102,7 +104,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
     setNeedsNonRoot(agent.needs_non_root ?? false);
     setConsolidatedDefault(agent.consolidated_default ?? true);
     setAgentCreatesPr(agent.agent_creates_pr ?? false);
-  }, [agent]);
+  }
 
   const loadAvailability = async () => {
     if (availability !== null) return;
@@ -166,14 +168,14 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
   };
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs">
       {/* Header */}
       <button
         onClick={handleExpand}
         className="w-full flex items-center justify-between p-4 text-left"
       >
         <div className="flex items-center gap-3">
-          <Bot className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <Bot className="w-4 h-4 text-gray-500 shrink-0" />
           <span className="text-sm font-medium">{agent.display_name}</span>
           <span className="text-xs px-2 py-0.5 rounded-full text-gray-500 bg-gray-800 font-mono">
             {agent.agent_name}
@@ -190,9 +192,9 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
           )}
         </div>
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
         )}
       </button>
 
@@ -212,7 +214,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             />
           </div>
 
@@ -223,7 +225,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             />
           </div>
 
@@ -238,7 +240,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                 min={1}
                 value={defaultTimeout}
                 onChange={(e) => setDefaultTimeout(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               />
             </div>
             <div>
@@ -248,7 +250,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                 min={0}
                 value={maxRetries}
                 onChange={(e) => setMaxRetries(e.target.value)}
-                className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
               />
             </div>
           </div>
@@ -309,7 +311,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   <select
                     value={agentType}
                     onChange={(e) => setAgentType(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                   >
                     <option value="cli_binary">cli_binary</option>
                     <option value="api_service">api_service</option>
@@ -322,7 +324,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                     value={prereqName}
                     onChange={(e) => setPrereqName(e.target.value)}
                     placeholder="e.g. curl"
-                    className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                   />
                 </div>
               </div>
@@ -333,7 +335,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   value={checkCmd}
                   onChange={(e) => setCheckCmd(e.target.value)}
                   placeholder="e.g. command -v claude"
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                 />
               </div>
               <div>
@@ -344,7 +346,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   onChange={(e) => setInstallCmd(e.target.value)}
                   placeholder="e.g. curl -fsSL https://... | bash"
                   rows={3}
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 resize-y"
                 />
               </div>
               <div>
@@ -355,7 +357,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   onChange={(e) => setPostInstallCmd(e.target.value)}
                   placeholder="e.g. claude plugin install ... || true"
                   rows={3}
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 resize-y"
                 />
               </div>
               <div>
@@ -365,7 +367,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                   value={prereqCheck}
                   onChange={(e) => setPrereqCheck(e.target.value)}
                   placeholder="e.g. command -v curl"
-                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  className="w-full px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -431,7 +433,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
                     key={a.workspace_server_id}
                     className="flex items-center gap-2 text-xs text-gray-400"
                   >
-                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
                     <span>Server #{a.workspace_server_id}</span>
                     {a.version && (
                       <span className="text-gray-600">v{a.version}</span>
@@ -465,16 +467,15 @@ export default function AgentSettingsPage() {
   const [agents, setAgents] = useState<AgentSettings[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
-    try {
-      const all = await getAgents();
+  const load = () => {
+    return getAgents().then((all) => {
       // Hide agents that aren't on the platform-wide allowlist so
       // this page matches the pickers in Chat / Settings / etc.
       setAgents(all.filter((a) => VISIBLE_AGENTS.has(a.agent_name)));
       setError(null);
-    } catch (e) {
+    }).catch((e) => {
       setError(String(e));
-    }
+    });
   };
 
   useEffect(() => {

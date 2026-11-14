@@ -110,7 +110,7 @@ class TestRunCommand:
         mock_conn.__aexit__ = AsyncMock(return_value=False)
 
         with patch.object(svc, "_connect", return_value=mock_conn):
-            stdout, stderr, code = await svc.run_command("command -v claude")
+            stdout, _stderr, code = await svc.run_command("command -v claude")
         assert stdout == "/usr/bin/claude\n"
         assert code == 0
 
@@ -127,7 +127,7 @@ class TestRunCommand:
         mock_conn.__aexit__ = AsyncMock(return_value=False)
 
         with patch.object(svc, "_connect", return_value=mock_conn):
-            stdout, stderr, code = await svc.run_command("command -v nonexistent")
+            _stdout, _stderr, code = await svc.run_command("command -v nonexistent")
         assert code == 1
 
 

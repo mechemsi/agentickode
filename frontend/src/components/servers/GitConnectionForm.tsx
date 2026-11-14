@@ -78,7 +78,7 @@ export default function GitConnectionForm({ serverId, existing, onSave, onCancel
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. My GitHub Token"
-            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
           />
         </div>
         <div>
@@ -86,7 +86,7 @@ export default function GitConnectionForm({ serverId, existing, onSave, onCancel
           <select
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
           >
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -103,7 +103,7 @@ export default function GitConnectionForm({ serverId, existing, onSave, onCancel
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder={provider === "gitea" ? "https://gitea.example.com" : "https://gitlab.example.com"}
-            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
           />
         </div>
       )}
@@ -117,7 +117,7 @@ export default function GitConnectionForm({ serverId, existing, onSave, onCancel
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder={existing ? "Token configured — enter new value to change" : "Personal access token"}
-          className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+          className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
         />
       </div>
 
@@ -127,7 +127,7 @@ export default function GitConnectionForm({ serverId, existing, onSave, onCancel
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
+            className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
           >
             <option value="global">Global</option>
             <option value="server">This Server</option>
