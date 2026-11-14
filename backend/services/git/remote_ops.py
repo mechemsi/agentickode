@@ -110,7 +110,7 @@ class RemoteGitOps:
             f"{shlex.quote(repo_url)} {shlex.quote(dest)}"
         )
         try:
-            stdout, stderr, rc = await self._ssh.run_command(cmd, timeout=120)
+            _stdout, stderr, rc = await self._ssh.run_command(cmd, timeout=120)
         except SSHCommandError:
             raise
         if rc != 0:

@@ -185,7 +185,7 @@ class SSHService:
     # Paths where user-space installers place binaries (e.g. claude, pipx, npm global).
     # Non-interactive SSH doesn't source .bashrc, so we prepend these explicitly.
     _EXTRA_PATH = (
-        "$HOME/.local/bin:$HOME/.claude/bin:$HOME/go/bin" ":$HOME/.cargo/bin:$HOME/.npm-global/bin"
+        "$HOME/.local/bin:$HOME/.claude/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.npm-global/bin"
     )
 
     async def run_command(self, cmd: str, timeout: int = 30) -> tuple[str, str, int]:

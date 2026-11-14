@@ -77,12 +77,12 @@ export default function RunDetail() {
       )}
 
       {/* Current step */}
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-6 backdrop-blur-sm">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 mb-6 backdrop-blur-xs">
         <PhaseTimeline currentPhase={run.current_phase} status={run.status} />
       </div>
 
       {/* Info Grid */}
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <Info label="Task ID" value={run.task_id} />
           <Info label="Run Type" value={run.run_type} />
@@ -152,7 +152,7 @@ export default function RunDetail() {
           {["failed", "cancelled", "timeout"].includes(run.status) && (
             <button
               onClick={async () => { await retryRun(runId); load(); }}
-              className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-yellow-900/30 focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
+              className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-yellow-900/30 focus:outline-hidden focus:ring-2 focus:ring-yellow-500/40"
             >
               <RotateCw className="w-4 h-4" />
               Retry
@@ -161,7 +161,7 @@ export default function RunDetail() {
           {!["pending", "running"].includes(run.status) && (
             <button
               onClick={async () => { await restartRun(runId); load(); }}
-              className="px-4 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-orange-900/30 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+              className="px-4 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-orange-900/30 focus:outline-hidden focus:ring-2 focus:ring-orange-500/40"
             >
               <RefreshCcw className="w-4 h-4" />
               Restart
@@ -170,7 +170,7 @@ export default function RunDetail() {
           {["pending", "running"].includes(run.status) && (
             <button
               onClick={async () => { await cancelRun(runId); load(); }}
-              className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-gray-500/40"
+              className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 focus:outline-hidden focus:ring-2 focus:ring-gray-500/40"
             >
               <XCircle className="w-4 h-4" />
               Cancel
@@ -179,7 +179,7 @@ export default function RunDetail() {
           {["completed", "failed", "awaiting_approval", "timeout", "cancelled", "waiting_for_trigger"].includes(run.status) && (
             <button
               onClick={() => setTerminalOpen(true)}
-              className="px-4 py-1.5 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500/40"
+              className="px-4 py-1.5 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-green-900/30 focus:outline-hidden focus:ring-2 focus:ring-green-500/40"
             >
               <Terminal className="w-4 h-4" />
               Continue in Terminal
@@ -189,7 +189,7 @@ export default function RunDetail() {
       )}
 
       {/* Logs */}
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-gray-400" />
           Logs

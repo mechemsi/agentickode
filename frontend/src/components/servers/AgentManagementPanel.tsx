@@ -63,7 +63,7 @@ function InstallDialog({ progress, onClose }: { progress: InstallProgress; onClo
   }, [progress.output]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-xs">
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-lg mx-4 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-white flex items-center gap-2">
@@ -198,7 +198,7 @@ function AuthTerminalModal({
   }, [serverId, tmuxName]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-xs">
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 w-full max-w-5xl mx-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-white">

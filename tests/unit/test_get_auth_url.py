@@ -52,5 +52,5 @@ class TestGetAuthUrl:
             mock_git_ops.to_ssh_url.return_value = None  # e.g. non-HTTPS URL
             mock_git_ops.inject_git_credentials.return_value = "https://token@gitea/repo.git"
 
-            url, method = await get_auth_url("http://gitea/org/repo.git", "gitea", mock_ssh)
+            _url, method = await get_auth_url("http://gitea/org/repo.git", "gitea", mock_ssh)
         assert method == "https"

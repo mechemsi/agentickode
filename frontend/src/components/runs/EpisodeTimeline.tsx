@@ -126,7 +126,7 @@ export default function EpisodeTimeline({
     streamEvent?.context_pct ?? activeEpisode?.context_usage_pct ?? 0;
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-gray-200 flex items-center gap-2">
           <Activity className="w-4 h-4" />

@@ -7,7 +7,7 @@ import { CheckCircle, ChevronDown, ChevronRight, GitBranch, Globe, Key, Link, Se
 import { parseGitUrl, testConnection } from "../../api";
 import type { GitUrlParseResponse, ProjectConfig, WorkspaceServer } from "../../types";
 
-const CLS = "bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full";
+const CLS = "bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 w-full";
 
 const TASK_SOURCES = [
   { value: "plain", label: "Manual (API only)" },
@@ -91,7 +91,7 @@ function UrlSection({ gitUrl, setGitUrl, onParsed, workspaceServerId }: { gitUrl
       <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Link className="w-3 h-3" />Git Repository URL</span>
       <div className="flex gap-2">
         <input className={CLS} placeholder="https://github.com/owner/repo" value={gitUrl} onChange={(e) => setGitUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && parse()} />
-        <button onClick={parse} disabled={loading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+        <button onClick={parse} disabled={loading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-sm whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40">
           {loading ? "Parsing…" : "Parse"}
         </button>
       </div>
@@ -222,7 +222,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
           <p className="text-xs text-gray-600 italic">No workspace servers configured.</p>
         )}
         <div className="flex gap-2 mt-1">
-          <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
+          <button onClick={handleTestConn} title="Test SSH connection to first selected server" className="px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 inline-flex items-center gap-1">
             <Zap className="w-4 h-4" />Test Connection
           </button>
         </div>
@@ -385,7 +385,7 @@ export default function ProjectForm({ initial, onSubmit, onCancel, servers = [] 
       <div className="col-span-1 sm:col-span-2 flex flex-col gap-2 mt-2">
         {saveErr && <StatusLine s={{ ok: false, msg: saveErr }} />}
         <div className="flex gap-2">
-          <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40">{saving ? "Saving…" : "Save"}</button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40">{saving ? "Saving…" : "Save"}</button>
           <button onClick={onCancel} className="px-4 py-1.5 text-gray-400 hover:text-white text-sm rounded-lg hover:bg-gray-700/50 transition-colors">Cancel</button>
         </div>
       </div>

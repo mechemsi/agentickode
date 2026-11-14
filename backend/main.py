@@ -269,7 +269,7 @@ async def _run_migrations() -> None:
     )
     # Platform-as-server: server_type column (local vs remote)
     await _run_migration_step(
-        "ALTER TABLE workspace_servers " "ADD COLUMN server_type TEXT NOT NULL DEFAULT 'remote'"
+        "ALTER TABLE workspace_servers ADD COLUMN server_type TEXT NOT NULL DEFAULT 'remote'"
     )
     # Polling fields + generic integration_config on project_configs
     await _run_migration_step(

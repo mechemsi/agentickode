@@ -79,7 +79,7 @@ class TestGetTokenUsage:
 
     def test_fallback_to_estimated(self):
         adapter = MagicMock(spec=[])  # no last_token_usage attr
-        tokens_in, tokens_out, cost, source = get_token_usage(adapter, "claude", 4000, 8000)
+        tokens_in, tokens_out, _cost, source = get_token_usage(adapter, "claude", 4000, 8000)
         assert tokens_in == 1000  # 4000 // 4
         assert tokens_out == 2000  # 8000 // 4
         assert source == "estimated"
@@ -87,7 +87,7 @@ class TestGetTokenUsage:
     def test_none_usage_falls_back(self):
         adapter = MagicMock()
         adapter.last_token_usage = None
-        tokens_in, tokens_out, cost, source = get_token_usage(adapter, "claude", 4000, 8000)
+        tokens_in, _tokens_out, _cost, source = get_token_usage(adapter, "claude", 4000, 8000)
         assert tokens_in == 1000
         assert source == "estimated"
 

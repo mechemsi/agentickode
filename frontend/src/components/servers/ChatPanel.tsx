@@ -108,7 +108,7 @@ export default function ChatPanel({ sessionId }: { sessionId: number }) {
           }}
           placeholder="Type a message..."
           disabled={loading}
-          className="flex-1 px-3 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50"
+          className="flex-1 px-3 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded text-sm text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50"
         />
         <button
           onClick={handleSend}

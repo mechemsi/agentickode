@@ -77,14 +77,14 @@ export function KVEditor({
             value={entry.key}
             onChange={(e) => updateRow(idx, "key", e.target.value)}
             placeholder={keyPlaceholder}
-            className="flex-1 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+            className="flex-1 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-hidden focus:ring-1 focus:ring-blue-500/40"
           />
           <input
             type={maskValues && !revealed.has(idx) ? "password" : "text"}
             value={entry.value}
             onChange={(e) => updateRow(idx, "value", e.target.value)}
             placeholder={valuePlaceholder}
-            className="flex-1 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+            className="flex-1 px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-white font-mono placeholder-gray-600 focus:outline-hidden focus:ring-1 focus:ring-blue-500/40"
           />
           {maskValues && (
             <button

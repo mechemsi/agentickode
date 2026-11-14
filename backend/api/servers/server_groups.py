@@ -180,7 +180,7 @@ async def deploy_group_token(
         try:
             ssh = executor_for_server(server)
             cmd = _build_git_credential_cmd(provider, token, server.worker_user)
-            stdout, stderr, rc = await ssh.run_command(cmd, timeout=30)
+            _stdout, stderr, rc = await ssh.run_command(cmd, timeout=30)
             results.append(
                 {
                     "server_id": server.id,

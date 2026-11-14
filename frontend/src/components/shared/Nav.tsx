@@ -67,7 +67,7 @@ export default function Nav() {
           <OfficeIcon />
           <Link
             to="/runs/new"
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-sm shadow-blue-900/30 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm inline-flex items-center gap-1.5 shadow-xs shadow-blue-900/30 transition-colors focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           >
             <Plus className="w-4 h-4" />
             New Run

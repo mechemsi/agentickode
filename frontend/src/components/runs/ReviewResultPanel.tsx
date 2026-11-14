@@ -56,7 +56,7 @@ export default function ReviewResultPanel({ data }: { data: ReviewResult }) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-4 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-4 backdrop-blur-xs">
       {/* Approval status */}
       <div className="flex items-center gap-2 mb-4">
         {approved ? (

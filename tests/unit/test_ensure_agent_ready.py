@@ -132,7 +132,7 @@ class TestEnsureAgentReadyInstallOnWorkerUser:
             )
             mock_user_svc_cls.return_value = mock_user_svc
 
-            with pytest.raises(RuntimeError, match="Install of claude.*failed"):
+            with pytest.raises(RuntimeError, match=r"Install of claude.*failed"):
                 await ensure_agent_ready(adapter, log_fn=mock_log, agent_settings=claude_settings)
 
     async def test_worker_user_creation_failure_raises(self, mock_ssh, mock_log, claude_settings):

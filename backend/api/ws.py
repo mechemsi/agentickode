@@ -275,7 +275,7 @@ async def ws_auth_terminal(websocket: WebSocket, server_id: int, tmux_name: str)
             except WebSocketDisconnect:
                 pass
 
-        done, pending = await asyncio.wait(
+        _done, pending = await asyncio.wait(
             [asyncio.ensure_future(ssh_to_ws()), asyncio.ensure_future(ws_to_ssh())],
             return_when=asyncio.FIRST_COMPLETED,
         )

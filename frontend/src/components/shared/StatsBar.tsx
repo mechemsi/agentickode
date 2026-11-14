@@ -31,7 +31,7 @@ export default function StatsBar({ stats }: { stats: Stats | null }) {
         return (
           <div
             key={it.key}
-            className={`text-center ${it.bg} border border-gray-800/60 rounded-xl p-3 shadow-sm backdrop-blur-sm hover:border-gray-700/60 transition-all`}
+            className={`text-center ${it.bg} border border-gray-800/60 rounded-xl p-3 shadow-xs backdrop-blur-xs hover:border-gray-700/60 transition-all`}
           >
             <Icon className={`w-4 h-4 mx-auto mb-1.5 ${it.color} opacity-50`} />
             <div className={`text-2xl font-bold ${it.color}`}>

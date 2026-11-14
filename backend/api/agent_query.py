@@ -142,7 +142,7 @@ async def get_run_diff(run_id: int):
         if not run:
             raise HTTPException(404, "Run not found")
 
-        ssh, workspace, worker_user = await _get_ssh_context(db, run)
+        ssh, workspace, _worker_user = await _get_ssh_context(db, run)
         ws = shlex.quote(workspace)
 
         # Get diff from the branch

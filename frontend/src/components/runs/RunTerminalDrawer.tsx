@@ -130,7 +130,7 @@ export default function RunTerminalDrawer({ runId, workspacePath, onClose, onAct
       {/* Drawer from right */}
       <div className="fixed top-0 right-0 bottom-0 w-[60vw] min-w-[480px] max-w-[1200px] bg-gray-900 border-l border-gray-700/50 z-[101] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-700/50 flex-shrink-0">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-700/50 shrink-0">
           <TerminalIcon className="w-4 h-4 text-green-400" />
           <span className="text-sm font-medium text-gray-200 flex-1 truncate">
             Terminal &mdash; {workspacePath}

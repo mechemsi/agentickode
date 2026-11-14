@@ -128,7 +128,7 @@ export default function QueueSchedule() {
         )}
       </div>
 
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-sm space-y-4">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-xs space-y-4">
         {/* Master toggle */}
         <label className="flex items-center gap-3 cursor-pointer">
           <input
@@ -157,7 +157,7 @@ export default function QueueSchedule() {
                 value={schedule.timezone}
                 onChange={(e) => update({ timezone: e.target.value })}
                 list="tz-list"
-                className="w-full max-w-xs bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+                className="w-full max-w-xs bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
               />
               <datalist id="tz-list">
                 {COMMON_TIMEZONES.map((tz) => (
@@ -198,14 +198,14 @@ export default function QueueSchedule() {
                             type="time"
                             value={config.start}
                             onChange={(e) => setDayTime(dayKey, "start", e.target.value)}
-                            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                           />
                           <span className="text-gray-500 text-xs">to</span>
                           <input
                             type="time"
                             value={config.end}
                             onChange={(e) => setDayTime(dayKey, "end", e.target.value)}
-                            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
                           />
                         </div>
                       )}

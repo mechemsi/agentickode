@@ -14,5 +14,5 @@ def validate_schema_version(version: str) -> None:
     if version not in COMPATIBLE_VERSIONS:
         supported = ", ".join(sorted(COMPATIBLE_VERSIONS))
         raise ValueError(
-            f"Unsupported schema version '{version}'. " f"Compatible versions: {supported}"
+            f"Unsupported schema version '{version}'. Compatible versions: {supported}"
         )

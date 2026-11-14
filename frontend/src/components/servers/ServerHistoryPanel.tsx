@@ -116,12 +116,12 @@ export default function ServerHistoryPanel({ serverId }: { serverId: number }) {
           placeholder="Filter agent..."
           value={agentFilter}
           onChange={(e) => setAgentFilter(e.target.value)}
-          className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 w-36"
+          className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50 w-36"
         />
         <select
           value={phaseFilter}
           onChange={(e) => setPhaseFilter(e.target.value)}
-          className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+          className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500/50"
         >
           <option value="">All phases</option>
           <option value="planning">Planning</option>

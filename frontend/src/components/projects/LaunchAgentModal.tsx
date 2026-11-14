@@ -150,7 +150,7 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
   }, [checkReadiness]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
       <div
         className={`bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col ${
           step === "terminal"
@@ -193,7 +193,7 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
                       : "border-gray-800 opacity-60 cursor-not-allowed"
                   }`}
                 >
-                  <Server className={`w-4 h-4 flex-shrink-0 ${
+                  <Server className={`w-4 h-4 shrink-0 ${
                     ws.status === "ready" ? "text-green-400" : "text-gray-500"
                   }`} />
                   <div className="flex-1 min-w-0">
@@ -203,7 +203,7 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
                     )}
                   </div>
                   {ws.status === "ready" && (
-                    <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
                   )}
                   {ws.status === "not_cloned" && (
                     <span className="text-xs text-amber-400">Not cloned</span>

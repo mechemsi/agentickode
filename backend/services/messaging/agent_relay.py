@@ -71,7 +71,7 @@ class AgentRelay:
             await asyncio.sleep(3)
 
             # Capture output
-            stdout, _, exit_code = await ssh.run_command(
+            stdout, _, _exit_code = await ssh.run_command(
                 f"tmux capture-pane -t {tmux_name} -p -S -30",
                 timeout=10,
             )

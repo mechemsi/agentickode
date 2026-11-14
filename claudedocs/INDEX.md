@@ -2,6 +2,10 @@
 
 Quick reference for all project documentation. Claude reads this first to find relevant context.
 
+## Dependency maintenance
+
+- [Dependency audit updates](dependency-audit-2026-11-14.md): versions, compatibility edits, remaining constraints, and validation (2026-11-14).
+
 ## Plans
 
 | Doc | Status | Date | Summary |

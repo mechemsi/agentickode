@@ -52,7 +52,7 @@ def _patch_encryption():
 @pytest.mark.asyncio
 async def test_resolve_prompts_without_project_id(db_session: AsyncSession):
     """Backward compat: no project_id returns empty env vars."""
-    system, template, extra, env_vars = await resolve_prompts(
+    system, template, _extra, env_vars = await resolve_prompts(
         None, object(), db_session, "fallback system", "fallback template"
     )
     assert system == "fallback system"

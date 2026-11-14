@@ -53,14 +53,14 @@ function SortIcon({ column, sortBy, sortOrder }: { column: string; sortBy?: stri
 export default function TaskRunTable({ runs, sortBy, sortOrder, onSort }: Props) {
   if (!runs.length)
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-sm">
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-900/40 border border-gray-800/60 rounded-xl backdrop-blur-xs">
         <Inbox className="w-8 h-8 mb-2 text-gray-600" />
         <p>No runs found.</p>
       </div>
     );
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-800/60 bg-gray-900/40 backdrop-blur-sm">
+    <div className="overflow-x-auto rounded-xl border border-gray-800/60 bg-gray-900/40 backdrop-blur-xs">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-800/60 text-left bg-gray-800/40">

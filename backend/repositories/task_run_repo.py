@@ -6,7 +6,7 @@
 
 from typing import ClassVar
 
-from sqlalchemy import func, select
+from sqlalchemy import Column, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import AgentInvocation, TaskRun
@@ -18,7 +18,7 @@ class TaskRunRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    _SORT_COLUMNS: ClassVar[dict] = {
+    _SORT_COLUMNS: ClassVar[dict[str, Column]] = {
         "created_at": TaskRun.created_at,
         "updated_at": TaskRun.updated_at,
         "title": TaskRun.title,
@@ -62,7 +62,7 @@ class TaskRunRepository:
         total = (await self._session.execute(count_q)).scalar() or 0
 
         # Sort
-        sort_col = self._SORT_COLUMNS.get(sort_by, TaskRun.created_at)
+        sort_col = self._SORT_COLUMNS.get(sort_by, self._SORT_COLUMNS["created_at"])
         order = sort_col.asc() if sort_order == "asc" else sort_col.desc()
 
         q = (

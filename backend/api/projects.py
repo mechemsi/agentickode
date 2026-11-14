@@ -210,7 +210,7 @@ async def check_workspace_readiness(
 
         ssh = executor_for_server(server)
         try:
-            stdout, _stderr, rc = await ssh.run_command(
+            stdout, _stderr, _rc = await ssh.run_command(
                 f"test -d {expected_path}/.git && echo 'exists' || echo 'missing'",
                 timeout=10,
             )

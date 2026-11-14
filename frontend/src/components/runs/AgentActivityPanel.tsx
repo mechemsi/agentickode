@@ -65,7 +65,7 @@ function InvocationRow({
           className="flex items-center gap-3 flex-1 min-w-0 text-left hover:bg-white/5 transition-colors"
           onClick={() => setExpanded((v) => !v)}
         >
-          <span className="text-gray-500 flex-shrink-0">
+          <span className="text-gray-500 shrink-0">
             {expanded ? (
               <ChevronDown className="w-4 h-4" />
             ) : (
@@ -74,12 +74,12 @@ function InvocationRow({
           </span>
 
           {/* Agent + Phase */}
-          <span className="font-mono text-xs text-blue-300 flex-shrink-0 min-w-[120px]">
+          <span className="font-mono text-xs text-blue-300 shrink-0 min-w-[120px]">
             {inv.agent_name}
           </span>
 
           {/* Phase badge */}
-          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300 flex-shrink-0">
+          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300 shrink-0">
             {inv.phase_name ?? "-"}
           </span>
 
@@ -93,24 +93,24 @@ function InvocationRow({
           </span>
 
           {/* Cost */}
-          <span className="text-xs text-amber-400 flex-shrink-0 w-16 text-right">
+          <span className="text-xs text-amber-400 shrink-0 w-16 text-right">
             {inv.estimated_cost_usd != null
               ? `$${inv.estimated_cost_usd.toFixed(4)}`
               : ""}
           </span>
 
           {/* Duration */}
-          <span className="text-xs text-gray-400 flex-shrink-0 w-16 text-right">
+          <span className="text-xs text-gray-400 shrink-0 w-16 text-right">
             {formatDuration(inv.duration_seconds)}
           </span>
 
           {/* Status */}
-          <span className={`text-xs font-medium flex-shrink-0 w-14 text-right ${statusColor(inv.status)}`}>
+          <span className={`text-xs font-medium shrink-0 w-14 text-right ${statusColor(inv.status)}`}>
             {inv.status}
           </span>
 
           {/* Exit code */}
-          <span className="text-xs text-gray-500 flex-shrink-0 w-10 text-right">
+          <span className="text-xs text-gray-500 shrink-0 w-10 text-right">
             {inv.exit_code !== null ? `exit ${inv.exit_code}` : ""}
           </span>
         </button>
@@ -122,7 +122,7 @@ function InvocationRow({
               e.stopPropagation();
               onFilterSession(sessionId);
             }}
-            className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-xs flex-shrink-0 hover:bg-purple-800/50 transition-colors"
+            className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 text-xs shrink-0 hover:bg-purple-800/50 transition-colors"
             title={`Filter by session: ${sessionId}`}
           >
             <Link className="w-3 h-3" />
@@ -136,7 +136,7 @@ function InvocationRow({
             e.stopPropagation();
             onViewDetail(inv.id);
           }}
-          className="p-1 rounded hover:bg-gray-700/50 text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+          className="p-1 rounded hover:bg-gray-700/50 text-gray-500 hover:text-gray-300 transition-colors shrink-0"
           title="View full prompt & response"
         >
           <Eye className="w-4 h-4" />
@@ -251,12 +251,12 @@ export default function AgentActivityPanel({ runId }: Props) {
   }, [runId, sessionFilter]);
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 mb-6 backdrop-blur-xs">
       <button
         className="w-full flex items-center gap-2 text-left mb-3"
         onClick={() => setCollapsed((v) => !v)}
       >
-        <Bot className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <Bot className="w-4 h-4 text-gray-400 shrink-0" />
         <h2 className="text-lg font-semibold flex-1">Agent Activity</h2>
         {(() => {
           const totalCost = invocations.reduce(
@@ -302,7 +302,7 @@ export default function AgentActivityPanel({ runId }: Props) {
             <div className="space-y-2">
               {/* Table header */}
               <div className="hidden sm:flex items-center gap-3 px-4 py-1 text-xs text-gray-500 font-medium">
-                <span className="w-4 flex-shrink-0" />
+                <span className="w-4 shrink-0" />
                 <span className="min-w-[120px]">Agent</span>
                 <span className="w-16">Phase</span>
                 <span className="flex-1">Subtask</span>

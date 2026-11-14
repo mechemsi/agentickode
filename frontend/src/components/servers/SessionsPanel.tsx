@@ -177,7 +177,7 @@ export default function SessionsPanel({ serverId, workerUser }: SessionsPanelPro
             <select
               value={formUser}
               onChange={(e) => setFormUser(e.target.value)}
-              className="text-xs px-2 py-1 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              className="text-xs px-2 py-1 bg-gray-800 border border-gray-700 rounded text-gray-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50"
             >
               <option value="root">root</option>
               {workerUser && <option value={workerUser}>{workerUser}</option>}
@@ -187,7 +187,7 @@ export default function SessionsPanel({ serverId, workerUser }: SessionsPanelPro
               value={formDisplayName}
               onChange={(e) => setFormDisplayName(e.target.value)}
               placeholder="Display name (optional)"
-              className="flex-1 min-w-[140px] px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              className="flex-1 min-w-[140px] px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-white placeholder-gray-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50"
             />
             <button
               onClick={handleCreate}

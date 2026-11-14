@@ -341,9 +341,7 @@ async def _install_user_deps(ssh: CommandExecutor, username: str) -> list[str]:
         return f"runuser -l {safe_user} -c {shlex.quote(inner)}"
 
     bun_cmd = _as_user(
-        "if ! command -v bun >/dev/null 2>&1; then "
-        "curl -fsSL https://bun.sh/install | bash; "
-        "fi"
+        "if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi"
     )
     stdout, stderr, rc = await ssh.run_command(bun_cmd, timeout=60)
     if rc != 0:

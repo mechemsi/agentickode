@@ -37,7 +37,7 @@ export default function OllamaServerForm({
           name
         </span>
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="gpu-01"
@@ -49,7 +49,7 @@ export default function OllamaServerForm({
           url
         </span>
         <input
-          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="bg-gray-800/80 border border-gray-700/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           value={form.url}
           onChange={(e) => set("url", e.target.value)}
           placeholder="http://10.10.50.20:11434"
@@ -58,7 +58,7 @@ export default function OllamaServerForm({
       <div className="col-span-1 sm:col-span-2 flex gap-2 mt-2">
         <button
           onClick={() => onSubmit(form)}
-          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm shadow-sm shadow-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm shadow-xs shadow-blue-900/30 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
         >
           Save
         </button>

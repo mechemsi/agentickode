@@ -127,7 +127,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
           <select
             value={config.plan_approval}
             onChange={(e) => set("plan_approval", e.target.value as AutonomyConfig["plan_approval"])}
-            className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+            className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
           >
             {PLAN_APPROVALS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -142,7 +142,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
                 max={50}
                 value={config.adaptive_max_files}
                 onChange={(e) => set("adaptive_max_files", Number(e.target.value))}
-                className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
               />
             </div>
           )}
@@ -155,7 +155,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
         <select
           value={config.merge_mode}
           onChange={(e) => set("merge_mode", e.target.value as AutonomyConfig["merge_mode"])}
-          className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+          className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
         >
           {MERGE_MODES.map((m) => (
             <option key={m.value} value={m.value}>{m.label}</option>
@@ -171,7 +171,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
                 max={20}
                 value={config.auto_merge_max_files}
                 onChange={(e) => set("auto_merge_max_files", Number(e.target.value))}
-                className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
               />
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -208,7 +208,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
               max={5}
               value={config.max_followup_depth}
               onChange={(e) => set("max_followup_depth", Number(e.target.value))}
-              className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+              className="w-16 bg-gray-800/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
             />
           </div>
         )}
@@ -235,14 +235,14 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
               <select
                 value={rule.metric}
                 onChange={(e) => updateRule(i, { metric: e.target.value })}
-                className="bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                className="bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
               >
                 {METRICS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
               <select
                 value={rule.operator}
                 onChange={(e) => updateRule(i, { operator: e.target.value as ThresholdRule["operator"] })}
-                className="bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50 w-14"
+                className="bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50 w-14"
               >
                 {OPERATORS.map((op) => <option key={op} value={op}>{op}</option>)}
               </select>
@@ -250,14 +250,14 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
                 type="number"
                 value={rule.value}
                 onChange={(e) => updateRule(i, { value: Number(e.target.value) })}
-                className="w-16 bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                className="w-16 bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50"
               />
               <input
                 type="text"
                 value={rule.task}
                 placeholder="Task description template"
                 onChange={(e) => updateRule(i, { task: e.target.value })}
-                className="flex-1 bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50 placeholder-gray-600"
+                className="flex-1 bg-gray-900/60 border border-gray-700/50 rounded px-2 py-1 text-white text-xs focus:outline-hidden focus:ring-1 focus:ring-purple-500/50 placeholder-gray-600"
               />
               <button
                 onClick={() => removeRule(i)}
@@ -280,7 +280,7 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
         <button
           onClick={save}
           disabled={saving}
-          className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-sm transition-colors focus:outline-hidden focus:ring-2 focus:ring-purple-500/40"
         >
           <Save className="w-3.5 h-3.5" />
           {saving ? "Saving…" : saved ? "Saved!" : "Save Autonomy Config"}

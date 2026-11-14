@@ -58,7 +58,7 @@ async def exec_command(server_id: int, req: ExecRequest):
 async def read_file(server_id: int, path: str):
     """Read a file from a workspace server."""
     ssh = await _get_ssh(server_id)
-    stdout, stderr, rc = await ssh.run_command(
+    stdout, _stderr, rc = await ssh.run_command(
         f"cat {shlex.quote(path)} 2>/dev/null",
         timeout=15,
     )
@@ -71,7 +71,7 @@ async def read_file(server_id: int, path: str):
 async def list_directory(server_id: int, path: str = "/"):
     """List files in a directory on a workspace server."""
     ssh = await _get_ssh(server_id)
-    stdout, stderr, rc = await ssh.run_command(
+    stdout, _stderr, rc = await ssh.run_command(
         f"ls -la {shlex.quote(path)} 2>/dev/null",
         timeout=15,
     )

@@ -66,7 +66,7 @@ export default function BackupExport() {
         <Download className="w-5 h-5 text-green-400" />
         Export Configuration
       </h2>
-      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-sm space-y-4">
+      <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-4 backdrop-blur-xs space-y-4">
         {/* Secret mode */}
         <div>
           <label className="block text-xs text-gray-400 mb-2">Secret Handling</label>
@@ -95,7 +95,7 @@ export default function BackupExport() {
               type="password" value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password..."
-              className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             />
           </div>
         )}
@@ -131,7 +131,7 @@ export default function BackupExport() {
             type="text" value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
             placeholder="project_id..."
-            className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="w-full max-w-xs px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
           />
         </div>
 

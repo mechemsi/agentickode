@@ -186,7 +186,7 @@ function PreloadControl({
         <div className="flex gap-2 mt-2 items-end flex-wrap">
           {availableModels.length > 0 ? (
             <select
-              className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 flex-1 min-w-[200px]"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 flex-1 min-w-[200px]"
               value={model}
               onChange={(e) => setModel(e.target.value)}
             >
@@ -197,14 +197,14 @@ function PreloadControl({
             </select>
           ) : (
             <input
-              className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 flex-1 min-w-[200px]"
+              className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40 flex-1 min-w-[200px]"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="model name (e.g. llama3.2)"
             />
           )}
           <select
-            className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="bg-gray-800/80 border border-gray-700/60 rounded-md px-2 py-1.5 text-sm text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/40"
             value={keepAlive}
             onChange={(e) => setKeepAlive(e.target.value)}
           >
@@ -260,7 +260,7 @@ function ServerCard({
   const totalVram = server.models.reduce((sum, m) => sum + (m.size_vram || 0), 0);
 
   return (
-    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-sm">
+    <div className="bg-gray-900/40 border border-gray-800/60 rounded-xl p-5 backdrop-blur-xs">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Server className="w-4 h-4 text-gray-400" />

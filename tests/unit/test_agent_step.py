@@ -312,7 +312,7 @@ class TestAgentStep:
             "kind": "agent",
             "params": {"prompt": "hi", "run_as": "a;rm -rf /"},
         }
-        with pytest.raises(UsernameError, match="step.params.run_as"):
+        with pytest.raises(UsernameError, match=r"step.params.run_as"):
             await run_agent_step(run, db_session, mock_services, phase_config)
 
         # Adapter state must not have been mutated.
