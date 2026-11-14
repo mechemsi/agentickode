@@ -63,23 +63,30 @@ export default function NewRun() {
     });
   }, []);
 
-  useEffect(() => {
+  const project = projects.find((p) => p.project_id === projectId);
+  const canFetchIssues = !!projectId && !!project && project.task_source !== "plain";
+  const [previousProject, setPreviousProject] = useState(project);
+  if (previousProject !== project) {
+    setPreviousProject(project);
     setIssues([]);
     setSelectedIssue(null);
     setIssuesError("");
-    if (!projectId) return;
-    const project = projects.find((p) => p.project_id === projectId);
-    if (!project || project.task_source === "plain") return;
+    setIssuesLoading(canFetchIssues);
+  }
 
-    setIssuesLoading(true);
+  useEffect(() => {
+    if (!canFetchIssues) return;
+    let active = true;
     getProjectIssues(projectId)
-      .then(setIssues)
+      .then((data) => { if (active) setIssues(data); })
       .catch((err) => {
+        if (!active) return;
         setIssues([]);
         setIssuesError(err instanceof Error ? err.message : "Failed to load issues");
       })
-      .finally(() => setIssuesLoading(false));
-  }, [projectId, projects]);
+      .finally(() => { if (active) setIssuesLoading(false); });
+    return () => { active = false; };
+  }, [projectId, project, canFetchIssues]);
 
   const handleIssueSelect = (issueNumber: string) => {
     if (!issueNumber) {

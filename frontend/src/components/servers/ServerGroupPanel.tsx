@@ -54,15 +54,14 @@ export default function ServerGroupPanel({ onGroupsChanged }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = async () => {
-    try {
-      const data = await getServerGroups();
+  const load = () => {
+    return getServerGroups().then((data) => {
       setGroups(data);
-    } catch (e) {
+    }).catch((e) => {
       toast.error(e instanceof Error ? e.message : "Failed to load groups");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {

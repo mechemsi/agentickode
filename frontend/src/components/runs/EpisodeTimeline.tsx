@@ -47,18 +47,13 @@ export default function EpisodeTimeline({
   const [loading, setLoading] = useState(true);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const fetchEpisodes = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/runs/${runId}/episodes`);
-      if (res.ok) {
-        const data = await res.json();
-        setEpisodes(data);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+  const fetchEpisodes = useCallback(() => {
+    return fetch(`/api/runs/${runId}/episodes`)
+      .then(async (res) => {
+        if (res.ok) setEpisodes(await res.json());
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
   }, [runId]);
 
   useEffect(() => {

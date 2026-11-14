@@ -56,11 +56,8 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
     }
   }, [project.project_id, project.project_slug]);
 
-  const checkReadiness = useCallback(async () => {
-    setStep("checking");
-    setError(null);
-    try {
-      const data = await getProjectWorkspaceReadiness(project.project_id);
+  const fetchReadiness = useCallback(() => {
+    return getProjectWorkspaceReadiness(project.project_id).then(async (data) => {
       setWorkspaces(data.workspaces);
 
       if (data.workspaces.length === 0) {
@@ -75,11 +72,17 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
       } else {
         setStep("select");
       }
-    } catch (e) {
+    }).catch((e) => {
       setError(`Failed to check workspaces: ${e instanceof Error ? e.message : "unknown error"}`);
       setStep("error");
-    }
+    });
   }, [project.project_id, launchOnWorkspace]);
+
+  const checkReadiness = () => {
+    setStep("checking");
+    setError(null);
+    return fetchReadiness();
+  };
 
   // Terminal setup when session is ready
   useEffect(() => {
@@ -146,8 +149,8 @@ export default function LaunchAgentModal({ project, onClose }: LaunchAgentModalP
   }, [step, sessionId]);
 
   useEffect(() => {
-    checkReadiness();
-  }, [checkReadiness]);
+    fetchReadiness();
+  }, [fetchReadiness]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">

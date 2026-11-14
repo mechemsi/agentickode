@@ -326,17 +326,16 @@ export default function GpuDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
 
-  const loadStatus = useCallback(async () => {
-    try {
-      const [status, servers] = await Promise.all([
-        getGpuStatus(),
-        getOllamaServers(),
-      ]);
+  const loadStatus = useCallback(() => {
+    return Promise.all([
+      getGpuStatus(),
+      getOllamaServers(),
+    ]).then(([status, servers]) => {
       setGpuStatus(status);
       setOllamaServers(servers);
-    } catch {
+    }).catch(() => {
       /* polling errors are silent */
-    }
+    });
   }, []);
 
   useEffect(() => {

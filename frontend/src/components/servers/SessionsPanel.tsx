@@ -56,7 +56,7 @@ function relativeTime(dateStr: string): string {
 
 export default function SessionsPanel({ serverId, workerUser }: SessionsPanelProps) {
   const [sessions, setSessions] = useState<CliSession[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState<string | null>(null); // "claude" | "codex" | null
   const [formUser, setFormUser] = useState<string>(workerUser || "root");
   const [formDisplayName, setFormDisplayName] = useState("");
@@ -66,21 +66,30 @@ export default function SessionsPanel({ serverId, workerUser }: SessionsPanelPro
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
-    try {
-      const data = await listServerSessions(serverId);
-      setSessions(data.filter((s) => s.status !== "closed"));
-    } catch {
-      // ignore load errors
-    } finally {
+  }
+
+  const fetchData = useCallback(() => {
+    return listServerSessions(serverId).then((result) => {
+      setSessions(result.filter((s) => s.status !== "closed"));
+    }).catch(() => {
+      /* ignore load errors */
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   const handleCreate = async () => {
     if (!creating) return;

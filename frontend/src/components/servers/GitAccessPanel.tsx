@@ -164,28 +164,37 @@ function UserGitSection({
 
 export default function GitAccessPanel({ serverId }: { serverId: number }) {
   const [status, setStatus] = useState<GitAccessStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [gh, setGh] = useState<GhCliCheckResult | null>(null);
   const [ghLoading, setGhLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
-    try {
-      const result = await checkGitAccess(serverId);
+  }
+
+  const fetchData = useCallback(() => {
+    return checkGitAccess(serverId).then((result) => {
       setStatus(result);
-    } catch {
+    }).catch(() => {
       setStatus(null);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   const handleGenerate = async () => {
     setGenerating(true);

@@ -35,7 +35,7 @@ const statusStyle: Record<string, string> = {
 
 export default function ServerHistoryPanel({ serverId }: { serverId: number }) {
   const [invocations, setInvocations] = useState<AgentInvocation[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -44,20 +44,17 @@ export default function ServerHistoryPanel({ serverId }: { serverId: number }) {
   const [agentFilter, setAgentFilter] = useState("");
   const [phaseFilter, setPhaseFilter] = useState("");
 
-  const load = useCallback(
-    async (reset = false) => {
-      setLoading(true);
-      setError(null);
+  const fetchData = useCallback(
+    (reset = false) => {
       const currentOffset = reset ? 0 : offset;
-      try {
-        const params: Record<string, string | number> = {
-          limit: PAGE_SIZE,
-          offset: currentOffset,
-        };
-        if (agentFilter) params.agent_name = agentFilter;
-        if (phaseFilter) params.phase_name = phaseFilter;
+      const params: Record<string, string | number> = {
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+      };
+      if (agentFilter) params.agent_name = agentFilter;
+      if (phaseFilter) params.phase_name = phaseFilter;
 
-        const result = await listServerInvocations(serverId, params);
+      return listServerInvocations(serverId, params).then((result) => {
         if (reset) {
           setInvocations(result);
           setOffset(result.length);
@@ -66,20 +63,34 @@ export default function ServerHistoryPanel({ serverId }: { serverId: number }) {
           setOffset(currentOffset + result.length);
         }
         setHasMore(result.length === PAGE_SIZE);
-      } catch {
+      }).catch(() => {
         setError("Failed to load invocations");
-      } finally {
+      }).finally(() => {
         setLoading(false);
-      }
+      });
     },
     [serverId, offset, agentFilter, phaseFilter],
   );
 
-  useEffect(() => {
+  const load = (reset = false) => {
+    setLoading(true);
+    setError(null);
+    return fetchData(reset);
+  };
+
+  const filterKey = `${serverId}:${agentFilter}:${phaseFilter}`;
+  const [previousFilter, setPreviousFilter] = useState(filterKey);
+  if (previousFilter !== filterKey) {
+    setPreviousFilter(filterKey);
+    setLoading(true);
+    setError(null);
     setInvocations(null);
     setOffset(0);
     setHasMore(true);
-    load(true);
+  }
+
+  useEffect(() => {
+    fetchData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverId, agentFilter, phaseFilter]);
 

@@ -19,7 +19,7 @@ export default function Projects() {
   const [autonomyFor, setAutonomyFor] = useState<string | null>(null);
   const [launchFor, setLaunchFor] = useState<ProjectConfig | null>(null);
 
-  const load = async () => setProjects(await getProjects());
+  const load = () => getProjects().then(setProjects);
   useEffect(() => { load(); getWorkspaceServers().then(setServers); }, []);
 
   const handleCreate = async (data: Record<string, unknown>) => {

@@ -67,15 +67,14 @@ export default function GitConnectionsPanel({ serverId }: { serverId: number }) 
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
-    try {
-      const data = await getGitConnections({ workspace_server_id: serverId });
+  const load = useCallback(() => {
+    return getGitConnections({ workspace_server_id: serverId }).then((data) => {
       setConnections(data);
-    } catch {
+    }).catch(() => {
       setConnections([]);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
   useEffect(() => {

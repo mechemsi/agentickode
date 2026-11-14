@@ -82,8 +82,10 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
   const [consolidatedDefault, setConsolidatedDefault] = useState(agent.consolidated_default ?? true);
   const [agentCreatesPr, setAgentCreatesPr] = useState(agent.agent_creates_pr ?? false);
 
-  // Sync when agent prop changes
-  useEffect(() => {
+  const [previousAgent, setPreviousAgent] = useState(agent);
+  if (previousAgent !== agent) {
+    setPreviousAgent(agent);
+
     setDisplayName(agent.display_name);
     setDescription(agent.description);
     setSupportsSession(agent.supports_session);
@@ -102,7 +104,7 @@ function AgentCard({ agent, onSaved }: AgentCardProps) {
     setNeedsNonRoot(agent.needs_non_root ?? false);
     setConsolidatedDefault(agent.consolidated_default ?? true);
     setAgentCreatesPr(agent.agent_creates_pr ?? false);
-  }, [agent]);
+  }
 
   const loadAvailability = async () => {
     if (availability !== null) return;
@@ -465,16 +467,15 @@ export default function AgentSettingsPage() {
   const [agents, setAgents] = useState<AgentSettings[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
-    try {
-      const all = await getAgents();
+  const load = () => {
+    return getAgents().then((all) => {
       // Hide agents that aren't on the platform-wide allowlist so
       // this page matches the pickers in Chat / Settings / etc.
       setAgents(all.filter((a) => VISIBLE_AGENTS.has(a.agent_name)));
       setError(null);
-    } catch (e) {
+    }).catch((e) => {
       setError(String(e));
-    }
+    });
   };
 
   useEffect(() => {

@@ -307,7 +307,7 @@ function AgentRow({
 
 export default function AgentManagementPanel({ serverId }: { serverId: number }) {
   const [status, setStatus] = useState<AgentManagementStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<InstallProgress | null>(null);
@@ -316,22 +316,32 @@ export default function AgentManagementPanel({ serverId }: { serverId: number })
     agentName: string;
   } | null>(null);
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
     setError(null);
-    try {
-      const result = await getAgentStatus(serverId);
+  }
+
+  const fetchData = useCallback(() => {
+    return getAgentStatus(serverId).then((result) => {
       setStatus(result);
-    } catch {
+    }).catch(() => {
       setError("Failed to check agent status");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   const handleInstall = async (agentName: string) => {
     const agent = agents.find((a) => a.agent_name === agentName);

@@ -47,6 +47,7 @@ const mockGetSupportedAgents = vi.fn().mockResolvedValue([
 ]);
 
 vi.mock("../api", () => ({
+  getOllamaServers: vi.fn().mockResolvedValue([]),
   getHealth: (...args: unknown[]) => mockGetHealth(...args),
   getSSHKeys: (...args: unknown[]) => mockGetSSHKeys(...args),
   createSSHKey: (...args: unknown[]) => mockCreateSSHKey(...args),

@@ -483,26 +483,36 @@ function CleanupTab({ serverId, diskUsage, onRefresh }: { serverId: number; disk
 
 export default function DockerPanel({ serverId }: { serverId: number }) {
   const [data, setData] = useState<DockerOverview | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("containers");
 
-  const load = useCallback(async () => {
+  const [previousServerId, setPreviousServerId] = useState(serverId);
+  if (previousServerId !== serverId) {
+    setPreviousServerId(serverId);
     setLoading(true);
     setError(null);
-    try {
-      const result = await getDockerOverview(serverId);
+  }
+
+  const fetchData = useCallback(() => {
+    return getDockerOverview(serverId).then((result) => {
       setData(result);
-    } catch (e) {
+    }).catch((e: unknown) => {
       setError(e instanceof Error ? e.message : "Failed to load Docker info");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [serverId]);
 
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    return fetchData();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchData();
+  }, [fetchData]);
 
   if (loading && !data) {
     return (

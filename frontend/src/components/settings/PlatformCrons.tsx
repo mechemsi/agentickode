@@ -67,12 +67,11 @@ export default function PlatformCrons() {
   const [formSessionId, setFormSessionId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const fetchCrons = useCallback(async () => {
-    try {
-      const res = await fetch("/api/platform-crons");
-      if (res.ok) setCrons(await res.json());
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+  const fetchCrons = useCallback(() => {
+    return fetch("/api/platform-crons")
+      .then(async (res) => { if (res.ok) setCrons(await res.json()); })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { fetchCrons(); }, [fetchCrons]);

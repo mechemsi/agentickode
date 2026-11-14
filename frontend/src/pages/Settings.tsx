@@ -71,35 +71,34 @@ export default function Settings() {
   const confirm = useConfirm();
   const toast = useToast();
 
-  const loadHealth = async () => {
-    try {
-      setHealth(await getHealth());
+  const loadHealth = () => {
+    return getHealth().then((response) => {
+      setHealth(response);
       setError(null);
-    } catch (e) {
+    }).catch((e) => {
       setError(String(e));
-    }
+    });
   };
 
-  const loadKeys = async () => {
-    try {
-      setKeys(await getSSHKeys());
-    } catch {
-      /* ignore – keys section just stays empty */
-    }
+  const loadKeys = () => {
+    return getSSHKeys().then((response) => {
+      setKeys(response);
+    }).catch(() => {
+      /* ignore: keys section just stays empty */
+    });
   };
 
-  const loadSettings = async () => {
-    try {
-      const settings = await getAppSettings();
+  const loadSettings = () => {
+    return getAppSettings().then((settings) => {
       if (Array.isArray(settings.default_agents)) {
         setDefaultAgents(settings.default_agents as string[]);
       }
       if (typeof settings["workspace.default_root"] === "string") {
         setDefaultWorkspaceRoot(settings["workspace.default_root"] as string);
       }
-    } catch {
+    }).catch(() => {
       /* ignore */
-    }
+    });
   };
 
   const saveDefaultWorkspaceRoot = async () => {
@@ -115,7 +114,9 @@ export default function Settings() {
     }
   };
 
-  const loadOllamaServers = async () => { try { setOllamaServers(await getOllamaServers()); } catch { /* ignore */ } };
+  const loadOllamaServers = () => {
+    return getOllamaServers().then(setOllamaServers).catch(() => { /* ignore */ });
+  };
 
   const handleCreateServer = async (data: { name: string; url: string }) => {
     await createOllamaServer(data);

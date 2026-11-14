@@ -61,7 +61,7 @@ const statusColor: Record<string, string> = {
   unknown: "bg-yellow-500",
   setting_up: "bg-blue-500 animate-pulse",
   setup_failed: "bg-red-500",
-};
+  };
 
 const STEP_LABELS: Record<string, string> = {
   ssh_test: "SSH Test",
@@ -73,7 +73,7 @@ const STEP_LABELS: Record<string, string> = {
   generate_ssh_key: "SSH Key",
   discover: "Discovery",
   mark_online: "Finalize",
-};
+  };
 
 /** Check if a running step looks stuck (>10 min since timestamp). */
 function isStepStuck(entry: { status: string; timestamp?: string }): boolean {
@@ -183,17 +183,15 @@ export default function WorkspaceServers() {
       return next;
     });
 
-  const loadGroups = async () => {
-    try {
-      const data = await getServerGroups();
-      setGroups(data);
-    } catch { /* ignore */ }
+  const loadGroups = () => {
+    return getServerGroups().then(setGroups).catch(() => { /* ignore */ });
   };
 
-  const load = async (check?: boolean) => {
-    const data = await getWorkspaceServers(check);
-    setServers(data);
-    setInitialLoading(false);
+  const load = (check?: boolean) => {
+    return getWorkspaceServers(check).then((data) => {
+      setServers(data);
+      setInitialLoading(false);
+    });
   };
   useEffect(() => {
     load(true); // Check connectivity on first load

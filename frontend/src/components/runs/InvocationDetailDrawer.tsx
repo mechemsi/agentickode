@@ -88,10 +88,16 @@ export default function InvocationDetailDrawer({ runId, invocationId, onClose }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const requestKey = `${runId}:${invocationId}`;
+  const [previousRequest, setPreviousRequest] = useState(requestKey);
+  if (previousRequest !== requestKey) {
+    setPreviousRequest(requestKey);
     setLoading(true);
     setError(null);
+  }
+
+  useEffect(() => {
+    let active = true;
     getInvocationDetail(runId, invocationId)
       .then((data) => {
         if (active) setDetail(data as AgentInvocationDetail);

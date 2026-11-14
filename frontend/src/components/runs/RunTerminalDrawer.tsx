@@ -92,6 +92,10 @@ export default function RunTerminalDrawer({ runId, workspacePath, onClose, onAct
     };
   }, [runId, showActions]);
 
+  const handleCloseRequest = () => {
+    setShowActions(true);
+  };
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -107,9 +111,6 @@ export default function RunTerminalDrawer({ runId, workspacePath, onClose, onAct
     return () => window.removeEventListener("keydown", handler);
   }, [showActions]);
 
-  const handleCloseRequest = () => {
-    setShowActions(true);
-  };
 
   const handleAction = async (action: "continue" | "pause" | "complete") => {
     setActionLoading(true);

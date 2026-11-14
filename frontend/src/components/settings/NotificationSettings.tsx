@@ -39,12 +39,12 @@ export default function NotificationSettings() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const load = async () => {
-    try {
-      setChannels(await getNotificationChannels());
-    } catch {
+  const load = () => {
+    return getNotificationChannels().then((response) => {
+      setChannels(response);
+    }).catch(() => {
       /* ignore */
-    }
+    });
   };
 
   useEffect(() => {

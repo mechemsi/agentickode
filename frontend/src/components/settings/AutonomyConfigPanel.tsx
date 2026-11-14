@@ -2,7 +2,7 @@
 // Licensed under AGPLv3. See LICENSE file.
 // Commercial licensing: info@mechemsi.com
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bot, Plus, Save, Trash2 } from "lucide-react";
 import { updateProject } from "../../api";
 import type { AutonomyConfig, ThresholdRule } from "../../types";
@@ -61,9 +61,14 @@ export default function AutonomyConfigPanel({ projectId, initial, onSaved }: Pro
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  const [previousInitial, setPreviousInitial] = useState(initial);
+  const [previousProjectId, setPreviousProjectId] = useState(projectId);
+  if (previousInitial !== initial || previousProjectId !== projectId) {
+    setPreviousInitial(initial);
+    setPreviousProjectId(projectId);
+
     setConfig(mergeWithDefaults(initial));
-  }, [initial, projectId]);
+  }
 
   const set = <K extends keyof AutonomyConfig>(key: K, value: AutonomyConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));

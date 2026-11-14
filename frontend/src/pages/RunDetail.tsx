@@ -31,10 +31,7 @@ export default function RunDetail() {
   const [run, setRun] = useState<TRD | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    const r = await getRun(runId);
-    setRun(r);
-  }, [runId]);
+  const load = useCallback(() => getRun(runId).then(setRun), [runId]);
 
   useEffect(() => {
     load();
