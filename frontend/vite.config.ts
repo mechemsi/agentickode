@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: ["autodev.localhost", "autodev-api.localhost"],
-    hmr: { clientPort: 80 },
     proxy: {
       "/api": "http://backend:8000",
       "/ws": { target: "ws://backend:8000", ws: true },

@@ -91,3 +91,21 @@ No database or Redis data was changed.
 - Docker is unavailable. Image builds, Node 26 execution, application tests,
   lint/type checks and live PostgreSQL/Redis migration/health checks remain
   unverified locally. CI results are pending; Redis tests currently mock Redis.
+
+# Verification of the supplied repository
+
+The supplied snapshot already contained all upgrades described above, including
+matching dev images, CI versions, and the PostgreSQL volume migration. No image,
+application dependency, or lockfile changes were needed during this verification.
+Reviewed the linked upstream release and migration notes again for Node 25 and
+26, PostgreSQL 17 and 18, and Redis 8. Registry requests independently confirmed
+that all three existing digest pins match the requested Docker Hub tags.
+
+Re-ran static assertions for matching image pins, PostgreSQL and Redis volume
+layouts, preserved PostgreSQL volume names, and npm ci lockfile usage. Passed.
+The Alembic single-head check and JavaScript syntax check passed again.
+The queue unit-test probe and Ruff probe could not run: their Python modules
+are absent. PyYAML and frontend node_modules are also absent, so YAML parsing,
+frontend lint, type checking, tests and build were not re-run. Docker builds,
+live service compatibility and data migration remain unverified. No host npm
+commands, commits, pushes or branch operations were performed.
