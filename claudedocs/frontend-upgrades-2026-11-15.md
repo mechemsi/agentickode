@@ -107,4 +107,33 @@ Commands run in frontend/ on Node 22.23.5, npm 10.9.9, without Docker:
 The production build retains its existing large-chunk warning. jsdom retains
 unimplemented canvas warnings, now naming its new optional backend.
 Docker builds, live backend services, browser visual checks and the full CI
-suite were not verified here. CI and frontend Dockerfiles already select Node 24.
+suite were not verified here. CI selects Node 24; frontend Dockerfiles select Node 26.
+
+
+## Requested-version revalidation
+
+The follow-up request targets ESLint 10.15.0 and Lucide 1.73.0. At the
+start of this pass, every requested version was already resolved, including
+TypeScript 7.0.2 through the documented native compiler alias. Raised the
+ESLint declaration from ^10.14.0 to ^10.15.0 using
+`npm install --ignore-scripts`; package-lock.json now records the same minimum.
+No resolved package versions changed and no further source migrations were needed.
+The TypeScript 6 API alias remains necessary for typescript-eslint 8.72.2.
+
+Re-read the linked upstream major migration notes and changelogs, including
+jsdom 26 through 31, React plugin 5 and 6, Hooks plugin 6 and 7, Vite 7 and 8,
+and TypeScript 6 and 7. Checked package imports, React refs and root rendering,
+router declarations, Markdown sanitization, test setup and mocks, Tailwind
+utilities/configuration, and ESLint presets against the existing migrations.
+
+Fresh validation on Node 22.23.5 and npm 10.9.9:
+
+- `npm install --ignore-scripts` and `npm ci --ignore-scripts`: passed.
+- `npm ls --all`: passed; `tsc --version` reports 7.0.2.
+- `npm run build`: typecheck and production build passed.
+- `npm run lint`: passed, with the two existing KVEditor Fast Refresh warnings.
+- `npm test` and `npm run test:coverage`: each passed all 250 tests in 35 files.
+
+Existing large-bundle and unimplemented jsdom canvas warnings remain.
+Docker, backend services, browser visual checks and the full CI suite are
+untested in this pass.
