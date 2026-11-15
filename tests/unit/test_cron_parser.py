@@ -4,6 +4,8 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from backend.services.cron_parser import human_readable, next_occurrence, validate_cron
 
 
@@ -56,3 +58,18 @@ class TestHumanReadable:
 
     def test_invalid_parts_returns_raw(self):
         assert human_readable("not valid") == "not valid"
+
+
+@pytest.mark.parametrize("expr", ["\u0665 * * * *", "0\u00a00 * * *", "0 0 * * 1#0"])
+def test_rejects_expressions_disallowed_in_croniter_7(expr):
+    assert validate_cron(expr) is False
+
+
+def test_maximum_minute_step_fires_only_at_maximum():
+    base = datetime(2026, 3, 28, 12, 0, tzinfo=UTC)
+    assert next_occurrence("59/15 * * * *", base) == base.replace(minute=59)
+
+
+def test_sunday_alias_remains_supported():
+    base = datetime(2026, 3, 28, 12, 0, tzinfo=UTC)
+    assert next_occurrence("0 0 * * 7", base) == datetime(2026, 3, 29, tzinfo=UTC)

@@ -21,7 +21,8 @@ class QueueService:
         self._redis: redis.Redis | None = None
 
     async def connect(self) -> None:
-        self._redis = redis.from_url(settings.redis_url, decode_responses=True)
+        # Keep the queue on RESP2 when redis-py defaults to RESP3.
+        self._redis = redis.from_url(settings.redis_url, decode_responses=True, protocol=2)
         await self._redis.ping()
         logger.info("Redis queue connected")
 
