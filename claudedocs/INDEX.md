@@ -4,6 +4,8 @@ Quick reference for all project documentation. Claude reads this first to find r
 
 ## Dependency maintenance
 
+- [Python major dependency upgrades](dependency-upgrades-2026-11-15.md): requested pins, migration review, compatibility checks and stored schedule audit (2026-11-15).
+
 - [Dependency audit updates](dependency-audit-2026-11-14.md): versions, compatibility edits, remaining constraints, and validation (2026-11-14).
 
 ## Plans
