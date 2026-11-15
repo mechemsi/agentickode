@@ -31,6 +31,7 @@ Quick reference for all project documentation. Claude reads this first to find r
 
 | Doc | Date | Summary |
 |-----|------|---------|
+| [Python major dependency review](implementations/2026-11-15-python-major-upgrades.md) | 2026-11-15 | Five target pins, migration review, backend validation and MCP regression tests |
 | [Research: Autonomous Platform](../claudedocs/research_autonomous_platform_integrations_20260328.md) | 2026-03-28 | Research notes on autonomous agent scheduling and self-sustaining loops |
 | [Notion + issue polling](implementations/2026-05-02-notion-and-issue-polling.md) | 2026-05-02 | Notion task source (webhook + poller + bidirectional manager) and generic issue-polling fallback for all trackers |
 | [PR-triggered AI code review](implementations/2026-06-05-pr-review-trigger.md) | 2026-06-05 | Restored `pr-review` template; label-gated PR webhooks + CI endpoint + HMAC; comment-mode finalization guard |
