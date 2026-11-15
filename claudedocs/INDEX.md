@@ -4,6 +4,8 @@ Quick reference for all project documentation. Claude reads this first to find r
 
 ## Dependency maintenance
 
+- [Docker major image upgrades](docker-upgrades-2026-11-15.md): digest pins, PostgreSQL data migration, runtime review and validation (2026-11-15).
+
 - [Frontend major dependency upgrades](frontend-upgrades-2026-11-15.md): remaining target versions, TypeScript 7 compiler compatibility aliases, migration review and validation (2026-11-15).
 
 - [Python major dependency upgrades](dependency-upgrades-2026-11-15.md): requested pins, migration review, compatibility checks and stored schedule audit (2026-11-15).

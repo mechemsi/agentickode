@@ -1,12 +1,13 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
     environment:
       POSTGRES_USER: agentickode
       POSTGRES_PASSWORD: agentickode
       POSTGRES_DB: agentickode
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Existing PostgreSQL 16 data requires migration; see claudedocs/docker-upgrades-2026-11-15.md.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agentickode"]
       interval: 2s
@@ -14,7 +15,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     volumes:
       - redisdata:/data
     healthcheck:
