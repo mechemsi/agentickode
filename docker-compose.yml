@@ -1,13 +1,12 @@
 services:
   postgres:
-    image: postgres:18-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
+    image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
     environment:
       POSTGRES_USER: agentickode
       POSTGRES_PASSWORD: agentickode
       POSTGRES_DB: agentickode
     volumes:
-      # Existing PostgreSQL 16 data requires migration; see claudedocs/docker-upgrades-2026-11-15.md.
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agentickode"]
       interval: 2s
