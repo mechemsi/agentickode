@@ -12,7 +12,9 @@ cryptography==50.0.2
 python-multipart>=0.0.18
 pyyaml>=6.0.2
 redis==8.1.0
-fastmcp==4.2.0
+fastmcp==4.2.2
+# Minimum for FastMCP's transitive storage dependency.
+py-key-value-aio>=0.5.0
 croniter==7.0.0
 # Minimum for croniter's transitive dependency after its maintenance gap.
 python-dateutil>=4.0.0
